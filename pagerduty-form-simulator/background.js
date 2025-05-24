@@ -150,7 +150,7 @@ function createIncidentPayload(formData, integrationKey, dedupKey) {
         event_action: "trigger",
         dedup_key: dedupKey,
         payload: {
-            summary: `Simulated form submission error on ${formData.title}`,
+            summary: `User Experience Error. Form submission error on ${formData.title}`,
             source: formData.url,
             severity: "error",
             component: "web-form",
