@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Injector</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚨 Incident Injector</h1>
+            <div class="status-indicator">
+                <span id="status-dot" class="status-dot"></span>
+                <span id="status-text">Loading...</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- Extension Toggle -->
+            <div class="section">
+                <div class="toggle-container">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="extension-enabled" class="toggle-input">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-text">Extension Enabled</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- PagerDuty Configuration -->
+            <div class="section">
+                <h3>PagerDuty Configuration</h3>
+                <div class="form-group">
+                    <label for="integration-key">Integration Key:</label>
+                    <input 
+                        type="password" 
+                        id="integration-key" 
+                        placeholder="Enter your PagerDuty integration key"
+                        maxlength="32"
+                    >
+                    <div class="input-help">
+                        32-character alphanumeric key from your PagerDuty service
+                    </div>
+                    <div id="key-validation" class="validation-message"></div>
+                </div>
+            </div>
+
+            <!-- Alert Configuration -->
+            <div class="section">
+                <h3>Alert Configuration</h3>
+                <div class="form-group">
+                    <label for="alert-message">Custom Alert Message:</label>
+                    <textarea
+                        id="alert-message"
+                        rows="3"
+                        placeholder="🚨 Incident Injected: Form submission failed! PagerDuty incident created."
+                    ></textarea>
+                </div>
+                
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="show-alert">
+                        <span class="checkmark"></span>
+                        Show alert popup
+                    </label>
+                    <div class="checkbox-help">
+                        If enabled, shows an alert popup when incidents are triggered
+                    </div>
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="allow-continuation">
+                        <span class="checkmark"></span>
+                        Allow form submission after alert
+                    </label>
+                    <div class="checkbox-help">
+                        If enabled, forms will submit normally after showing the alert
+                    </div>
+                </div>
+
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="redirect-to-500">
+                        <span class="checkmark"></span>
+                        Redirect to 500 error page
+                    </label>
+                    <div class="checkbox-help">
+                        If enabled, redirects to a 500 error page to simulate server failure
+                    </div>
+                </div>
+            </div>
+
+            <!-- Target Element Configuration -->
+            <div class="section">
+                <h3>Target Element Configuration</h3>
+                <div class="form-group">
+                    <label for="target-elements">Element Text to Hook (comma-separated):</label>
+                    <textarea
+                        id="target-elements"
+                        rows="2"
+                        placeholder="Enter text to match (e.g., sign in, checkout, submit)"
+                    ></textarea>
+                    <div class="input-help">
+                        Enter text to intercept on buttons, links, or other clickable elements (case-insensitive). Leave empty to disable interception.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Section -->
+            <div class="section">
+                <h3>Test Incident</h3>
+                <button id="test-incident" class="btn btn-primary">
+                    <span class="btn-icon">🧪</span>
+                    Send Test Incident
+                </button>
+                <div id="test-result" class="test-result"></div>
+            </div>
+
+            <!-- Status Section -->
+            <div class="section">
+                <h3>Status</h3>
+                <div class="status-info">
+                    <div class="status-row">
+                        <span class="status-label">Last Incident:</span>
+                        <span id="last-incident" class="status-value">Never</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Extension Version:</span>
+                        <span class="status-value">1.0</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <div class="footer-links">
+                <a href="#" id="help-link">Help</a>
+                <a href="#" id="setup-link">Setup Guide</a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Help & Setup Guide</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <h3>Setup Instructions:</h3>
+                <ol>
+                    <li>Log into your PagerDuty account</li>
+                    <li>Go to Services → Your Service → Integrations</li>
+                    <li>Add a new "Events API v2" integration</li>
+                    <li>Copy the Integration Key (32 characters)</li>
+                    <li>Paste it into the field above</li>
+                    <li>Enable the extension and test it</li>
+                </ol>
+                
+                <h3>How it works:</h3>
+                <p>This extension intercepts form submissions on any website and creates PagerDuty incidents to inject realistic errors. It's useful for testing incident response procedures.</p>
+                
+                <h3>Features:</h3>
+                <ul>
+                    <li>Intercepts all form submissions</li>
+                    <li>Shows customizable error alerts</li>
+                    <li>Creates detailed PagerDuty incidents</li>
+                    <li>Prevents duplicate incidents (5-minute window)</li>
+                    <li>Works with AJAX and SPA forms</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>

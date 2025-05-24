@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Injector - Test Page</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+        .form-section h2 {
+            color: #06ac38;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #06ac38;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background: #0a7c2a;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        .ajax-result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+        .ajax-result.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .ajax-result.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .instructions {
+            background: #e7f3ff;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 30px;
+            border-left: 4px solid #06ac38;
+        }
+        .instructions h3 {
+            margin-top: 0;
+            color: #06ac38;
+        }
+        .spa-section {
+            margin-top: 20px;
+        }
+        #dynamic-forms {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 Incident Injector Test Page</h1>
+        
+        <div class="instructions">
+            <h3>Testing Instructions</h3>
+            <ol>
+                <li>Install the Incident Injector extension</li>
+                <li>Configure it with your PagerDuty integration key</li>
+                <li>Enable the extension</li>
+                <li>Try submitting any of the forms below</li>
+                <li>You should see an alert and a PagerDuty incident should be created</li>
+            </ol>
+        </div>
+
+        <!-- Standard Contact Form -->
+        <div class="form-section">
+            <h2>📝 Standard Contact Form</h2>
+            <form action="/contact" method="POST" id="contact-form">
+                <div class="form-group">
+                    <label for="name">Name:</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="message">Message:</label>
+                    <textarea id="message" name="message" rows="4" required></textarea>
+                </div>
+                <button type="submit">Send Message</button>
+            </form>
+        </div>
+
+        <!-- Login Form -->
+        <div class="form-section">
+            <h2>🔐 Login Form</h2>
+            <form action="/login" method="POST" id="login-form">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <button type="submit">Login</button>
+            </form>
+        </div>
+
+        <!-- Registration Form -->
+        <div class="form-section">
+            <h2>📋 Registration Form</h2>
+            <form action="/register" method="POST" id="register-form">
+                <div class="form-group">
+                    <label for="reg-email">Email:</label>
+                    <input type="email" id="reg-email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">Password:</label>
+                    <input type="password" id="reg-password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">Confirm Password:</label>
+                    <input type="password" id="confirm-password" name="confirm_password" required>
+                </div>
+                <div class="form-group">
+                    <label for="country">Country:</label>
+                    <select id="country" name="country" required>
+                        <option value="">Select Country</option>
+                        <option value="us">United States</option>
+                        <option value="uk">United Kingdom</option>
+                        <option value="ca">Canada</option>
+                        <option value="au">Australia</option>
+                    </select>
+                </div>
+                <button type="submit">Create Account</button>
+            </form>
+        </div>
+
+        <!-- AJAX Form -->
+        <div class="form-section">
+            <h2>⚡ AJAX Form (Fetch API)</h2>
+            <form id="ajax-form">
+                <div class="form-group">
+                    <label for="ajax-name">Name:</label>
+                    <input type="text" id="ajax-name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="ajax-email">Email:</label>
+                    <input type="email" id="ajax-email" name="email" required>
+                </div>
+                <button type="submit">Submit via AJAX</button>
+            </form>
+            <div id="ajax-result" class="ajax-result"></div>
+        </div>
+
+        <!-- XMLHttpRequest Form -->
+        <div class="form-section">
+            <h2>🔄 XMLHttpRequest Form</h2>
+            <form id="xhr-form">
+                <div class="form-group">
+                    <label for="xhr-data">Data:</label>
+                    <input type="text" id="xhr-data" name="data" required>
+                </div>
+                <button type="submit">Submit via XHR</button>
+            </form>
+            <div id="xhr-result" class="ajax-result"></div>
+        </div>
+
+        <!-- Button Click Form -->
+        <div class="form-section">
+            <h2>🖱️ Button Click Tests</h2>
+            <form id="button-form">
+                <div class="form-group">
+                    <label for="button-input">Test Input:</label>
+                    <input type="text" id="button-input" name="test" value="Test data">
+                </div>
+                <button type="submit" class="submit">Submit Button</button>
+                <button type="button" class="btn-submit">Custom Submit</button>
+                <button type="button" class="save">Save Button</button>
+                <button type="button" class="send">Send Button</button>
+            </form>
+        </div>
+
+        <!-- Single Page Application Simulation -->
+        <div class="form-section">
+            <h2>🔄 SPA Dynamic Forms</h2>
+            <p>These forms are added dynamically to test MutationObserver functionality:</p>
+            <button type="button" id="add-dynamic-form" class="btn-secondary">Add Dynamic Form</button>
+            <div id="dynamic-forms"></div>
+        </div>
+
+        <!-- Search Form (Should be ignored) -->
+        <div class="form-section">
+            <h2>🔍 Search Form (Should be ignored)</h2>
+            <form action="/search" method="GET" id="search-form">
+                <div class="form-group">
+                    <label for="search-query">Search:</label>
+                    <input type="text" id="search-query" name="q" placeholder="This form should be ignored">
+                </div>
+                <button type="submit">Search</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // AJAX Form Handler
+        document.getElementById('ajax-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('ajax-result');
+            
+            try {
+                const formData = new FormData(e.target);
+                const response = await fetch('/api/submit', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                resultDiv.textContent = 'AJAX submission completed (this would normally process)';
+                resultDiv.className = 'ajax-result success';
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                resultDiv.textContent = 'AJAX submission failed: ' + error.message;
+                resultDiv.className = 'ajax-result error';
+                resultDiv.style.display = 'block';
+            }
+        });
+
+        // XMLHttpRequest Form Handler
+        document.getElementById('xhr-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const resultDiv = document.getElementById('xhr-result');
+            
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/xhr-submit');
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            xhr.onload = function() {
+                resultDiv.textContent = 'XHR submission completed';
+                resultDiv.className = 'ajax-result success';
+                resultDiv.style.display = 'block';
+            };
+            
+            xhr.onerror = function() {
+                resultDiv.textContent = 'XHR submission failed';
+                resultDiv.className = 'ajax-result error';
+                resultDiv.style.display = 'block';
+            };
+            
+            const data = JSON.stringify({
+                data: document.getElementById('xhr-data').value
+            });
+            
+            xhr.send(data);
+        });
+
+        // Dynamic Form Addition
+        let dynamicFormCounter = 0;
+        document.getElementById('add-dynamic-form').addEventListener('click', () => {
+            dynamicFormCounter++;
+            const container = document.getElementById('dynamic-forms');
+            
+            const formDiv = document.createElement('div');
+            formDiv.className = 'spa-section';
+            formDiv.innerHTML = `
+                <h4>Dynamic Form ${dynamicFormCounter}</h4>
+                <form action="/dynamic-submit" method="POST">
+                    <div class="form-group">
+                        <label>Dynamic Input ${dynamicFormCounter}:</label>
+                        <input type="text" name="dynamic_field" value="Dynamic data ${dynamicFormCounter}" required>
+                    </div>
+                    <button type="submit">Submit Dynamic Form</button>
+                </form>
+            `;
+            
+            container.appendChild(formDiv);
+        });
+
+        // Custom button handlers
+        document.querySelectorAll('.btn-submit, .save, .send').forEach(button => {
+            button.addEventListener('click', (e) => {
+                // These buttons should trigger the extension even though they're not type="submit"
+                console.log('Custom button clicked:', e.target.className);
+            });
+        });
+
+        console.log('Test page loaded - ready for PagerDuty Form Simulator testing');
+    </script>
+</body>
+</html>
