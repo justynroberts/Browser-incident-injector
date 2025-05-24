@@ -64,7 +64,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             extensionEnabledToggle.checked = result.extension_enabled !== false; // Default to true
             integrationKeyInput.value = result.pagerduty_integration_key || '';
             alertMessageTextarea.value = result.custom_alert_message ||
-                '🚨 Simulated Error: Form submission failed! PagerDuty incident created.';
+                '🚨 Error: Form submission failed! PagerDuty incident created.';
             showAlertCheckbox.checked = result.show_alert !== false; // Default to true
             allowContinuationCheckbox.checked = result.allow_form_continuation || false;
             redirectTo500Checkbox.checked = result.redirect_to_500 || false;

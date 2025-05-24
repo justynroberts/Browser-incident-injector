@@ -8,7 +8,7 @@ chrome.runtime.onInstalled.addListener(() => {
         show_alert: true,
         allow_form_continuation: false,
         redirect_to_500: false,
-        custom_alert_message: "🚨 Simulated Error: Form submission failed! PagerDuty incident created.",
+        custom_alert_message: "🚨 Error: Form submission failed! PagerDuty incident created.",
         target_element_texts: "" // No defaults - user must configure
     });
 });

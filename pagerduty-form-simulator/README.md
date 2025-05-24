@@ -192,7 +192,7 @@ The extension uses PagerDuty's Events API v2:
   "event_action": "trigger",
   "dedup_key": "GENERATED_DEDUP_KEY",
   "payload": {
-    "summary": "Simulated form submission error on Page Title",
+    "summary": "Form submission error on Page Title",
     "source": "https://example.com/page",
     "severity": "error",
     "component": "web-form",

@@ -6,7 +6,7 @@
     let showAlert = true;
     let allowFormContinuation = false;
     let redirectTo500 = false;
-    let customAlertMessage = "🚨 Simulated Error: Form submission failed! PagerDuty incident created.";
+    let customAlertMessage = "🚨 Error: Form submission failed! PagerDuty incident created.";
     let targetElementTexts = []; // No defaults - user must configure
     let lastSubmissionTime = 0;
     const SUBMISSION_COOLDOWN = 5000; // 5 seconds to prevent spam
