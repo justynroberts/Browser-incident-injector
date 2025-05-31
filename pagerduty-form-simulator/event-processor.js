@@ -216,8 +216,8 @@ class PagerDutyEventProcessor {
                 console.log(`[Event Processor] Processing event ${i+1}/${events.length}:`, event);
                 
                 // Apply delay if specified
-                if (event.delay && event.delay > 0) {
-                    const delayMs = this.calculateDelay(event.delay);
+                const delayMs = this.calculateDelay(event.delay);
+                if (delayMs > 0) {
                     console.log(`[Event Processor] Delaying for ${delayMs}ms before sending event`);
                     await new Promise(resolve => setTimeout(resolve, delayMs));
                 }
@@ -248,8 +248,8 @@ class PagerDutyEventProcessor {
                 console.log(`[Event Processor] Processing event ${i+1}/${scenario.events.length}:`, event);
                 
                 // Apply delay if specified
-                if (event.delay && event.delay > 0) {
-                    const delayMs = this.calculateDelay(event.delay);
+                const delayMs = this.calculateDelay(event.delay);
+                if (delayMs > 0) {
                     console.log(`[Event Processor] Delaying for ${delayMs}ms before sending event`);
                     await new Promise(resolve => setTimeout(resolve, delayMs));
                 }

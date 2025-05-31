@@ -54,6 +54,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Initially disable test scenario button until a scenario is selected
     updateScenarioButtonState();
+    
+    // Check if event definition exists, if not, load the sample by default
+    try {
+        const localResult = await chrome.storage.local.get(['event_definition']);
+        if (!localResult.event_definition) {
+            console.log('[Incident Injector] No event definition found, loading sample by default');
+            // Call the sample loading function but don't block the UI initialization
+            handleLoadSample().catch(error => {
+                console.error('[Incident Injector] Error auto-loading sample:', error);
+                // Show a non-blocking error message
+                showMessage('Failed to auto-load sample. You can try loading it manually.', 'error');
+            });
+        }
+    } catch (error) {
+        console.error('[Incident Injector] Error checking for event definition:', error);
+    }
 
     // Event listeners
     extensionEnabledToggle.addEventListener('change', saveSettings);
