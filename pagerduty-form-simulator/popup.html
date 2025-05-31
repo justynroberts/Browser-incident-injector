@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>🚨 Incident Injector</h1>
+            <h1>Event Injection</h1>
             <div class="status-indicator">
                 <span id="status-dot" class="status-dot"></span>
                 <span id="status-text">Loading...</span>
@@ -30,105 +30,235 @@
 
             <!-- PagerDuty Configuration -->
             <div class="section">
-                <h3>PagerDuty Configuration</h3>
-                <div class="form-group">
-                    <label for="integration-key">Integration Key:</label>
-                    <input 
-                        type="password" 
-                        id="integration-key" 
-                        placeholder="Enter your PagerDuty integration key"
-                        maxlength="32"
-                    >
-                    <div class="input-help">
-                        32-character alphanumeric key from your PagerDuty service
+                <div class="section-header">
+                    <h3><span class="section-icon">🟩</span> PagerDuty Configuration</h3>
+                    <button class="toggle-button" id="toggle-pagerduty-config">
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                </div>
+                <div class="section-content" id="pagerduty-config-content">
+                    <div class="form-group">
+                        <label for="integration-key">Integration Key:</label>
+                        <input
+                            type="password"
+                            id="integration-key"
+                            placeholder="Enter your PagerDuty integration key"
+                            maxlength="32"
+                        >
+                        <div class="input-help">
+                            32-character alphanumeric key from your PagerDuty service
+                        </div>
+                        <div id="key-validation" class="validation-message"></div>
                     </div>
-                    <div id="key-validation" class="validation-message"></div>
                 </div>
             </div>
 
-            <!-- Alert Configuration -->
+            <!-- Alert & Trigger Configuration -->
             <div class="section">
-                <h3>Alert Configuration</h3>
-                <div class="form-group">
-                    <label for="alert-message">Custom Alert Message:</label>
-                    <textarea
-                        id="alert-message"
-                        rows="3"
-                        placeholder="🚨 Incident Injected: Form submission failed! PagerDuty incident created."
-                    ></textarea>
+                <div class="section-header">
+                    <h3><span class="section-icon">🟩</span> Alert & Trigger Configuration</h3>
+                    <button class="toggle-button" id="toggle-alert-config">
+                        <span class="toggle-icon">▼</span>
+                    </button>
                 </div>
-                
-                <div class="checkbox-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="show-alert">
-                        <span class="checkmark"></span>
-                        Show alert popup
-                    </label>
-                    <div class="checkbox-help">
-                        If enabled, shows an alert popup when incidents are triggered
+                <div class="section-content" id="alert-config-content">
+                    <div class="form-group">
+                        <label for="alert-message">Custom Alert Message:</label>
+                        <textarea
+                            id="alert-message"
+                            rows="3"
+                            placeholder="🟩 Incident Injected: Form submission failed! PagerDuty incident created."
+                        ></textarea>
+                    </div>
+                    
+                    <div class="trigger-options-container">
+                        <div class="trigger-option">
+                            <span class="option-number">1</span>
+                            <div class="option-content">
+                                <div class="option-title">Show Custom Alert</div>
+                                <div class="option-description">Alert always shown when extension is enabled</div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="option-create-alert" checked disabled>
+                                    <span class="switch-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="trigger-option">
+                            <span class="option-number">2</span>
+                            <div class="option-content">
+                                <div class="option-title">Run Scenario</div>
+                                <div class="option-description">Execute the selected event definition scenario</div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="option-run-scenario">
+                                    <span class="switch-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="trigger-option">
+                            <span class="option-number">3</span>
+                            <div class="option-content">
+                                <div class="option-title">Add 500 Error</div>
+                                <div class="option-description">Redirect to a 500 error page to simulate server failure</div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="option-add-500-error">
+                                    <span class="switch-slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="trigger-option">
+                            <span class="option-number">4</span>
+                            <div class="option-content">
+                                <div class="option-title">Continue to Destination</div>
+                                <div class="option-description">Allow form to submit normally after alert</div>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="option-continue-destination">
+                                    <span class="switch-slider"></span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="checkbox-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="allow-continuation">
-                        <span class="checkmark"></span>
-                        Allow form submission after alert
-                    </label>
-                    <div class="checkbox-help">
-                        If enabled, forms will submit normally after showing the alert
-                    </div>
+            <!-- PagerDuty Event Definition System -->
+            <div class="section">
+                <div class="section-header">
+                    <h3><span class="section-icon">🟩</span> Multi Event Definition </h3>
+                    <button class="toggle-button" id="toggle-event-definition">
+                        <span class="toggle-icon">▼</span>
+                    </button>
                 </div>
-
-                <div class="checkbox-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="redirect-to-500">
-                        <span class="checkmark"></span>
-                        Redirect to 500 error page
-                    </label>
-                    <div class="checkbox-help">
-                        If enabled, redirects to a 500 error page to simulate server failure
+                <div class="section-content" id="event-definition-content">
+                    <div class="form-group">
+                        <label for="event-definition">Event Definition JSON:</label>
+                        <textarea
+                            id="event-definition"
+                            rows="5"
+                            placeholder="Paste your PagerDuty event definition JSON here"
+                        ></textarea>
+                        <div class="input-help">
+                            Define complex incident scenarios with timing and multiple event types
+                        </div>
+                        <div id="definition-validation" class="validation-message"></div>
+                        <div class="button-row">
+                            <button id="load-sample" class="btn btn-secondary">
+                                <span class="btn-icon">📋</span>
+                                Load Scenario Definition
+                            </button>
+                            <button id="edit-json" class="btn btn-secondary">
+                                <span class="btn-icon">✏️</span>
+                                Edit JSON
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="scenario-controls" id="scenario-controls" style="display: none;">
+                        <div class="form-group">
+                            <label for="scenario-select">Select Scenario:</label>
+                            <select id="scenario-select" class="select-input">
+                                <option value="">-- Select a scenario --</option>
+                            </select>
+                        </div>
+                        
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="dry-run-mode">
+                                <span class="checkmark"></span>
+                                Dry Run Mode
+                            </label>
+                            <div class="checkbox-help">
+                                Simulate scenario execution without sending actual PagerDuty events
+                            </div>
+                        </div>
+                        
+                        <button id="run-scenario" class="btn btn-primary" disabled>
+                            <span class="btn-icon">▶️</span>
+                            Run Scenario
+                        </button>
+                        <div id="scenario-result" class="test-result"></div>
                     </div>
                 </div>
             </div>
 
             <!-- Target Element Configuration -->
             <div class="section">
-                <h3>Target Element Configuration</h3>
-                <div class="form-group">
-                    <label for="target-elements">Element Text to Hook (comma-separated):</label>
-                    <textarea
-                        id="target-elements"
-                        rows="2"
-                        placeholder="Enter text to match (e.g., sign in, checkout, submit)"
-                    ></textarea>
-                    <div class="input-help">
-                        Enter text to intercept on buttons, links, or other clickable elements (case-insensitive). Leave empty to disable interception.
+                <div class="section-header">
+                    <h3><span class="section-icon">🟩</span> Target Element Configuration</h3>
+                    <button class="toggle-button" id="toggle-target-config">
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                </div>
+                <div class="section-content" id="target-config-content">
+                    <div class="form-group">
+                        <label for="target-elements">Element Text to Hook (comma-separated):</label>
+                        <textarea
+                            id="target-elements"
+                            rows="2"
+                            placeholder="Enter text to match (e.g., sign in, checkout, submit)"
+                        ></textarea>
+                        <div class="input-help">
+                            Enter text to intercept on buttons, links, or other clickable elements (case-insensitive). Leave empty to disable interception.
+                        </div>
+                    </div>
+                    
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="toggle-button-visible" checked>
+                            <span class="checkmark"></span>
+                            Show Toggle Button
+                        </label>
+                        <div class="checkbox-help">
+                            Display a floating button on pages to quickly access the extension
+                        </div>
                     </div>
                 </div>
             </div>
 
+            
             <!-- Test Section -->
             <div class="section">
-                <h3>Test Incident</h3>
-                <button id="test-incident" class="btn btn-primary">
-                    <span class="btn-icon">🧪</span>
-                    Send Test Incident
-                </button>
-                <div id="test-result" class="test-result"></div>
+                <div class="section-header">
+                    <h3><span class="section-icon">🟩</span> Test Options</h3>
+                    <button class="toggle-button" id="toggle-test-section">
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                </div>
+                <div class="section-content" id="test-section-content">
+                    <div class="button-row">
+                        <button id="test-incident" class="btn btn-secondary">
+                            <span class="btn-icon">🧪</span>
+                            Send Test Alert
+                        </button>
+                        <button id="test-scenario" class="btn btn-primary">
+                            <span class="btn-icon">▶️</span>
+                            Test Current Scenario
+                        </button>
+                    </div>
+                    <div id="test-result" class="test-result"></div>
+                </div>
             </div>
 
             <!-- Status Section -->
             <div class="section">
-                <h3>Status</h3>
-                <div class="status-info">
-                    <div class="status-row">
-                        <span class="status-label">Last Incident:</span>
-                        <span id="last-incident" class="status-value">Never</span>
-                    </div>
-                    <div class="status-row">
-                        <span class="status-label">Extension Version:</span>
-                        <span class="status-value">1.0</span>
+                <div class="section-header">
+                    <h3><span class="section-icon">🟩</span> Status</h3>
+                    <button class="toggle-button" id="toggle-status-section">
+                        <span class="toggle-icon">▼</span>
+                    </button>
+                </div>
+                <div class="section-content" id="status-section-content">
+                    <div class="status-info">
+                        <div class="status-row">
+                            <span class="status-label">Last Incident:</span>
+                            <span id="last-incident" class="status-value">Never</span>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label">Extension Version:</span>
+                            <span class="status-value">1.0</span>
+                        </div>
                     </div>
                 </div>
             </div>

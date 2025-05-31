@@ -6,23 +6,56 @@
     let showAlert = true;
     let allowFormContinuation = false;
     let redirectTo500 = false;
-    let customAlertMessage = "🚨 Error: Form submission failed! PagerDuty incident created.";
+    let runScenarioOnSubmit = false;
+    let customAlertMessage = "Oops ⛓️‍💥 Error: UX Failure -  Our team are Working on it now.";
     let targetElementTexts = []; // No defaults - user must configure
     let lastSubmissionTime = 0;
-    const SUBMISSION_COOLDOWN = 5000; // 5 seconds to prevent spam
+    const SUBMISSION_COOLDOWN = 0; // No cooldown - allow immediate resubmission
     let lastProcessedElement = null;
     let lastProcessedTime = 0;
+    let toggleButtonVisible = true; // Control visibility of the toggle button
 
     // Load extension settings
-    chrome.storage.sync.get(['extension_enabled', 'show_alert', 'allow_form_continuation', 'redirect_to_500', 'custom_alert_message', 'target_element_texts'], (result) => {
+    chrome.storage.sync.get([
+        'extension_enabled',
+        'show_alert',
+        'allow_form_continuation',
+        'redirect_to_500',
+        'run_scenario_on_submit',
+        'custom_alert_message',
+        'target_element_texts',
+        'active_scenario_id',
+        'toggle_button_visible'
+    ], (result) => {
         extensionEnabled = result.extension_enabled !== false; // Default to true
         showAlert = result.show_alert !== false; // Default to true
         allowFormContinuation = result.allow_form_continuation || false;
         redirectTo500 = result.redirect_to_500 || false;
+        
+        // Only enable run_scenario_on_submit if there's an active scenario
+        const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
+        // Default run_scenario_on_submit to true if not explicitly set to false
+        const shouldRunScenario = result.run_scenario_on_submit !== false;
+        runScenarioOnSubmit = hasActiveScenario && shouldRunScenario;
+        
+        console.log('[PagerDuty Simulator] Initial settings loaded:', {
+            extensionEnabled,
+            showAlert,
+            allowFormContinuation,
+            redirectTo500,
+            hasActiveScenario,
+            shouldRunScenario,
+            runScenarioOnSubmit,
+            activeScenarioId: result.active_scenario_id
+        });
+        
         customAlertMessage = result.custom_alert_message || customAlertMessage;
         if (result.target_element_texts && result.target_element_texts.trim()) {
             targetElementTexts = result.target_element_texts.split(',').map(text => text.trim().toLowerCase());
         }
+        
+        // Load toggle button visibility setting (default to true if not set)
+        toggleButtonVisible = result.toggle_button_visible !== false;
     });
 
     // Listen for storage changes
@@ -40,6 +73,50 @@
             if (changes.redirect_to_500) {
                 redirectTo500 = changes.redirect_to_500.newValue;
             }
+            
+            // Handle changes to run_scenario_on_submit or active_scenario_id
+            let updateRunScenario = false;
+            let runScenarioValue = runScenarioOnSubmit;
+            let activeScenarioValue = null;
+            
+            if (changes.run_scenario_on_submit) {
+                runScenarioValue = changes.run_scenario_on_submit.newValue;
+                updateRunScenario = true;
+            }
+            
+            if (changes.active_scenario_id) {
+                activeScenarioValue = changes.active_scenario_id.newValue;
+                updateRunScenario = true;
+            }
+            
+            // If either value changed, we need to update runScenarioOnSubmit
+            if (updateRunScenario) {
+                // If active_scenario_id wasn't in the changes, get its current value
+                if (activeScenarioValue === null) {
+                    chrome.storage.sync.get(['active_scenario_id', 'run_scenario_on_submit'], (result) => {
+                        const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
+                        const shouldRunScenario = result.run_scenario_on_submit !== false; // Default to true if not explicitly set
+                        runScenarioOnSubmit = hasActiveScenario && shouldRunScenario;
+                        console.log('[PagerDuty Simulator] Updated runScenarioOnSubmit:', runScenarioOnSubmit,
+                            'hasActiveScenario:', hasActiveScenario, 'shouldRunScenario:', shouldRunScenario);
+                    });
+                } else {
+                    // We have both values, update directly
+                    const hasActiveScenario = activeScenarioValue && activeScenarioValue.trim() !== '';
+                    // If run_scenario_on_submit wasn't in the changes, get its current value
+                    if (changes.run_scenario_on_submit) {
+                        runScenarioOnSubmit = hasActiveScenario && changes.run_scenario_on_submit.newValue;
+                    } else {
+                        chrome.storage.sync.get(['run_scenario_on_submit'], (result) => {
+                            const shouldRunScenario = result.run_scenario_on_submit !== false; // Default to true if not explicitly set
+                            runScenarioOnSubmit = hasActiveScenario && shouldRunScenario;
+                        });
+                    }
+                    console.log('[PagerDuty Simulator] Updated runScenarioOnSubmit:', runScenarioOnSubmit,
+                        'hasActiveScenario:', hasActiveScenario, 'activeScenarioValue:', activeScenarioValue);
+                }
+            }
+            
             if (changes.custom_alert_message) {
                 customAlertMessage = changes.custom_alert_message.newValue;
             }
@@ -54,6 +131,11 @@
                 // Reinitialize listeners when target texts change
                 console.log('[Incident Injector] Target texts changed, reinitializing...');
                 reinitializeListeners();
+            }
+            if (changes.toggle_button_visible) {
+                toggleButtonVisible = changes.toggle_button_visible.newValue;
+                // Update toggle button visibility
+                updateToggleButtonVisibility();
             }
         }
     });
@@ -215,12 +297,8 @@
 
         const form = event.target.closest('form') || event.target;
         
-        // Only handle form submissions if no target texts are configured
-        // (when target texts are configured, we rely on click handler instead)
-        if (targetElementTexts.length > 0) {
-            console.log('[PagerDuty Simulator] Target texts configured - skipping form handler');
-            return;
-        }
+        // Always handle form submissions, even if target texts are configured
+        console.log('[PagerDuty Simulator] Processing form submission');
         
         // For forms, check if we should ignore them
         if (form && shouldIgnoreForm(form)) {
@@ -235,9 +313,37 @@
         // Extract and send data
         const elementData = extractFormData(form, clickedElement);
         createIncident(elementData);
+        
+        // Always check for active scenario if extension is enabled
+        // Double-check that there's an active scenario before attempting to run it
+        chrome.storage.sync.get(['active_scenario_id'], (result) => {
+            const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
+            
+            if (hasActiveScenario) {
+                console.log('[PagerDuty Simulator] Running active scenario on form submission:', result.active_scenario_id);
+                console.log('[PagerDuty Simulator] Sending message to background script with data:', elementData);
+                chrome.runtime.sendMessage({
+                    action: "run_active_scenario",
+                    data: elementData
+                }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        console.error('[PagerDuty Simulator] Error running scenario:', chrome.runtime.lastError);
+                        return;
+                    }
+                    
+                    if (response && response.success) {
+                        console.log('[PagerDuty Simulator] Scenario executed successfully');
+                    } else {
+                        console.error('[PagerDuty Simulator] Failed to run scenario:', response?.error);
+                    }
+                });
+            } else {
+                console.log('[PagerDuty Simulator] No active scenario defined, skipping scenario execution');
+            }
+        });
 
-        // Show alert
-        if (showAlert) {
+        // Show alert if extension is enabled
+        if (extensionEnabled) {
             showAlertMessage(customAlertMessage);
         }
 
@@ -267,9 +373,38 @@
         const form = element.closest('form');
         const elementData = extractFormData(form, element);
         createIncident(elementData);
+        
+        // Always check for active scenario if extension is enabled
+        console.log('[PagerDuty Simulator] Checking for active scenario on element click');
+        // Double-check that there's an active scenario before attempting to run it
+        chrome.storage.sync.get(['active_scenario_id'], (result) => {
+            const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
+            
+            if (hasActiveScenario) {
+                console.log('[PagerDuty Simulator] Running active scenario on element click:', result.active_scenario_id);
+                console.log('[PagerDuty Simulator] Sending message to background script with data:', elementData);
+                chrome.runtime.sendMessage({
+                    action: "run_active_scenario",
+                    data: elementData
+                }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        console.error('[PagerDuty Simulator] Error running scenario:', chrome.runtime.lastError);
+                        return;
+                    }
+                    
+                    if (response && response.success) {
+                        console.log('[PagerDuty Simulator] Scenario executed successfully');
+                    } else {
+                        console.error('[PagerDuty Simulator] Failed to run scenario:', response?.error);
+                    }
+                });
+            } else {
+                console.log('[PagerDuty Simulator] No active scenario defined, skipping scenario execution');
+            }
+        });
 
-        // Show alert if enabled
-        if (showAlert) {
+        // Show alert if extension is enabled
+        if (extensionEnabled) {
             showAlertMessage(customAlertMessage);
         }
 
@@ -514,16 +649,24 @@
 
     // Handle element clicks (buttons and links)
     function handleElementClick(event) {
-        if (!extensionEnabled) return;
-        
-        // Only proceed if target texts are configured
-        if (targetElementTexts.length === 0) return;
-
-        // Cooldown check - prevent rapid-fire triggering
-        const now = Date.now();
-        if (now - lastProcessedTime < 1000) { // 1 second cooldown
+        console.log('[PagerDuty Simulator] Click event detected on element:', event.target.tagName,
+            event.target.textContent ? event.target.textContent.substring(0, 20) + '...' : '(no text)');
+            
+        if (!extensionEnabled) {
+            console.log('[PagerDuty Simulator] Extension disabled, ignoring click');
             return;
         }
+        
+        // If no target texts are configured, just log and return
+        if (targetElementTexts.length === 0) {
+            console.log('[PagerDuty Simulator] Click detected but no target texts configured');
+            return;
+        }
+        
+        console.log('[PagerDuty Simulator] Checking click against target texts:', targetElementTexts);
+
+        // No cooldown check - allow rapid-fire triggering
+        const now = Date.now();
 
         let element = event.target;
         let matchingElement = null;
@@ -558,6 +701,12 @@
                                      element.title?.toLowerCase().includes(lowerTargetText) ||
                                      element.getAttribute('alt')?.toLowerCase().includes(lowerTargetText);
                 
+                // Log matching attempts for debugging
+                if (exactMatch || containsMatch || attributeMatch) {
+                    console.log(`[PagerDuty Simulator] Element text "${elementText}" matched target "${lowerTargetText}"`,
+                        { exactMatch, containsMatch, attributeMatch });
+                }
+                
                 return exactMatch || containsMatch || attributeMatch;
             });
 
@@ -572,10 +721,8 @@
 
         // Handle any element that matches target text
         if (matchingElement) {
-            // Prevent duplicate processing of the same element
-            if (matchingElement === lastProcessedElement && now - lastProcessedTime < 5000) {
-                return;
-            }
+            // Allow processing the same element immediately
+            // No duplicate prevention
             
             lastProcessedElement = matchingElement;
             lastProcessedTime = now;
@@ -590,17 +737,21 @@
 
     // Initialize event listeners
     function initializeListeners() {
-        // Only add form submission listener if no target texts are configured
-        // This prevents double triggering when specific elements are targeted
-        if (targetElementTexts.length === 0) {
-            document.addEventListener('submit', handleFormSubmission, true);
-            console.log('[PagerDuty Simulator] Form submit listener added (no target texts)');
-        } else {
-            console.log('[PagerDuty Simulator] Form submit listener skipped (target texts configured)');
-        }
+        console.log('[PagerDuty Simulator] Initializing event listeners with extension enabled:', extensionEnabled);
+        console.log('[PagerDuty Simulator] Target texts:', targetElementTexts);
         
-        // Element click listeners (buttons and links)
+        // Remove any existing listeners first to prevent duplicates
+        document.removeEventListener('submit', handleFormSubmission, true);
+        document.removeEventListener('click', handleElementClick, true);
+        
+        // Always add form submission listener
+        document.addEventListener('submit', handleFormSubmission, true);
+        console.log('[PagerDuty Simulator] Form submit listener added');
+        
+        // Always add click listener, even if no target texts are configured yet
         document.addEventListener('click', handleElementClick, true);
+        console.log('[PagerDuty Simulator] Click listener added',
+            targetElementTexts.length > 0 ? `for target texts: ${targetElementTexts}` : '(no target texts configured yet)');
 
         console.log('[PagerDuty Simulator] Event listeners initialized');
     }
@@ -651,7 +802,7 @@
                     };
                     
                     createIncident(formData);
-                    showAlert(customAlertMessage);
+                    showAlertMessage(customAlertMessage);
                 }
             }
             
@@ -684,13 +835,92 @@
                 };
                 
                 createIncident(formData);
-                showAlert(customAlertMessage);
+                showAlertMessage(customAlertMessage);
             }
             
             return originalXHRSend.apply(this, arguments);
         };
     }
 
+    // Create and add the toggle button to open the extension popup
+    function createToggleButton() {
+        // Check if button already exists
+        const existingButton = document.getElementById('pagerduty-toggle-button');
+        if (existingButton) {
+            return existingButton;
+        }
+        
+        // Create the button element
+        const toggleButton = document.createElement('div');
+        toggleButton.id = 'pagerduty-toggle-button';
+        
+        // Set styles individually to avoid CSP issues
+        toggleButton.style.position = 'fixed';
+        toggleButton.style.bottom = '20px';
+        toggleButton.style.right = '20px';
+        toggleButton.style.width = '50px';
+        toggleButton.style.height = '50px';
+        toggleButton.style.borderRadius = '50%';
+        toggleButton.style.backgroundColor = extensionEnabled ? '#06ac38' : '#ccc';
+        toggleButton.style.color = 'white';
+        toggleButton.style.display = 'flex';
+        toggleButton.style.alignItems = 'center';
+        toggleButton.style.justifyContent = 'center';
+        toggleButton.style.fontSize = '24px';
+        toggleButton.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
+        toggleButton.style.cursor = 'pointer';
+        toggleButton.style.zIndex = '999999';
+        toggleButton.style.transition = 'all 0.3s ease';
+        toggleButton.style.border = 'none';
+        toggleButton.style.fontFamily = 'Arial, sans-serif';
+        
+        // Set button content
+        toggleButton.textContent = '🚨';
+        
+        // Add hover effect
+        toggleButton.addEventListener('mouseover', () => {
+            toggleButton.style.transform = 'scale(1.1)';
+            toggleButton.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
+        });
+        
+        toggleButton.addEventListener('mouseout', () => {
+            toggleButton.style.transform = 'scale(1)';
+            toggleButton.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
+        });
+        
+        // Add click handler to open the extension popup
+        toggleButton.addEventListener('click', () => {
+            // Send message to background script to open the popup
+            chrome.runtime.sendMessage({
+                action: 'open_popup'
+            });
+        });
+        
+        // Add to the page
+        document.body.appendChild(toggleButton);
+        
+        return toggleButton;
+    }
+    
+    // Update toggle button visibility
+    function updateToggleButtonVisibility() {
+        const toggleButton = document.getElementById('pagerduty-toggle-button');
+        
+        if (toggleButtonVisible) {
+            // Create button if it doesn't exist
+            if (!toggleButton) {
+                createToggleButton();
+            } else {
+                toggleButton.style.display = 'flex';
+            }
+        } else {
+            // Hide button if it exists
+            if (toggleButton) {
+                toggleButton.style.display = 'none';
+            }
+        }
+    }
+    
     // Initialize the content script
     function initialize() {
         console.log('[Incident Injector] Initializing content script...');
@@ -699,6 +929,14 @@
         reinitializeListeners();
         observeFormChanges();
         interceptAjaxSubmissions();
+        
+        // Create toggle button if enabled
+        if (toggleButtonVisible) {
+            // Wait a short time for the page to fully load
+            setTimeout(() => {
+                createToggleButton();
+            }, 500);
+        }
         
         console.log('[Incident Injector] Content script initialized');
     }
