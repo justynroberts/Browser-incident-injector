@@ -1,635 +1,597 @@
-# PagerDuty Event Definition System - Developer Documentation
+# PagerDuty Event Definition System - Developer Guide
 
-## Overview
+## Table of Contents
 
-The PagerDuty Event Definition System is a JSON-based framework for orchestrating realistic incident and change scenarios. It allows you to define complex event sequences that execute automatically with proper timing, escalation patterns, and cross-team dependencies.
+1. [System Overview](#system-overview)
+2. [Schema Reference](#schema-reference)
+3. [Creating Realistic Scenarios](#creating-realistic-scenarios)
+4. [LLM-Assisted Scenario Generation](#llm-assisted-scenario-generation)
+5. [Best Practices](#best-practices)
+6. [Implementation Examples](#implementation-examples)
+7. [Validation and Testing](#validation-and-testing)
 
-## Core Schema Structure
+## System Overview
 
-### Root Definition
+The PagerDuty Event Definition System is a JSON-based framework for creating realistic incident simulation scenarios. It allows you to define sequences of monitoring alerts that execute with proper timing and escalation patterns.
 
+### Core Components
+
+- **Event Definitions**: JSON files containing scenario configurations
+- **Event Processor**: Engine that executes scenarios and sends PagerDuty API calls
+- **Variable System**: Template substitution for dynamic content
+- **Timing Engine**: Sophisticated delay and randomization controls
+
+### Use Cases
+
+- **Training**: Realistic incident response drills
+- **Testing**: Validate alerting and escalation policies
+- **Demos**: Consistent, professional incident simulations
+- **Load Testing**: Stress-test PagerDuty integrations
+- **Documentation**: Living examples of incident patterns
+
+## Schema Reference
+
+### Root Structure
 ```json
 {
   "schema_version": "1.0",
-  "description": "Optional description of this definition file",
-  "event_definitions": [...],
-  "global_config": {...}
+  "global_config": {
+    "variables": {...},
+    "routing_key_mappings": {...}
+  },
+  "event_definitions": [...]
 }
 ```
 
-### Event Definition
-
+### Event Definition Structure
 ```json
 {
-  "name": "scenario_name",
-  "description": "Human readable description",
-  "events": [...],
-  "execution": {
-    "repeat_count": 1,
-    "randomize_delays": false
-  }
+  "id": "unique_scenario_id",
+  "name": "Human Readable Name",
+  "description": "Detailed scenario description",
+  "variables": {...},
+  "events": [...]
 }
 ```
 
-### Individual Event
-
+### Event Structure
 ```json
 {
   "type": "trigger|acknowledge|resolve|change",
-  "routing_key": "integration-key",
+  "summary": "Alert summary text",
+  "severity": "critical|error|warning|info",
+  "component": "service-name",
+  "group": "logical-grouping",
+  "class": "alert-classification",
   "dedup_key": "optional-deduplication-key",
-  "payload": {...},
-  "delay_after": {...}
+  "custom_details": {...},
+  "delay": {...}
 }
 ```
 
-## Event Types and API Mapping
-
-### Incident Events
-
-Endpoint: `https://events.pagerduty.com/v2/enqueue`
-
-#### Trigger Event
-
+### Delay Configuration
 ```json
 {
-  "type": "trigger",
-  "routing_key": "service-integration-key",
-  "payload": {
-    "summary": "Database connection pool exhausted - {{timestamp}}",
-    "source": "db-monitor.prod",
-    "severity": "critical|error|warning|info",
-    "component": "postgresql",
-    "class": "database",
-    "group": "infrastructure",
-    "custom_details": {
-      "pool_size": 100,
-      "active_connections": 98,
-      "affected_services": ["api", "web", "billing"],
-      "runbook_url": "https://runbooks.company.com/db-pool"
-    },
-    "images": [
-      {
-        "src": "https://monitoring.company.com/graph.png",
-        "href": "https://monitoring.company.com/dashboard",
-        "alt": "Performance graph"
-      }
-    ],
-    "links": [
-      {
-        "href": "https://runbooks.company.com/db-issues",
-        "text": "Database Troubleshooting Guide"
-      }
-    ]
-  },
-  "delay_after": {
-    "type": "fixed",
-    "value": 300
-  }
+  "type": "fixed|random|exponential",
+  "value": 300,           // for fixed delays (seconds)
+  "min": 60,              // for random delays
+  "max": 300,             // for random delays
+  "base": 30,             // for exponential delays
+  "multiplier": 2,        // for exponential delays
+  "max": 600              // for exponential max cap
 }
 ```
 
-#### Acknowledge Event
+## Creating Realistic Scenarios
+
+### 1. Start with Real Monitoring Data
+
+Base scenarios on actual alerts from your monitoring stack:
 
 ```json
 {
-  "type": "acknowledge",
-  "routing_key": "service-integration-key",
-  "dedup_key": "db-pool-exhausted-{{timestamp}}",
-  "payload": {
-    "summary": "Investigating database connection issues",
-    "source": "on-call-engineer"
-  },
-  "delay_after": {
-    "type": "random",
-    "min": 300,
-    "max": 900
-  }
-}
-```
-
-#### Resolve Event
-
-```json
-{
-  "type": "resolve",
-  "routing_key": "service-integration-key",
-  "dedup_key": "db-pool-exhausted-{{timestamp}}",
-  "payload": {
-    "summary": "Database pool size increased, connections stable",
-    "source": "db-monitor.prod",
-    "custom_details": {
-      "resolution": "Increased pool size to 200",
-      "downtime_duration": "15m",
-      "root_cause": "Memory leak in connection pool"
-    }
-  }
-}
-```
-
-### Change Events
-
-Endpoint: `https://events.pagerduty.com/v2/change/enqueue`
-
-```json
-{
-  "type": "change",
-  "routing_key": "change-events-integration-key",
-  "payload": {
-    "summary": "Deploy application v3.2.1 to production",
-    "source": "ci-cd-pipeline",
-    "timestamp": "{{scheduled_time}}",
-    "custom_details": {
-      "change_type": "deployment|maintenance|configuration",
-      "environment": "production",
-      "version": "v3.2.1",
-      "change_id": "CHG-{{random_number}}",
-      "approver": "tech-lead@company.com",
-      "risk_assessment": "low|medium|high|critical",
-      "estimated_duration": "20 minutes",
-      "affected_services": ["web-app", "api-gateway"],
-      "rollback_procedure": "kubectl rollout undo deployment/web-app",
-      "deployment_method": "blue-green|rolling|canary"
-    },
-    "links": [
-      {
-        "href": "https://github.com/company/app/releases/tag/v3.2.1",
-        "text": "Release Notes"
-      },
-      {
-        "href": "https://jenkins.company.com/job/deploy-prod/123",
-        "text": "Build Details"
-      }
-    ]
-  }
-}
-```
-
-## Timing and Delay Configuration
-
-### Fixed Delays
-
-```json
-{
-  "delay_after": {
-    "type": "fixed",
-    "value": 300
-  }
-}
-```
-
-### Random Delays
-
-```json
-{
-  "delay_after": {
-    "type": "random",
-    "min": 120,
-    "max": 600
-  }
-}
-```
-
-### Exponential Backoff
-
-```json
-{
-  "delay_after": {
-    "type": "exponential",
-    "base": 30,
-    "multiplier": 2,
-    "max": 300
-  }
-}
-```
-
-### No Delay
-
-```json
-{
-  "delay_after": null
-}
-```
-
-## Variables and Templates
-
-### Built-in Variables
-
-- `{{timestamp}}` - Current ISO8601 timestamp
-- `{{current_time}}` - Same as timestamp
-- `{{random_number}}` - 4-digit random number
-- `{{random_4_digit}}` - 4-digit random number
-- `{{scheduled_time}}` - Current time + 1 hour
-
-### Custom Variables
-
-```json
-{
-  "global_config": {
-    "variables": {
-      "environment": "production",
-      "team_email": "oncall@company.com",
-      "region": "us-west-2",
-      "service_version": "v2.1.0"
-    }
-  }
-}
-```
-
-Usage in payloads:
-
-```json
-{
-  "summary": "Service {{service_version}} issue in {{environment}}",
+  "summary": "API response time > 2s threshold exceeded",
   "custom_details": {
-    "region": "{{region}}",
-    "contact": "{{team_email}}"
+    "metric": "http_request_duration_p95",
+    "current_value": "3.7s",
+    "threshold": "2.0s",
+    "endpoint": "/api/v1/users",
+    "monitoring_tool": "Prometheus",
+    "query": "histogram_quantile(0.95, http_request_duration_seconds_bucket)"
   }
 }
 ```
 
-## Complete Example Scenarios
+### 2. Use Industry-Appropriate Terminology
 
-### Database Cascade Incident
-
+**Finance Example:**
 ```json
 {
-  "event_definitions": [
-    {
-      "name": "database_cascade_outage",
-      "description": "Database failure cascading to multiple services",
-      "events": [
-        {
-          "type": "trigger",
-          "routing_key": "database-team-key",
-          "payload": {
-            "summary": "Primary database connection failed - {{timestamp}}",
-            "source": "db-health-check.prod",
-            "severity": "critical",
-            "component": "postgresql-primary",
-            "custom_details": {
-              "database": "prod-db-01",
-              "error": "Connection timeout after 30s",
-              "replica_status": "healthy",
-              "affected_services": ["api", "web", "billing"]
-            }
-          },
-          "delay_after": {
-            "type": "fixed",
-            "value": 180
-          }
-        },
-        {
-          "type": "trigger",
-          "routing_key": "api-team-key",
-          "payload": {
-            "summary": "API error rate spike - database dependency failure",
-            "source": "api-gateway.prod",
-            "severity": "warning",
-            "component": "user-api",
-            "custom_details": {
-              "error_rate": "85%",
-              "normal_error_rate": "0.1%",
-              "upstream_dependency": "database",
-              "affected_endpoints": ["/users", "/auth", "/billing"]
-            }
-          },
-          "delay_after": {
-            "type": "random",
-            "min": 60,
-            "max": 300
-          }
-        },
-        {
-          "type": "acknowledge",
-          "routing_key": "database-team-key",
-          "dedup_key": "db-outage-{{timestamp}}",
-          "payload": {
-            "summary": "Database team investigating primary DB failure",
-            "source": "dba-oncall"
-          },
-          "delay_after": {
-            "type": "random",
-            "min": 600,
-            "max": 900
-          }
-        },
-        {
-          "type": "resolve",
-          "routing_key": "database-team-key",
-          "dedup_key": "db-outage-{{timestamp}}",
-          "payload": {
-            "summary": "Failed over to replica, primary DB restored",
-            "source": "db-health-check.prod",
-            "custom_details": {
-              "resolution": "Automatic failover + primary restart",
-              "downtime": "18 minutes",
-              "root_cause": "Memory leak in connection pool"
-            }
-          },
-          "delay_after": {
-            "type": "fixed",
-            "value": 120
-          }
-        },
-        {
-          "type": "resolve",
-          "routing_key": "api-team-key",
-          "payload": {
-            "summary": "API error rate back to normal",
-            "source": "api-gateway.prod",
-            "custom_details": {
-              "current_error_rate": "0.1%",
-              "recovery_time": "2 minutes after DB restoration"
-            }
-          }
-        }
-      ],
-      "execution": {
-        "repeat_count": 1,
-        "randomize_delays": false
-      }
-    }
-  ]
+  "summary": "Order execution error rate > 1% threshold",
+  "custom_details": {
+    "failed_orders_count": 23,
+    "error_types": "TIMEOUT,INVALID_SYMBOL,INSUFFICIENT_FUNDS",
+    "regulatory_impact": "trade reporting delay"
+  }
 }
 ```
 
-### Deployment Scenario with Change Events
-
+**E-commerce Example:**
 ```json
 {
-  "event_definitions": [
-    {
-      "name": "production_deployment",
-      "description": "Production deployment with change tracking",
-      "events": [
-        {
-          "type": "change",
-          "routing_key": "change-events-key",
-          "payload": {
-            "summary": "Starting deployment: User service v2.1.0",
-            "source": "github-actions",
-            "timestamp": "{{timestamp}}",
-            "custom_details": {
-              "change_type": "deployment",
-              "environment": "production",
-              "version": "v2.1.0",
-              "change_id": "CHG-2025-{{random_number}}",
-              "approver": "engineering-manager@company.com",
-              "risk_assessment": "medium",
-              "estimated_duration": "15 minutes",
-              "features": [
-                "New authentication flow",
-                "Performance improvements",
-                "Profile update bug fixes"
-              ],
-              "rollback_plan": "Blue-green deployment rollback"
-            },
-            "links": [
-              {
-                "href": "https://github.com/company/user-service/releases/v2.1.0",
-                "text": "Release Notes"
-              }
-            ]
-          },
-          "delay_after": {
-            "type": "fixed",
-            "value": 900
-          }
-        },
-        {
-          "type": "change",
-          "routing_key": "change-events-key",
-          "payload": {
-            "summary": "Deployment completed: User service v2.1.0",
-            "source": "github-actions",
-            "custom_details": {
-              "change_id": "CHG-2025-{{random_number}}",
-              "status": "completed",
-              "actual_duration": "13 minutes",
-              "success": true,
-              "post_deployment_tests": "all passed",
-              "performance_impact": "Response time improved 15%"
-            }
-          }
-        }
-      ]
-    }
-  ]
+  "summary": "Shopping cart service error rate > 2% threshold",
+  "custom_details": {
+    "primary_error": "DynamoDB ProvisionedThroughputExceededException",
+    "failed_amount_usd": 47000,
+    "peak_traffic_multiplier": "4x normal"
+  }
 }
 ```
 
-### Security Incident Scenario
+### 3. Model Realistic Cascade Patterns
+
+Incidents rarely happen in isolation. Model how problems spread:
 
 ```json
 {
-  "event_definitions": [
+  "events": [
     {
-      "name": "security_incident",
-      "description": "Security incident with escalation",
-      "events": [
-        {
-          "type": "trigger",
-          "routing_key": "security-team-key",
-          "payload": {
-            "summary": "Suspicious login attempts detected - {{timestamp}}",
-            "source": "security-monitor.prod",
-            "severity": "warning",
-            "component": "authentication-service",
-            "class": "security",
-            "custom_details": {
-              "attack_type": "brute_force",
-              "source_ips": ["203.0.113.45", "198.51.100.78"],
-              "failed_attempts": 1247,
-              "affected_accounts": 23,
-              "time_window": "last 10 minutes",
-              "geographical_anomaly": true
-            }
-          },
-          "delay_after": {
-            "type": "fixed",
-            "value": 600
-          }
-        },
-        {
-          "type": "trigger",
-          "routing_key": "security-team-key",
-          "payload": {
-            "summary": "Rate limiting activated - blocking suspicious IPs",
-            "source": "waf.prod",
-            "severity": "info",
-            "component": "web-application-firewall",
-            "custom_details": {
-              "blocked_ips": ["203.0.113.45", "198.51.100.78"],
-              "rate_limit_threshold": "100 requests/minute",
-              "automatic_response": true
-            }
-          },
-          "delay_after": {
-            "type": "fixed",
-            "value": 300
-          }
-        },
-        {
-          "type": "resolve",
-          "routing_key": "security-team-key",
-          "payload": {
-            "summary": "Brute force attack mitigated - monitoring continues",
-            "source": "security-monitor.prod",
-            "custom_details": {
-              "resolution": "IPs blocked, accounts secured",
-              "duration": "15 minutes",
-              "affected_users_notified": true,
-              "additional_monitoring": "24 hours"
-            }
-          }
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Load Test Monitoring
-
-```json
-{
-  "event_definitions": [
-    {
-      "name": "load_test_monitoring",
-      "description": "Expected alerts during load testing",
-      "events": [
-        {
-          "type": "trigger",
-          "routing_key": "performance-team-key",
-          "payload": {
-            "summary": "High resource usage - load test in progress",
-            "source": "load-test-monitor",
-            "severity": "info",
-            "component": "web-servers",
-            "custom_details": {
-              "cpu_usage": "85%",
-              "memory_usage": "78%",
-              "load_test_phase": "peak_load",
-              "concurrent_users": 5000,
-              "expected_behavior": true,
-              "baseline_cpu": "15%"
-            }
-          },
-          "delay_after": {
-            "type": "random",
-            "min": 60,
-            "max": 180
-          }
-        },
-        {
-          "type": "resolve",
-          "routing_key": "performance-team-key",
-          "payload": {
-            "summary": "Load test completed - resources back to normal",
-            "source": "load-test-monitor",
-            "custom_details": {
-              "final_cpu": "12%",
-              "test_duration": "45 minutes",
-              "peak_concurrent_users": 5000,
-              "performance_results": "within acceptable thresholds"
-            }
-          }
-        }
-      ],
-      "execution": {
-        "repeat_count": 3,
-        "randomize_delays": true
-      }
-    }
-  ]
-}
-```
-
-## Global Configuration Options
-
-```json
-{
-  "global_config": {
-    "base_delay_seconds": 0,
-    "randomization_factor": 0.2,
-    "default_severity": "warning",
-    "default_source": "event-simulator",
-    "variables": {
-      "environment": "production",
-      "region": "us-west-2",
-      "team_email": "oncall@company.com",
-      "company_name": "Acme Corp"
+      "summary": "Database connection pool exhausted",
+      "severity": "critical",
+      "delay": {"type": "fixed", "value": 0}
     },
-    "routing_key_mappings": {
-      "database": "db-team-integration-key",
-      "api": "api-team-integration-key",
-      "frontend": "frontend-team-integration-key",
-      "security": "security-team-integration-key",
-      "changes": "change-management-key"
+    {
+      "summary": "API gateway timeout errors increasing",
+      "severity": "error", 
+      "delay": {"type": "random", "min": 120, "max": 300}
+    },
+    {
+      "summary": "Customer-facing service degraded",
+      "severity": "warning",
+      "delay": {"type": "random", "min": 200, "max": 500}
     }
-  }
+  ]
 }
 ```
 
-## Execution Configuration
+### 4. Include Proper Monitoring Context
+
+Each alert should include details a real monitoring tool would provide:
 
 ```json
 {
-  "execution": {
-    "repeat_count": 5,
-    "randomize_delays": true,
-    "parallel_execution": false,
-    "stop_on_error": false,
-    "max_concurrent_events": 1
+  "custom_details": {
+    "metric": "cpu_utilization_percent",
+    "current_value": "94.2%",
+    "threshold": "85.0%",
+    "hostname": "web-server-prod-03",
+    "monitoring_tool": "CloudWatch",
+    "alarm_arn": "arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPU",
+    "dashboard": "https://console.aws.amazon.com/cloudwatch/home#alarmsV2:",
+    "runbook": "https://wiki.company.com/runbooks/high-cpu"
   }
 }
 ```
 
-## API Field Reference
+## LLM-Assisted Scenario Generation
 
-### Incident Event Fields
+### Prompt Engineering for Scenario Creation
 
-- **Required**: summary, source, routing_key, event_action
-- **Optional**: severity, component, group, class, custom_details, images, links, dedup_key
+Use structured prompts to generate realistic scenarios with LLMs:
 
-### Change Event Fields
+#### Basic Scenario Generation Prompt
 
-- **Required**: summary, source, routing_key
-- **Optional**: timestamp, custom_details, links
+```
+Create a PagerDuty event definition scenario for a [INDUSTRY] company experiencing [INCIDENT_TYPE].
 
-### Severity Levels
+Requirements:
+- Use realistic monitoring alert summaries (not narrative descriptions)
+- Include proper technical metrics with current values and thresholds
+- Reference actual monitoring tools (Prometheus, DataDog, CloudWatch, etc.)
+- Follow this JSON schema: [PASTE_SCHEMA]
+- Create a cascade of 3-5 related alerts with realistic timing delays
+- Include industry-specific terminology and business impact metrics
 
-- **critical** - Service completely down
-- **error** - Major functionality impacted
-- **warning** - Minor issues or degradation
-- **info** - Informational events
+Industry: E-commerce
+Incident Type: Payment processing failure during Black Friday
+
+Focus on these technical areas:
+- API response times and error rates
+- Database connection issues
+- Payment gateway timeouts
+- CDN performance problems
+```
+
+#### Advanced Prompt for Industry-Specific Scenarios
+
+```
+Generate a realistic PagerDuty event scenario for [SPECIFIC_INDUSTRY_VERTICAL].
+
+Context:
+- Company: [COMPANY_TYPE] 
+- System: [SYSTEM_DESCRIPTION]
+- Incident Pattern: [INCIDENT_PATTERN]
+- Business Impact: [IMPACT_DESCRIPTION]
+
+Technical Requirements:
+1. Alert summaries must read like actual monitoring tool outputs
+2. Include specific metric names, current values, and thresholds  
+3. Reference real monitoring tools and their output formats
+4. Use proper technical terminology for the industry
+5. Model realistic failure cascade timing (30s to 20min delays)
+6. Include business context in custom_details
+
+Industry-Specific Requirements:
+[INDUSTRY]: [SPECIFIC_REQUIREMENTS]
+
+Example for Finance:
+- Include regulatory reporting implications
+- Reference trading symbols and market data
+- Use financial system terminology (order execution, risk management)
+- Include compliance and audit trail information
+
+Generate JSON following this exact schema:
+[PASTE_COMPLETE_SCHEMA]
+```
+
+#### Prompt Template for Different Industries
+
+**Finance/Trading:**
+```
+Create alerts for a financial trading platform experiencing issues during market hours.
+
+Include:
+- Market data feed latency alerts
+- Order execution failures with financial impact
+- Risk management system issues
+- Regulatory compliance implications
+- Trading symbol references (AAPL, MSFT, etc.)
+- Market session context (pre-market, active trading, after-hours)
+```
+
+**Gaming:**
+```
+Create alerts for a multiplayer gaming platform during peak hours.
+
+Include:
+- Matchmaking queue performance issues
+- Game server resource alerts (CPU, memory, network)
+- Player experience metrics (latency, disconnections)
+- Monetization system failures (in-game purchases)
+- Anti-cheat system alerts
+- Concurrent player counts and regional distribution
+```
+
+**E-commerce:**
+```
+Create alerts for an e-commerce platform during a major sale event.
+
+Include:
+- Website performance degradation under load
+- Shopping cart and checkout failures
+- Payment processing issues with financial impact
+- Inventory system problems
+- CDN and caching layer issues
+- Customer experience metrics
+```
+
+**Automotive:**
+```
+Create alerts for a connected vehicle platform.
+
+Include:
+- Vehicle connectivity and telematics issues
+- Safety-critical service failures (emergency calling)
+- Navigation and mapping service problems
+- Over-the-air update system alerts
+- IoT device offline alerts
+- Manufacturing system integration issues
+```
+
+### LLM Refinement Techniques
+
+#### Iterative Improvement Prompts
+
+```
+Improve this PagerDuty scenario to make it more realistic:
+
+[PASTE_CURRENT_SCENARIO]
+
+Make these specific improvements:
+1. Replace generic descriptions with specific monitoring tool outputs
+2. Add realistic metric names and values
+3. Include proper error codes and technical details
+4. Adjust timing delays to be more realistic for human response
+5. Add industry-specific business impact context
+6. Ensure alert summaries read like actual monitoring alerts
+
+Focus on technical accuracy and real-world plausibility.
+```
+
+#### Validation Prompts
+
+```
+Review this PagerDuty event scenario for realism and technical accuracy:
+
+[PASTE_SCENARIO]
+
+Check for:
+1. Do the alert summaries sound like real monitoring tools?
+2. Are the metric names and values realistic?
+3. Do the timing delays make sense for incident response?
+4. Is the technical terminology correct for the industry?
+5. Are the monitoring tool references accurate?
+6. Do the alerts follow a logical cascade pattern?
+
+Provide specific feedback and suggest improvements.
+```
+
+### Multi-Step Generation Process
+
+1. **Generate Base Scenario**
+   - Use industry-specific prompt
+   - Get initial scenario structure
+
+2. **Refine Technical Details**
+   - Focus on monitoring tool accuracy
+   - Improve metric names and values
+   - Add realistic error codes
+
+3. **Validate Business Context**
+   - Ensure industry terminology is correct
+   - Add appropriate business impact metrics
+   - Include regulatory/compliance context
+
+4. **Test Scenario Logic**
+   - Verify cascade timing makes sense
+   - Check alert severity progression
+   - Ensure deduplication keys are logical
+
+### Sample LLM Conversation
+
+**Human:** "Create a realistic PagerDuty scenario for a fintech payment processor experiencing issues during a flash sale event."
+
+**LLM Response Structure:**
+```json
+{
+  "id": "fintech_payment_surge",
+  "name": "Payment Processor Flash Sale Overload",
+  "description": "Payment processing system alerts during unexpected traffic surge",
+  "events": [
+    {
+      "type": "trigger",
+      "summary": "Payment API response time > 3s threshold exceeded",
+      "severity": "warning",
+      "custom_details": {
+        "metric": "payment_api_response_time_p99",
+        "current_value": "4.7s",
+        "threshold": "3.0s",
+        "endpoint": "/api/v2/payments/process",
+        "monitoring_tool": "New Relic",
+        "transaction_volume": "12,000 TPS vs normal 2,000 TPS"
+      }
+    }
+    // ... more alerts
+  ]
+}
+```
+
+**Follow-up Refinement:** "Make the monitoring details more specific to actual payment processing tools and add PCI compliance context."
 
 ## Best Practices
 
-### Naming Conventions
+### Scenario Design
 
-- Use descriptive scenario names: `database_cascade_outage` vs `test1`
-- Include service/component in routing keys: `api-team-prod-key`
-- Use consistent dedup_key patterns: `incident-type-{{timestamp}}`
+1. **Start with Real Incidents**
+   - Base scenarios on actual outages you've experienced
+   - Interview teams about their most challenging incidents
+   - Review post-mortem documents for realistic patterns
 
-### Realistic Data
+2. **Use Authentic Monitoring Data**
+   - Copy actual alert formats from your monitoring tools
+   - Include real metric names and typical threshold values
+   - Reference actual dashboard URLs and runbook links
 
-- Include actual service names and error messages
-- Use proper severity levels based on business impact
-- Add meaningful custom_details for troubleshooting context
-- Reference real runbooks and documentation
+3. **Model Human Response Times**
+   - Initial detection: 1-5 minutes
+   - Acknowledgment: 5-15 minutes  
+   - Investigation: 15-45 minutes
+   - Resolution: 30 minutes - 4 hours
 
-### Timing Considerations
+### Technical Accuracy
 
-- Model realistic human response times (5-15 minutes)
-- Account for escalation delays (15-30 minutes)
-- Use randomization to avoid predictable patterns
-- Consider time zones and business hours
+1. **Monitoring Tool Fidelity**
+   ```json
+   // Good - specific and realistic
+   "monitoring_tool": "Prometheus",
+   "query": "rate(http_requests_total{status=~\"5..\"}[5m])",
+   "alert_manager_url": "https://alertmanager.company.com/#/alerts"
+   
+   // Bad - too generic
+   "monitoring_tool": "monitoring system",
+   "error": "high error rate detected"
+   ```
 
-### Security and Operations
+2. **Realistic Metrics**
+   ```json
+   // Good - specific values and context
+   "cpu_usage": "94.2%",
+   "normal_range": "15-25%",
+   "duration": "last 8 minutes"
+   
+   // Bad - vague descriptions  
+   "cpu_usage": "very high",
+   "performance": "degraded"
+   ```
 
-- Never include sensitive data in payloads
-- Use test routing keys for non-production scenarios
-- Version control definition files
-- Document scenario purposes and expected outcomes
+### Business Context
+
+1. **Industry-Specific Impact**
+   - Finance: Regulatory reporting requirements, trading halts
+   - Healthcare: Patient safety implications, HIPAA concerns
+   - Gaming: Player experience metrics, revenue per user impact
+   - E-commerce: Cart abandonment rates, conversion impact
+
+2. **Stakeholder Communication**
+   - Include customer impact statements
+   - Reference SLA violations
+   - Mention revenue or cost implications
+
+## Implementation Examples
+
+### Simple Monitoring Alert
+```json
+{
+  "type": "trigger",
+  "summary": "High memory usage on web server cluster",
+  "severity": "warning",
+  "component": "web-application",
+  "group": "infrastructure",
+  "class": "resource-usage",
+  "custom_details": {
+    "metric": "memory_utilization_percent",
+    "current_value": "87.3%",
+    "threshold": "80.0%",
+    "affected_hosts": ["web-01", "web-02", "web-03"],
+    "monitoring_tool": "DataDog",
+    "dashboard": "https://app.datadoghq.com/dash/web-servers",
+    "duration": "5 minutes above threshold"
+  }
+}
+```
+
+### Complex Cascade Scenario
+```json
+{
+  "id": "database_cascade",
+  "name": "Database Performance Cascade",
+  "events": [
+    {
+      "summary": "Database slow query threshold exceeded",
+      "severity": "warning",
+      "custom_details": {
+        "slowest_query_time": "12.7s",
+        "query": "SELECT * FROM orders WHERE customer_id = ?",
+        "affected_table": "orders",
+        "monitoring_tool": "pgBadger"
+      },
+      "delay": {"type": "fixed", "value": 0}
+    },
+    {
+      "summary": "Database connection pool 90% utilization",
+      "severity": "error", 
+      "custom_details": {
+        "active_connections": 90,
+        "max_connections": 100,
+        "wait_count": 23,
+        "monitoring_tool": "PgBouncer"
+      },
+      "delay": {"type": "random", "min": 180, "max": 420}
+    },
+    {
+      "summary": "API response time SLA breach",
+      "severity": "critical",
+      "custom_details": {
+        "sla_threshold": "2.0s",
+        "current_p95": "8.3s",
+        "affected_endpoints": ["/orders", "/customers"],
+        "monitoring_tool": "Elastic APM"
+      },
+      "delay": {"type": "random", "min": 300, "max": 600}
+    }
+  ]
+}
+```
+
+## Validation and Testing
+
+### Schema Validation
+```json
+{
+  "required_fields": [
+    "schema_version",
+    "event_definitions"
+  ],
+  "event_required_fields": [
+    "id", "name", "events"
+  ],
+  "alert_required_fields": [
+    "type", "summary", "severity", "component"
+  ]
+}
+```
+
+### Realistic Content Checks
+- Alert summaries should not contain narrative descriptions
+- Metric values should be plausible for the system type
+- Timing delays should reflect realistic human response patterns
+- Business impact should be quantified where possible
+- Monitoring tool references should be accurate
+
+### Testing Methodology
+
+1. **Dry Run Testing**
+   - Execute scenarios in dry-run mode
+   - Verify JSON structure and variable substitution
+   - Check timing calculations
+
+2. **Staging Environment**
+   - Use test PagerDuty services
+   - Validate API integration
+   - Test escalation policies
+
+3. **Team Review**
+   - Have domain experts review scenarios for accuracy
+   - Validate business impact statements
+   - Confirm technical terminology
+
+### Quality Checklist
+
+- [ ] Alert summaries read like actual monitoring tool outputs
+- [ ] Metric names and values are realistic and specific  
+- [ ] Business impact is quantified and industry-appropriate
+- [ ] Timing delays reflect realistic human response patterns
+- [ ] Technical terminology is accurate for the industry
+- [ ] Monitoring tool references are correct and specific
+- [ ] Cascade patterns follow logical cause-and-effect relationships
+- [ ] Severity levels progress appropriately
+- [ ] Custom details include actionable troubleshooting information
+- [ ] Variable substitution works correctly
+
+## Advanced Techniques
+
+### Dynamic Scenario Generation
+Use LLMs to generate scenarios based on real-time system state:
+
+```python
+def generate_scenario_for_system(system_metrics, industry, incident_type):
+    prompt = f"""
+    Generate a PagerDuty scenario for a {industry} system currently showing:
+    - CPU: {system_metrics['cpu']}%
+    - Memory: {system_metrics['memory']}%  
+    - Error Rate: {system_metrics['error_rate']}%
+    
+    Create a {incident_type} scenario that starts from these current conditions.
+    """
+    return llm.generate(prompt)
+```
+
+### Scenario Libraries
+Build reusable scenario components:
+
+```json
+{
+  "templates": {
+    "database_alerts": {...},
+    "api_performance": {...},
+    "security_incidents": {...}
+  },
+  "industry_contexts": {
+    "finance": {...},
+    "healthcare": {...},
+    "gaming": {...}
+  }
+}
+```
+
+This comprehensive guide provides everything needed to create realistic PagerDuty event scenarios, either manually or with LLM assistance, ensuring they accurately reflect real-world monitoring and incident response patterns.

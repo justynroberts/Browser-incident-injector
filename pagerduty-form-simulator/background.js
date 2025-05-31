@@ -38,7 +38,7 @@ chrome.runtime.onInstalled.addListener(() => {
         allow_form_continuation: false,
         redirect_to_500: false,
         run_scenario_on_submit: false,
-        custom_alert_message: "Oops ⛓️‍� Error: UX Failure -  Our team are Working on it now.",
+        custom_alert_message: "Oops ⛓️‍ Error: UX Failure -  Our team are Working on it now.",
         target_element_texts: "", // No defaults - user must configure
         active_scenario_id: "", // No default active scenario
         toggle_button_visible: true // Show toggle button by default
