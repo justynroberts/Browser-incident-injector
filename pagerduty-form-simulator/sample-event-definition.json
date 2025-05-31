@@ -35,7 +35,7 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 0
+            "value": 10000
           }
         },
         {
@@ -55,9 +55,8 @@
             "dashboard": "https://grafana.company.com/d/trading-orders"
           },
           "delay": {
-            "type": "random",
-            "min": 300,
-            "max": 600
+            "type": "fixed",
+            "value": 10000
           }
         },
         {
@@ -76,9 +75,8 @@
             "consul_service_id": "risk-calc-prod-01"
           },
           "delay": {
-            "type": "random",
-            "min": 200,
-            "max": 400
+            "type": "fixed",
+            "value": 10000
           }
         },
         {
@@ -98,9 +96,8 @@
             "apm_trace_id": "abc123def456"
           },
           "delay": {
-            "type": "random",
-            "min": 400,
-            "max": 800
+            "type": "fixed",
+            "value": 10000
           }
         }
       ]
@@ -133,7 +130,7 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 0
+            "value": 10000
           }
         },
         {
@@ -152,9 +149,8 @@
             "monitoring_tool": "Hystrix Dashboard"
           },
           "delay": {
-            "type": "random",
-            "min": 600,
-            "max": 1000
+            "type": "fixed",
+            "value": 10000
           }
         },
         {
@@ -174,9 +170,8 @@
             "search_query": "index=api service=navigation status>=400"
           },
           "delay": {
-            "type": "random",
-            "min": 400,
-            "max": 700
+            "type": "fixed",
+            "value": 10000
           }
         },
         {
@@ -196,9 +191,8 @@
             "monitoring_tool": "Nagios"
           },
           "delay": {
-            "type": "random",
-            "min": 800,
-            "max": 1200
+            "type": "fixed",
+            "value": 10000
           }
         }
       ]
@@ -231,7 +225,7 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 0
+            "value": 10000
           }
         },
         {
@@ -251,9 +245,8 @@
             "monitoring_tool": "CloudWatch"
           },
           "delay": {
-            "type": "random",
-            "min": 300,
-            "max": 500
+            "type": "fixed",
+            "value": 10000
           }
         },
         {
@@ -273,9 +266,8 @@
             "business_transaction": "In-Game Purchase"
           },
           "delay": {
-            "type": "random",
-            "min": 500,
-            "max": 800
+            "type": "fixed",
+            "value": 10000
           }
         },
         {
@@ -295,9 +287,8 @@
             "namespace": "gaming-prod"
           },
           "delay": {
-            "type": "random",
-            "min": 600,
-            "max": 1000
+            "type": "fixed",
+            "value": 10000
           }
         }
       ]
@@ -330,7 +321,7 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 0
+            "value": 10000
           }
         },
         {
@@ -350,9 +341,8 @@
             "monitoring_tool": "X-Ray"
           },
           "delay": {
-            "type": "random",
-            "min": 400,
-            "max": 600
+            "type": "fixed",
+            "value": 10000
           }
         },
         {
@@ -372,9 +362,8 @@
             "monitoring_tool": "Stripe Dashboard"
           },
           "delay": {
-            "type": "random",
-            "min": 600,
-            "max": 900
+            "type": "fixed",
+            "value": 10000
           }
         },
         {
@@ -395,9 +384,8 @@
             "application": "{{application}}"
           },
           "delay": {
-            "type": "random",
-            "min": 1000,
-            "max": 2000
+            "type": "fixed",
+            "value": 10000
           }
         },
         {
@@ -414,9 +402,8 @@
             "application": "{{application}}"
           },
           "delay": {
-            "type": "random",
-            "min": 1000,
-            "max": 2000
+            "type": "fixed",
+            "value": 10000
           }
         },
         {
@@ -434,9 +421,8 @@
             "application": "{{application}}"
           },
           "delay": {
-            "type": "random",
-            "min": 1000,
-            "max": 2000
+            "type": "fixed",
+            "value": 10000
           }
         }
       ]

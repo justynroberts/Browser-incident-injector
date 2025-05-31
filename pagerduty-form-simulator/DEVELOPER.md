@@ -20,6 +20,7 @@ The PagerDuty Event Definition System is a JSON-based framework for creating rea
 - **Event Processor**: Engine that executes scenarios and sends PagerDuty API calls
 - **Variable System**: Template substitution for dynamic content
 - **Timing Engine**: Sophisticated delay and randomization controls
+- **Auto-loading**: Sample scenarios are automatically loaded on first use
 
 ### Use Cases
 
@@ -73,14 +74,16 @@ The PagerDuty Event Definition System is a JSON-based framework for creating rea
 ```json
 {
   "type": "fixed|random|exponential",
-  "value": 300,           // for fixed delays (seconds)
-  "min": 60,              // for random delays
-  "max": 300,             // for random delays
-  "base": 30,             // for exponential delays
+  "value": 10000,         // for fixed delays (milliseconds)
+  "min": 5000,            // for random delays (milliseconds)
+  "max": 15000,           // for random delays (milliseconds)
+  "base": 3000,           // for exponential delays (milliseconds)
   "multiplier": 2,        // for exponential delays
-  "max": 600              // for exponential max cap
+  "max": 60000            // for exponential max cap (milliseconds)
 }
 ```
+
+**Note**: All delay values are in milliseconds. The default sample scenarios use a fixed 10-second (10000ms) delay between events.
 
 ## Creating Realistic Scenarios
 
@@ -138,17 +141,17 @@ Incidents rarely happen in isolation. Model how problems spread:
     {
       "summary": "Database connection pool exhausted",
       "severity": "critical",
-      "delay": {"type": "fixed", "value": 0}
+      "delay": {"type": "fixed", "value": 10000}
     },
     {
       "summary": "API gateway timeout errors increasing",
       "severity": "error", 
-      "delay": {"type": "random", "min": 120, "max": 300}
+      "delay": {"type": "random", "min": 5000, "max": 15000}
     },
     {
       "summary": "Customer-facing service degraded",
       "severity": "warning",
-      "delay": {"type": "random", "min": 200, "max": 500}
+      "delay": {"type": "random", "min": 8000, "max": 12000}
     }
   ]
 }
@@ -475,7 +478,7 @@ Provide specific feedback and suggest improvements.
         "affected_table": "orders",
         "monitoring_tool": "pgBadger"
       },
-      "delay": {"type": "fixed", "value": 0}
+      "delay": {"type": "fixed", "value": 10000}
     },
     {
       "summary": "Database connection pool 90% utilization",
@@ -486,7 +489,7 @@ Provide specific feedback and suggest improvements.
         "wait_count": 23,
         "monitoring_tool": "PgBouncer"
       },
-      "delay": {"type": "random", "min": 180, "max": 420}
+      "delay": {"type": "random", "min": 8000, "max": 12000}
     },
     {
       "summary": "API response time SLA breach",
@@ -497,7 +500,7 @@ Provide specific feedback and suggest improvements.
         "affected_endpoints": ["/orders", "/customers"],
         "monitoring_tool": "Elastic APM"
       },
-      "delay": {"type": "random", "min": 300, "max": 600}
+      "delay": {"type": "random", "min": 8000, "max": 12000}
     }
   ]
 }
@@ -524,7 +527,7 @@ Provide specific feedback and suggest improvements.
 ### Realistic Content Checks
 - Alert summaries should not contain narrative descriptions
 - Metric values should be plausible for the system type
-- Timing delays should reflect realistic human response patterns
+- Timing delays should reflect realistic human response patterns (default is 10 seconds between events)
 - Business impact should be quantified where possible
 - Monitoring tool references should be accurate
 
@@ -550,7 +553,7 @@ Provide specific feedback and suggest improvements.
 - [ ] Alert summaries read like actual monitoring tool outputs
 - [ ] Metric names and values are realistic and specific  
 - [ ] Business impact is quantified and industry-appropriate
-- [ ] Timing delays reflect realistic human response patterns
+- [ ] Timing delays reflect realistic human response patterns (default 10 seconds)
 - [ ] Technical terminology is accurate for the industry
 - [ ] Monitoring tool references are correct and specific
 - [ ] Cascade patterns follow logical cause-and-effect relationships
@@ -595,3 +598,19 @@ Build reusable scenario components:
 ```
 
 This comprehensive guide provides everything needed to create realistic PagerDuty event scenarios, either manually or with LLM assistance, ensuring they accurately reflect real-world monitoring and incident response patterns.
+
+## Recent Updates
+
+### Auto-loading Sample Scenarios
+
+The extension now automatically loads sample scenarios on first use, eliminating the need for users to manually click the "Load Sample" button. This provides a better out-of-the-box experience for new users.
+
+### Improved Delay Handling
+
+The event processor has been updated to properly handle all delay configuration types:
+
+- Fixed delays: `{ "type": "fixed", "value": 10000 }`
+- Random delays: `{ "type": "random", "min": 5000, "max": 15000 }`
+- Simple number delays: `10000`
+
+All sample scenarios now use a consistent 10-second (10000ms) delay between events by default, creating a more predictable and manageable incident simulation experience.

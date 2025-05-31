@@ -69,8 +69,8 @@ A Chrome extension that intercepts form submissions and user interactions to tri
 ### Scenario Configuration
 1. Navigate to the "Event Definition System" section
 2. Either:
-   - Click "Load Sample Definition" to use the included examples
-   - Paste your own JSON event definition
+   - The sample definition will be automatically loaded on first use
+   - Or paste your own JSON event definition
 3. Select a scenario from the dropdown
 4. Optionally enable "Dry Run Mode" to test without sending actual alerts
 5. Click "Run Scenario" to execute manually, or enable "Run Scenario" in the trigger options to run automatically on form submissions
@@ -106,8 +106,8 @@ The Event Definition System allows you to create complex, multi-step incident sc
 
 1. Click the extension icon
 2. Scroll to the "Event Definition System" section
-3. Enter your JSON definition in the textarea
-4. Or click "Load Sample" to start with a template
+3. The sample definition will be automatically loaded on first use
+4. Or enter your own JSON definition in the textarea
 5. Select a scenario from the dropdown
 6. Click "Run Scenario" to execute manually
 
@@ -147,9 +147,9 @@ When the extension is enabled and a scenario is selected:
           },
           "delay": {
             "type": "fixed|random",
-            "value": 5000,
-            "min": 1000,
-            "max": 10000
+            "value": 10000,
+            "min": 5000,
+            "max": 15000
           }
         }
       ]
@@ -190,6 +190,7 @@ For advanced users who want to create custom event definitions, please refer to 
 - **Extension not working**: Check browser console for errors (F12 > Console tab)
 - **Toggle button not appearing**: Some sites may block content scripts. Try refreshing the page or check if the "Show Toggle Button" option is enabled.
 - **Scenarios not triggering**: Ensure you have selected a scenario from the dropdown and that the extension is enabled.
+- **Delays not working between events**: Check that the event-processor.js file is properly calculating delays from the event definition.
 - **500 error page not showing**: Some sites have strict Content Security Policies that prevent page modifications.
 
 ## Advanced Configuration
@@ -216,20 +217,29 @@ For advanced users, you can create your own event definitions with complex logic
           "summary": "{{service_name}} connection timeout",
           "severity": "critical",
           "component": "{{component_name}}",
-          "delay": 0
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
         },
         {
           "type": "trigger",
           "summary": "API latency increased by 500%",
           "severity": "error",
           "component": "API Gateway",
-          "delay": 60000
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
         },
         {
           "type": "acknowledge",
           "summary": "DBA team investigating",
           "dedup_key": "{{incident_id}}",
-          "delay": 180000
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
         }
       ]
     }
