@@ -11,6 +11,10 @@ class PagerDutyEventProcessor {
         this.dryRun = false;
         this.globalConfig = {};
         this.schemaVersion = "1.0";
+        this.maxRetries = 3;
+        this.retryDelay = 2000; // 2 seconds
+        this.maxConcurrentEvents = 3;
+        this.failedEvents = [];
     }
 
     // Initialize the processor with configuration
@@ -34,14 +38,59 @@ class PagerDutyEventProcessor {
 
     // Reset template variables
     resetVariables() {
-        // Built-in variables
+        // Built-in variables with improved formatting and validation
         const baseVariables = {
-            timestamp: () => new Date().toISOString(),
-            current_time: () => new Date().toISOString(),
-            random_number: () => Math.floor(Math.random() * 10000),
-            random_4_digit: () => Math.floor(1000 + Math.random() * 9000),
-            incident_id: () => Math.random().toString(36).substr(2, 9).toUpperCase(),
-            scheduled_time: () => new Date(Date.now() + 3600000).toISOString() // Current time + 1 hour
+            timestamp: () => {
+                try {
+                    return new Date().toISOString();
+                } catch (e) {
+                    console.error("[Event Processor] Error generating timestamp:", e);
+                    return new Date().toUTCString();
+                }
+            },
+            current_time: () => {
+                try {
+                    return new Date().toISOString();
+                } catch (e) {
+                    console.error("[Event Processor] Error generating current_time:", e);
+                    return new Date().toUTCString();
+                }
+            },
+            random_number: () => {
+                try {
+                    // Keep random_number distinct from random_4_digit by using a different range
+                    return Math.floor(Math.random() * 100000).toString();
+                } catch (e) {
+                    console.error("[Event Processor] Error generating random_number:", e);
+                    return '0';
+                }
+            },
+            random_4_digit: () => {
+                try {
+                    // Ensure exactly 4 digits by using padStart
+                    const num = Math.floor(Math.random() * 10000);
+                    return num.toString().padStart(4, '0');
+                } catch (e) {
+                    console.error("[Event Processor] Error generating random_4_digit:", e);
+                    return '0000';
+                }
+            },
+            incident_id: () => {
+                try {
+                    return Math.random().toString(36).substr(2, 9).toUpperCase();
+                } catch (e) {
+                    console.error("[Event Processor] Error generating incident_id:", e);
+                    return 'INCIDENT0';
+                }
+            },
+            scheduled_time: () => {
+                try {
+                    return new Date(Date.now() + 3600000).toISOString();
+                } catch (e) {
+                    console.error("[Event Processor] Error generating scheduled_time:", e);
+                    return new Date(Date.now() + 3600000).toUTCString();
+                }
+            }
         };
         
         // Default values
@@ -51,8 +100,21 @@ class PagerDutyEventProcessor {
             environment: "Production"
         };
         
-        // Custom variables from global config
-        const customVariables = this.globalConfig?.variables || {};
+        // Custom variables from global config with validation
+        let customVariables = {};
+        if (this.globalConfig?.variables) {
+            try {
+                // Ensure all custom variables are strings or simple values
+                customVariables = Object.entries(this.globalConfig.variables).reduce((acc, [key, value]) => {
+                    if (value !== null && typeof value !== 'undefined') {
+                        acc[key] = String(value);
+                    }
+                    return acc;
+                }, {});
+            } catch (e) {
+                console.error("[Event Processor] Error processing custom variables:", e);
+            }
+        }
         
         // Combine all variables
         this.variables = {
@@ -76,35 +138,83 @@ class PagerDutyEventProcessor {
                 ? JSON.parse(definitionJson)
                 : definitionJson;
             
-            // Store the definition
-            this.currentDefinition = definition;
-            
-            console.log("[Event Processor] Definition loaded, structure:",
-                definition.event_definitions ? `${definition.event_definitions.length} event definitions` :
-                definition.scenarios ? `${Object.keys(definition.scenarios).length} scenarios` : "Unknown structure");
-            
-            // Extract schema version if available
-            if (definition.schema_version) {
-                this.schemaVersion = definition.schema_version;
+            // Validate schema version
+            if (!definition.schema_version) {
+                console.warn("[Event Processor] No schema version specified, defaulting to 1.0");
+                definition.schema_version = "1.0";
             }
+            this.schemaVersion = definition.schema_version;
             
-            // Extract global config if available
+            // Extract and validate global config
             if (definition.global_config) {
+                if (typeof definition.global_config !== 'object') {
+                    throw new Error("Global config must be an object");
+                }
                 this.globalConfig = definition.global_config;
                 console.log("[Event Processor] Global config loaded:", this.globalConfig);
             }
             
-            // Basic validation - check for event_definitions
-            if (definition.event_definitions && definition.event_definitions.length > 0) {
-                // New schema format
+            // Validate event definitions structure
+            if (definition.event_definitions && Array.isArray(definition.event_definitions)) {
+                // Validate each event definition
+                definition.event_definitions.forEach((eventDef, index) => {
+                    if (!eventDef.id) {
+                        throw new Error(`Event definition at index ${index} must have an id`);
+                    }
+                    if (!eventDef.events || !Array.isArray(eventDef.events)) {
+                        throw new Error(`Event definition '${eventDef.id}' must have an events array`);
+                    }
+                    if (eventDef.events.length === 0) {
+                        throw new Error(`Event definition '${eventDef.id}' must have at least one event`);
+                    }
+                    if (eventDef.events.length > 50) {
+                        console.warn(`[Event Processor] Warning: Event definition '${eventDef.id}' has ${eventDef.events.length} events. Large numbers of events may impact performance.`);
+                    }
+                    
+                    // Validate each event in the definition
+                    eventDef.events.forEach((event, eventIndex) => {
+                        if (!event.type) {
+                            throw new Error(`Event ${eventIndex} in definition '${eventDef.id}' must have a type`);
+                        }
+                        if (!event.summary) {
+                            throw new Error(`Event ${eventIndex} in definition '${eventDef.id}' must have a summary`);
+                        }
+                    });
+                });
+                
                 console.log(`[Event Processor] Loaded ${definition.event_definitions.length} event definitions`);
+                this.currentDefinition = definition;
             }
             // Backward compatibility with old schema
-            else if (definition.scenarios && Object.keys(definition.scenarios).length > 0) {
+            else if (definition.scenarios && typeof definition.scenarios === 'object') {
+                // Validate each scenario
+                Object.entries(definition.scenarios).forEach(([id, scenario]) => {
+                    if (!Array.isArray(scenario.events)) {
+                        throw new Error(`Scenario '${id}' must have an events array`);
+                    }
+                    if (scenario.events.length === 0) {
+                        throw new Error(`Scenario '${id}' must have at least one event`);
+                    }
+                    if (scenario.events.length > 50) {
+                        console.warn(`[Event Processor] Warning: Scenario '${id}' has ${scenario.events.length} events. Large numbers of events may impact performance.`);
+                    }
+                    
+                    // Validate each event in the scenario
+                    scenario.events.forEach((event, eventIndex) => {
+                        if (!event.type) {
+                            throw new Error(`Event ${eventIndex} in scenario '${id}' must have a type`);
+                        }
+                        if (!event.summary) {
+                            throw new Error(`Event ${eventIndex} in scenario '${id}' must have a summary`);
+                        }
+                    });
+                });
+                
                 console.log(`[Event Processor] Loaded ${Object.keys(definition.scenarios).length} scenarios (legacy format)`);
+                this.currentDefinition = definition;
             }
             else {
-                throw new Error("Event definition must contain at least one scenario or event definition");
+                throw new Error("Event definition must contain either event_definitions array or scenarios object");
             }
             
             // Reset variables with new global config
@@ -202,28 +312,92 @@ class PagerDutyEventProcessor {
             
             // Apply event definition variables if any
             if (eventDefinition.variables) {
-                for (const [key, value] of Object.entries(eventDefinition.variables)) {
-                    this.variables[key] = value;
+                try {
+                    // Validate and process event definition variables
+                    const processedVars = Object.entries(eventDefinition.variables).reduce((acc, [key, value]) => {
+                        // Skip null/undefined values
+                        if (value === null || value === undefined) {
+                            console.warn(`[Event Processor] Skipping null/undefined variable: ${key}`);
+                            return acc;
+                        }
+                        
+                        // Convert to string if not a function
+                        if (typeof value !== 'function') {
+                            acc[key] = String(value);
+                        } else {
+                            acc[key] = value;
+                        }
+                        return acc;
+                    }, {});
+                    
+                    // Merge with existing variables, preserving built-in functions
+                    this.variables = {
+                        ...this.variables,
+                        ...processedVars
+                    };
+                    
+                    console.log("[Event Processor] Applied event definition variables:",
+                        Object.fromEntries(
+                            Object.entries(processedVars)
+                                .filter(([_, v]) => typeof v !== 'function')
+                        )
+                    );
+                } catch (error) {
+                    console.error("[Event Processor] Error applying event definition variables:", error);
                 }
-                console.log("[Event Processor] Applied event definition variables:", eventDefinition.variables);
             }
             
-            // Process each event in the definition
+            // Process each event in the definition with improved handling
             const events = eventDefinition.events || [];
             console.log(`[Event Processor] Found ${events.length} events to process`);
-            for (let i = 0; i < events.length; i++) {
-                const event = events[i];
-                console.log(`[Event Processor] Processing event ${i+1}/${events.length}:`, event);
+            
+            // Process events in batches to control concurrency
+            for (let i = 0; i < events.length; i += this.maxConcurrentEvents) {
+                const batch = events.slice(i, i + this.maxConcurrentEvents);
+                console.log(`[Event Processor] Processing batch of ${batch.length} events (${i + 1}-${Math.min(i + batch.length, events.length)} of ${events.length})`);
                 
-                // Apply delay if specified
-                const delayMs = this.calculateDelay(event.delay);
-                if (delayMs > 0) {
-                    console.log(`[Event Processor] Delaying for ${delayMs}ms before sending event`);
-                    await new Promise(resolve => setTimeout(resolve, delayMs));
-                }
+                const batchPromises = batch.map(async (event, batchIndex) => {
+                    const eventIndex = i + batchIndex;
+                    console.log(`[Event Processor] Processing event ${eventIndex + 1}/${events.length}:`, event);
+                    
+                    // Apply delay if specified
+                    const delayMs = this.calculateDelay(event.delay);
+                    if (delayMs > 0) {
+                        console.log(`[Event Processor] Delaying for ${delayMs}ms before sending event`);
+                        await new Promise(resolve => setTimeout(resolve, delayMs));
+                    }
+                    
+                    // Send event with retries
+                    let lastError;
+                    for (let retry = 0; retry < this.maxRetries; retry++) {
+                        try {
+                            const result = await this.sendEvent(event);
+                            if (result.success) {
+                                return result;
+                            }
+                            lastError = new Error(result.error || 'Unknown error');
+                        } catch (error) {
+                            lastError = error;
+                            if (retry < this.maxRetries - 1) {
+                                console.log(`[Event Processor] Retry ${retry + 1}/${this.maxRetries} for event ${eventIndex + 1} after ${this.retryDelay}ms`);
+                                await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+                            }
+                        }
+                    }
+                    
+                    // If all retries failed, record the failure but continue processing
+                    this.failedEvents.push({ event, error: lastError });
+                    console.error(`[Event Processor] Failed to process event ${eventIndex + 1} after ${this.maxRetries} attempts:`, lastError);
+                    return { success: false, error: lastError.message };
+                });
                 
-                // Send the event
-                await this.sendEvent(event);
+                // Wait for current batch to complete before processing next batch
+                await Promise.all(batchPromises);
+            }
+            
+            // Report any failures after all events are processed
+            if (this.failedEvents.length > 0) {
+                console.warn(`[Event Processor] Completed with ${this.failedEvents.length} failed events:`, this.failedEvents);
             }
             
             console.log(`[Event Processor] Event definition '${eventDefinition.name || 'unnamed'}' completed`);
@@ -363,19 +537,59 @@ class PagerDutyEventProcessor {
         return 0;
     }
 
-    // Process template strings with variable substitution
+    // Process template strings with variable substitution and improved validation
     processTemplate(template) {
         if (typeof template !== 'string') return template;
         
         return template.replace(/\{\{([^}]+)\}\}/g, (match, variable) => {
-            const trimmedVar = variable.trim();
-            if (this.variables[trimmedVar]) {
-                if (typeof this.variables[trimmedVar] === 'function') {
-                    return this.variables[trimmedVar]();
+            try {
+                const trimmedVar = variable.trim();
+                
+                // Check if variable exists
+                if (!this.variables.hasOwnProperty(trimmedVar)) {
+                    console.warn(`[Event Processor] Variable not found: ${trimmedVar}`);
+                    return match;
                 }
-                return this.variables[trimmedVar];
+                
+                // Handle dynamic (function) variables
+                if (typeof this.variables[trimmedVar] === 'function') {
+                    try {
+                        const value = this.variables[trimmedVar]();
+                        console.log(`[Event Processor] Processed dynamic variable ${trimmedVar}:`, value);
+                        return value;
+                    } catch (funcError) {
+                        console.error(`[Event Processor] Error executing dynamic variable ${trimmedVar}:`, funcError);
+                        // Provide fallback values for built-in variables
+                        switch (trimmedVar) {
+                            case 'timestamp':
+                            case 'current_time':
+                                return new Date().toUTCString();
+                            case 'random_number':
+                            case 'random_4_digit':
+                                return '0000';
+                            case 'incident_id':
+                                return 'INCIDENT0';
+                            case 'scheduled_time':
+                                return new Date(Date.now() + 3600000).toUTCString();
+                            default:
+                                return match;
+                        }
+                    }
+                }
+                
+                // Handle static variables
+                const value = this.variables[trimmedVar];
+                if (value === null || value === undefined) {
+                    console.warn(`[Event Processor] Variable ${trimmedVar} has null/undefined value`);
+                    return match;
+                }
+                
+                console.log(`[Event Processor] Processed static variable ${trimmedVar}:`, value);
+                return String(value);
+            } catch (error) {
+                console.error(`[Event Processor] Error processing template variable ${variable}:`, error);
+                return match; // Return original on error
             }
-            return match; // Return original if variable not found
         });
     }
 

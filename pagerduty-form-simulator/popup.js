@@ -29,7 +29,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const scenarioControls = document.getElementById('scenario-controls');
     const scenarioSelect = document.getElementById('scenario-select');
     const dryRunCheckbox = document.getElementById('dry-run-mode');
-    const runScenarioButton = document.getElementById('run-scenario');
     const scenarioResult = document.getElementById('scenario-result');
     const loadSampleButton = document.getElementById('load-sample');
     
@@ -89,7 +88,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Event Definition System event listeners
     eventDefinitionTextarea.addEventListener('input', handleEventDefinitionInput);
     scenarioSelect.addEventListener('change', handleScenarioSelect);
-    runScenarioButton.addEventListener('click', handleRunScenario);
     loadSampleButton.addEventListener('click', handleLoadSample);
     
     // Add event listener for the Edit JSON button
@@ -579,15 +577,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 createAlertToggle.checked = true; // Always show alert when extension is enabled
                 createAlertToggle.disabled = true; // Disable the toggle since it's always on
             }
-            if (runScenarioToggle) runScenarioToggle.checked = result.run_scenario_on_submit === true;
+            if (runScenarioToggle) {
+                runScenarioToggle.checked = result.run_scenario_on_submit === true;
+                runScenarioToggle.disabled = !result.active_scenario_id;
+            }
             if (add500ErrorToggle) add500ErrorToggle.checked = result.redirect_to_500 === true;
             if (continueDestinationToggle) continueDestinationToggle.checked = result.allow_form_continuation === true;
             
-            // Disable run scenario toggle if no active scenario
-            if (runScenarioToggle && !result.active_scenario_id) {
-                runScenarioToggle.disabled = true;
-                runScenarioToggle.checked = false;
-            }
         });
         
         // Add event listeners with null checks
@@ -601,7 +597,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function saveTriggerOptions() {
         chrome.storage.sync.set({
             show_alert: true, // Always show alert when extension is enabled
-            run_scenario_on_submit: runScenarioToggle.checked,
+            run_scenario_on_submit: runScenarioToggle ? runScenarioToggle.checked : false,
             redirect_to_500: add500ErrorToggle.checked,
             allow_form_continuation: continueDestinationToggle.checked
         });
@@ -810,6 +806,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             console.log(`[Event Definition] Set active scenario to: ${selectedOption.value}`);
             
+            
             // Update run scenario toggle if it exists
             if (runScenarioToggle) {
                 runScenarioToggle.disabled = false;
@@ -834,6 +831,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 active_scenario_id: ""
             });
             
+            
             // Disable run scenario toggle if it exists
             if (runScenarioToggle) {
                 runScenarioToggle.disabled = true;
@@ -847,77 +845,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
     
-    // Handle run scenario button click
-    function handleRunScenario() {
-        // Check for valid integration key first
-        if (!validateIntegrationKey(integrationKeyInput.value.trim())) {
-            showError('Please enter a valid PagerDuty integration key first');
-            
-            // Automatically open the PagerDuty Configuration section
-            const toggleButton = document.getElementById('toggle-pagerduty-config');
-            const contentElement = document.getElementById('pagerduty-config-content');
-            
-            if (toggleButton && contentElement) {
-                // Expand the section if it's collapsed
-                if (contentElement.classList.contains('collapsed')) {
-                    contentElement.classList.remove('collapsed');
-                    toggleButton.classList.remove('collapsed');
-                    // Save the expanded state
-                    saveToggleState('toggle-pagerduty-config', false);
-                }
-                
-                // Focus on the integration key input
-                setTimeout(() => {
-                    integrationKeyInput.focus();
-                }, 100);
-            }
-            
-            return;
-        }
-        
-        const scenarioId = scenarioSelect.value;
-        if (!scenarioId) {
-            showError('Please select a scenario first');
-            runScenarioButton.disabled = true;
-            return;
-        }
-        
-        // Disable button and show loading
-        runScenarioButton.disabled = true;
-        runScenarioButton.innerHTML = '<span class="btn-icon">⏳</span>Running...';
-        scenarioResult.textContent = '';
-        
-        // Get dry run option
-        const dryRun = dryRunCheckbox.checked;
-        
-        // Send to background script to run
-        chrome.runtime.sendMessage({
-            action: 'run_scenario',
-            scenarioId: scenarioId,
-            options: {
-                dryRun: dryRun
-            }
-        }, (response) => {
-            // Re-enable button
-            runScenarioButton.disabled = false;
-            runScenarioButton.innerHTML = '<span class="btn-icon">▶️</span>Run Scenario';
-            
-            if (response && response.success) {
-                showScenarioSuccess(`Scenario "${scenarioId}" started successfully${dryRun ? ' (DRY RUN)' : ''}`);
-                
-                // Update last incident timestamp if not dry run
-                if (!dryRun) {
-                    const now = new Date();
-                    lastIncidentSpan.textContent = formatTimestamp(now);
-                    chrome.storage.sync.set({
-                        last_incident_timestamp: now.toISOString()
-                    });
-                }
-            } else {
-                showScenarioError(`Failed to run scenario: ${response?.error || 'Unknown error'}`);
-            }
-        });
-    }
     
     // Show scenario success message
     function showScenarioSuccess(message) {
