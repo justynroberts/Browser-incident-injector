@@ -107,9 +107,18 @@ The Event Definition System allows you to create complex, multi-step incident sc
 1. Click the extension icon
 2. Scroll to the "Event Definition System" section
 3. Enter your JSON definition in the textarea
-4. Or click "Load Sample Definition" to start with a template
+4. Or click "Load Sample" to start with a template
 5. Select a scenario from the dropdown
 6. Click "Run Scenario" to execute manually
+
+### Saving and Loading Scenario Sets
+
+You can save your custom scenario definitions to JSON files and load them later:
+
+1. **Save to File**: After creating or modifying a scenario definition, click "Save to File" to download it as a JSON file
+2. **Load from File**: Click "Load from File" to import a previously saved scenario definition
+3. The loaded scenario will be automatically validated and saved to local storage
+4. Your loaded scenarios will persist between browser sessions
 
 ### Automatic Scenario Execution
 

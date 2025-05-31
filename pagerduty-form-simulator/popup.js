@@ -79,6 +79,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Add event listener for the Edit JSON button
     document.getElementById('edit-json').addEventListener('click', handleEditJson);
     
+    // Add event listeners for save/load file buttons
+    document.getElementById('save-to-file').addEventListener('click', handleSaveToFile);
+    document.getElementById('load-from-file').addEventListener('click', handleLoadFromFile);
+    
     // Close modal when clicking outside
     window.addEventListener('click', (event) => {
         if (event.target === helpModal) {
@@ -988,5 +992,130 @@ document.addEventListener('DOMContentLoaded', async () => {
             loadSampleButton.disabled = false;
             loadSampleButton.innerHTML = '<span class="btn-icon">📋</span>Load Sample Definition';
         }
+    }
+    
+    // Handle saving event definition to file
+    async function handleSaveToFile() {
+        try {
+            // Get the current event definition
+            const eventDefinition = eventDefinitionTextarea.value.trim();
+            
+            if (!eventDefinition) {
+                showError('No event definition to save');
+                return;
+            }
+            
+            // Validate JSON
+            try {
+                JSON.parse(eventDefinition);
+            } catch (error) {
+                showError(`Invalid JSON: ${error.message}`);
+                return;
+            }
+            
+            // Create a blob with the JSON content
+            const blob = new Blob([eventDefinition], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create a default filename based on current date/time
+            const now = new Date();
+            const defaultFilename = `pagerduty-scenario-${now.toISOString().slice(0, 10)}.json`;
+            
+            // Create a temporary link element to trigger the download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = defaultFilename;
+            a.style.display = 'none';
+            
+            // Add to the DOM, click it, then remove it
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+            
+            showSuccess('Event definition saved to file');
+        } catch (error) {
+            console.error('Error saving to file:', error);
+            showError(`Failed to save file: ${error.message}`);
+        }
+    }
+    
+    // Handle loading event definition from file
+    function handleLoadFromFile() {
+        try {
+            // Create a file input element
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json';
+            fileInput.style.display = 'none';
+            
+            // Add event listener for when a file is selected
+            fileInput.addEventListener('change', async (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                try {
+                    // Read the file content
+                    const content = await readFileContent(file);
+                    
+                    // Validate JSON
+                    try {
+                        JSON.parse(content);
+                    } catch (error) {
+                        showError(`Invalid JSON in file: ${error.message}`);
+                        return;
+                    }
+                    
+                    // Set the content in the textarea
+                    eventDefinitionTextarea.value = content;
+                    
+                    // Validate and process the event definition
+                    const isValid = validateEventDefinition(content);
+                    
+                    if (isValid) {
+                        // Save to local storage
+                        await chrome.storage.local.set({
+                            event_definition: content
+                        });
+                        
+                        showSuccess(`Event definition loaded from ${file.name}`);
+                    }
+                } catch (error) {
+                    console.error('Error reading file:', error);
+                    showError(`Failed to read file: ${error.message}`);
+                }
+                
+                // Clean up
+                document.body.removeChild(fileInput);
+            });
+            
+            // Add to the DOM and trigger click
+            document.body.appendChild(fileInput);
+            fileInput.click();
+        } catch (error) {
+            console.error('Error loading from file:', error);
+            showError(`Failed to load file: ${error.message}`);
+        }
+    }
+    
+    // Helper function to read file content
+    function readFileContent(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            
+            reader.onload = (event) => {
+                resolve(event.target.result);
+            };
+            
+            reader.onerror = (error) => {
+                reject(error);
+            };
+            
+            reader.readAsText(file);
+        });
     }
 });
