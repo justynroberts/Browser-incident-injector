@@ -1,19 +1,51 @@
 // Incident Injector - Background Script
+
+// Import event processor
+importScripts('event-processor.js');
+
+// Initialize event processor
+console.log('[Incident Injector] Initializing event processor');
+eventProcessor.initialize()
+    .then(() => {
+        console.log('[Incident Injector] Event processor initialized successfully');
+        
+        // Check if there's an event definition in local storage
+        return chrome.storage.local.get(['event_definition']);
+    })
+    .then((result) => {
+        if (result.event_definition) {
+            console.log('[Incident Injector] Found event definition in storage, loading it');
+            return eventProcessor.loadEventDefinition(result.event_definition);
+        } else {
+            console.log('[Incident Injector] No event definition found in storage');
+            return false;
+        }
+    })
+    .then((loaded) => {
+        console.log('[Incident Injector] Event definition loaded:', loaded);
+    })
+    .catch(error => {
+        console.error('[Incident Injector] Failed to initialize event processor:', error);
+    });
+
 chrome.runtime.onInstalled.addListener(() => {
     console.log('[Incident Injector] Extension installed');
     
     // Set default values
     chrome.storage.sync.set({
-        extension_enabled: true,
-        show_alert: true,
+        extension_enabled: false, // Disabled by default
+        show_alert: true, // Always show alert when extension is enabled
         allow_form_continuation: false,
         redirect_to_500: false,
-        custom_alert_message: "🚨 Error: Form submission failed! PagerDuty incident created.",
-        target_element_texts: "" // No defaults - user must configure
+        run_scenario_on_submit: false,
+        custom_alert_message: "Oops ⛓️‍� Error: UX Failure -  Our team are Working on it now.",
+        target_element_texts: "", // No defaults - user must configure
+        active_scenario_id: "", // No default active scenario
+        toggle_button_visible: true // Show toggle button by default
     });
 });
 
-// Listen for messages from content scripts
+// Listen for messages from content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'create_incident') {
         handleIncidentCreation(request.data, sendResponse);
@@ -21,8 +53,146 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'test_incident') {
         handleTestIncident(sendResponse);
         return true;
+    } else if (request.action === 'load_event_definition') {
+        handleLoadEventDefinition(request.definition, sendResponse);
+        return true;
+    } else if (request.action === 'run_scenario') {
+        handleRunScenario(request.scenarioId, request.options, sendResponse);
+        return true;
+    } else if (request.action === 'run_active_scenario') {
+        handleRunActiveScenario(request.data, sendResponse);
+        return true;
+    } else if (request.action === 'open_popup') {
+        // Handle opening the popup
+        chrome.action.openPopup();
+        sendResponse({ success: true });
+        return true;
     }
 });
+
+// Handle loading event definition
+async function handleLoadEventDefinition(definitionJson, sendResponse) {
+    try {
+        // Load the definition into the event processor
+        const success = eventProcessor.loadEventDefinition(definitionJson);
+        
+        if (success) {
+            // Get available scenarios
+            const scenarios = eventProcessor.getAvailableScenarios();
+            sendResponse({
+                success: true,
+                scenarios: scenarios
+            });
+        } else {
+            sendResponse({
+                success: false,
+                error: 'Failed to load event definition'
+            });
+        }
+    } catch (error) {
+        console.error('[Event Definition] Error loading definition:', error);
+        sendResponse({
+            success: false,
+            error: error.message
+        });
+    }
+}
+
+// Handle running a scenario
+async function handleRunScenario(scenarioId, options, sendResponse) {
+    try {
+        // Re-initialize to ensure integration key is loaded
+        await eventProcessor.initialize();
+        
+        // Start the scenario
+        const success = await eventProcessor.startScenario(scenarioId, options);
+        
+        if (success) {
+            sendResponse({
+                success: true,
+                message: `Event definition ${scenarioId} started successfully`
+            });
+        } else {
+            // Check if integration key is missing
+            const result = await chrome.storage.sync.get(['pagerduty_integration_key']);
+            const errorMessage = !result.pagerduty_integration_key ?
+                'No PagerDuty integration key configured. Please set a key in the extension settings.' :
+                'Failed to start event definition';
+                
+            sendResponse({
+                success: false,
+                error: errorMessage
+            });
+        }
+    } catch (error) {
+        console.error('[Event Definition] Error running event definition:', error);
+        sendResponse({
+            success: false,
+            error: error.message
+        });
+    }
+}
+
+// Handle running the active scenario
+async function handleRunActiveScenario(formData, sendResponse) {
+    try {
+        console.log('[Event Definition] Handling run active scenario request with form data:', formData);
+        console.log('[Event Definition] Message received in background script');
+        
+        // Get the active scenario ID
+        const result = await chrome.storage.sync.get(['active_scenario_id']);
+        const activeScenarioId = result.active_scenario_id;
+        console.log('[Event Definition] Retrieved active scenario ID from storage:', activeScenarioId);
+        
+        console.log('[Event Definition] Active scenario ID:', activeScenarioId);
+        
+        if (!activeScenarioId) {
+            console.error('[Event Definition] No active scenario configured');
+            sendResponse({
+                success: false,
+                error: 'No active scenario configured'
+            });
+            return;
+        }
+        
+        // Re-initialize to ensure integration key is loaded
+        await eventProcessor.initialize();
+        
+        // Start the scenario
+        console.log('[Event Definition] Running scenario:', activeScenarioId);
+        
+        // Add more detailed logging
+        console.log('[Event Definition] Integration key:', eventProcessor.integrationKey);
+        console.log('[Event Definition] Current definition:', eventProcessor.currentDefinition ? 'Loaded' : 'Not loaded');
+        
+        const success = await eventProcessor.runScenario(activeScenarioId);
+        console.log('[Event Definition] Scenario run result:', success);
+        
+        if (success) {
+            sendResponse({
+                success: true,
+                message: `Active scenario ${activeScenarioId} executed successfully`
+            });
+        } else {
+            // Check if integration key is missing
+            const keyResult = await chrome.storage.sync.get(['pagerduty_integration_key']);
+            const errorMessage = !keyResult.pagerduty_integration_key ?
+                'No PagerDuty integration key configured. Please set a key in the extension settings.' :
+                'Failed to run active scenario';
+                
+            sendResponse({
+                success: false,
+                error: errorMessage
+            });
+        }
+    } catch (error) {
+        console.error('[Event Definition] Error running active scenario:', error);
+        sendResponse({
+            success: false,
+            error: error.message
+        });
+    }
+}
 
 // Handle incident creation
 async function handleIncidentCreation(formData, sendResponse) {
@@ -55,17 +225,8 @@ async function handleIncidentCreation(formData, sendResponse) {
         // Generate deduplication key
         const dedupKey = generateDedupKey(formData.url, formData.formAction);
         
-        // Check if we've sent this incident recently (deduplication)
-        const recentIncidents = await getRecentIncidents();
-        if (recentIncidents.includes(dedupKey)) {
-            console.log('[PagerDuty Simulator] Incident deduplicated:', dedupKey);
-            sendResponse({
-                success: true,
-                incidentId: 'deduplicated',
-                message: 'Incident deduplicated (sent within last 5 minutes)'
-            });
-            return;
-        }
+        // No deduplication - allow sending the same incident multiple times
+        console.log('[PagerDuty Simulator] Deduplication disabled, allowing duplicate incidents');
 
         // Create PagerDuty incident payload
         const payload = createIncidentPayload(formData, integrationKey, dedupKey);
@@ -137,9 +298,10 @@ function isValidIntegrationKey(key) {
     return keyRegex.test(key);
 }
 
-// Generate deduplication key
+// Generate deduplication key with timestamp to ensure uniqueness
 function generateDedupKey(url, formAction) {
-    const baseString = `${url}:${formAction}`;
+    const timestamp = Date.now();
+    const baseString = `${url}:${formAction}:${timestamp}`;
     return btoa(baseString).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
 }
 
@@ -150,7 +312,7 @@ function createIncidentPayload(formData, integrationKey, dedupKey) {
         event_action: "trigger",
         dedup_key: dedupKey,
         payload: {
-            summary: `User Experience Error. Form submission error on ${formData.title}`,
+            summary: `User Experience Error. Form submission error on ${formData.title} - ${new Date().toLocaleTimeString()}`,
             source: formData.url,
             severity: "error",
             component: "web-form",
@@ -214,42 +376,16 @@ async function sendToPagerDuty(payload, retryCount = 0) {
     }
 }
 
-// Store recent incident for deduplication
+// Store recent incident for deduplication - now a no-op to disable deduplication
 async function storeRecentIncident(dedupKey) {
-    const result = await chrome.storage.local.get(['recent_incidents']);
-    const recentIncidents = result.recent_incidents || {};
-    
-    // Clean up old incidents (older than 5 minutes)
-    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-    const cleanedIncidents = {};
-    
-    for (const [key, timestamp] of Object.entries(recentIncidents)) {
-        if (timestamp > fiveMinutesAgo) {
-            cleanedIncidents[key] = timestamp;
-        }
-    }
-    
-    // Add new incident
-    cleanedIncidents[dedupKey] = Date.now();
-    
-    await chrome.storage.local.set({ recent_incidents: cleanedIncidents });
+    // No-op - deduplication disabled
+    console.log('[PagerDuty Simulator] Deduplication disabled, not storing incident:', dedupKey);
 }
 
-// Get recent incidents for deduplication
+// Get recent incidents for deduplication - now returns empty array to disable deduplication
 async function getRecentIncidents() {
-    const result = await chrome.storage.local.get(['recent_incidents']);
-    const recentIncidents = result.recent_incidents || {};
-    
-    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-    const recentKeys = [];
-    
-    for (const [key, timestamp] of Object.entries(recentIncidents)) {
-        if (timestamp > fiveMinutesAgo) {
-            recentKeys.push(key);
-        }
-    }
-    
-    return recentKeys;
+    // Return empty array to disable deduplication
+    return [];
 }
 
 // Handle extension uninstall - clear stored data

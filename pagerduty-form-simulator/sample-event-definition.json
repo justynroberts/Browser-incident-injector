@@ -1,0 +1,445 @@
+{
+  "schema_version": "1.0",
+  "global_config": {
+    "variables": {
+      "service_name": "Web Application",
+      "component_name": "Frontend",
+      "environment": "Production",
+      "team": "Platform Engineering",
+      "application": "E-commerce Platform"
+    }
+  },
+  "event_definitions": [
+    {
+      "id": "deployment_incident",
+      "name": "Deployment with Incidents",
+      "description": "Simulates a deployment followed by related incidents",
+      "variables": {
+        "deployment_version": "v2.8.0",
+        "deployer": "CI/CD Pipeline",
+        "component": "web-application"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Deploying {{deployment_version}} to {{environment}}",
+          "severity": "info",
+          "component": "{{component}}",
+          "group": "change-management",
+          "class": "change",
+          "custom_details": {
+            "change_type": "deployment",
+            "version": "{{deployment_version}}",
+            "components": ["api", "frontend", "database"],
+            "change_id": "CH-{{random_number}}",
+            "deployer": "{{deployer}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 0
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "API latency spike detected after deployment",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "performance",
+          "class": "degradation",
+          "custom_details": {
+            "latency_increase": "47%",
+            "affected_endpoints": ["/users", "/transactions"],
+            "deployment_id": "D-{{random_number}}",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Database connection pool exhausted",
+          "severity": "error",
+          "component": "{{component}}",
+          "group": "infrastructure",
+          "class": "resource",
+          "custom_details": {
+            "connection_count": "Maximum (100)",
+            "query_timeout_count": 27,
+            "related_to": "Recent deployment {{deployment_version}}",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Payment processing failures reported",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "business",
+          "class": "error",
+          "custom_details": {
+            "error_rate": "18%",
+            "affected_payment_methods": ["credit-card", "paypal"],
+            "error_message": "Database query timeout",
+            "customer_impact": "Unable to complete purchases",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        }
+      ]
+    },
+    {
+      "id": "infrastructure_degradation",
+      "name": "Infrastructure Degradation",
+      "description": "Simulates infrastructure issues starting with a maintenance event",
+      "variables": {
+        "maintenance_window": "30 minutes",
+        "affected_region": "us-east-1",
+        "component": "web-application"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Scheduled network maintenance starting",
+          "severity": "info",
+          "component": "{{component}}",
+          "group": "change-management",
+          "class": "change",
+          "custom_details": {
+            "change_type": "maintenance",
+            "maintenance_window": "{{maintenance_window}}",
+            "affected_regions": ["{{affected_region}}"],
+            "expected_impact": "Minimal",
+            "change_id": "CH-{{random_number}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 0
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "CDN edge node failures detected",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "infrastructure",
+          "class": "availability",
+          "custom_details": {
+            "affected_regions": ["{{affected_region}}"],
+            "error_rate": "12%",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "API gateway timeout errors increasing",
+          "severity": "error",
+          "component": "{{component}}",
+          "group": "infrastructure",
+          "class": "availability",
+          "custom_details": {
+            "timeout_rate": "23%",
+            "affected_services": ["user-service", "product-service"],
+            "related_to": "Network maintenance",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Customer login failures reported",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "security",
+          "class": "error",
+          "custom_details": {
+            "failure_rate": "35%",
+            "error_message": "Gateway timeout",
+            "customer_impact": "Unable to log in",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        }
+      ]
+    },
+    {
+      "id": "incident_lifecycle",
+      "name": "Full Incident Lifecycle",
+      "description": "Simulates a complete incident lifecycle with multiple related trigger events",
+      "variables": {
+        "incident_key": "INC-{{incident_id}}",
+        "component": "web-application"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "High CPU usage detected on web servers",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "infrastructure",
+          "class": "resource",
+          "dedup_key": "{{incident_key}}",
+          "custom_details": {
+            "cpu_usage": "92%",
+            "affected_servers": ["web-01", "web-02", "web-03"],
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 0
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Investigating high CPU usage on web servers",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "infrastructure",
+          "class": "resource",
+          "dedup_key": "{{incident_key}}-2",
+          "custom_details": {
+            "investigation_by": "On-call Engineer",
+            "notes": "Investigating potential memory leak",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "High CPU usage resolved - restarted application services",
+          "severity": "info",
+          "component": "{{component}}",
+          "group": "infrastructure",
+          "class": "resource",
+          "dedup_key": "{{incident_key}}-3",
+          "custom_details": {
+            "resolution_notes": "Identified memory leak in caching service and restarted application",
+            "resolution_time": "17 minutes",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        }
+      ]
+    },
+    {
+      "id": "security_incident",
+      "name": "Security Incident Escalation",
+      "description": "Simulates a security incident with escalating severity",
+      "variables": {
+        "incident_key": "SEC-{{incident_id}}",
+        "component": "web-application"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Unusual login patterns detected",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "security",
+          "class": "security",
+          "dedup_key": "{{incident_key}}",
+          "custom_details": {
+            "login_attempts": "127 in last 5 minutes",
+            "source_ips": "Multiple countries",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 0
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Potential brute force attack in progress",
+          "severity": "error",
+          "component": "{{component}}",
+          "group": "security",
+          "class": "security",
+          "custom_details": {
+            "failed_logins": "85% failure rate",
+            "affected_accounts": "12 user accounts",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Unauthorized access detected to admin console",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "security",
+          "class": "security",
+          "custom_details": {
+            "access_type": "Admin console",
+            "actions_taken": "User permission changes",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Security team investigating unauthorized access",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "security",
+          "class": "security",
+          "dedup_key": "{{incident_key}}-2",
+          "custom_details": {
+            "investigation_by": "Security Team Lead",
+            "actions_taken": "Locked affected accounts, enabled enhanced monitoring",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        }
+      ]
+    },
+    {
+      "id": "database_failure",
+      "name": "Database Failure Cascade",
+      "description": "Simulates a database failure that cascades to multiple services",
+      "variables": {
+        "incident_key": "DB-{{incident_id}}",
+        "component": "web-application"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Database replication lag detected",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "database",
+          "class": "performance",
+          "dedup_key": "{{incident_key}}",
+          "custom_details": {
+            "replication_lag": "45 seconds",
+            "affected_replicas": "2 of 3",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 0
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Primary database CPU saturation",
+          "severity": "error",
+          "component": "{{component}}",
+          "group": "database",
+          "class": "resource",
+          "custom_details": {
+            "cpu_usage": "98%",
+            "memory_usage": "87%",
+            "query_count": "3x normal load",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Database failover initiated",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "database",
+          "class": "availability",
+          "custom_details": {
+            "failover_type": "Automatic",
+            "estimated_downtime": "30-60 seconds",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Multiple services reporting database connection failures",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "application",
+          "class": "error",
+          "custom_details": {
+            "affected_services": ["checkout", "inventory", "user-profiles"],
+            "error_rate": "100%",
+            "customer_impact": "Unable to complete transactions",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "random",
+            "min": 1000,
+            "max": 2000
+          }
+        }
+      ]
+    }
+  ]
+}

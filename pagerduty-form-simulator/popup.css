@@ -82,10 +82,85 @@ main {
     margin-bottom: 0;
 }
 
-.section h3 {
+/* Section Headers with Toggle */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.section-header h3 {
     font-size: 14px;
     font-weight: 600;
     color: #333;
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+}
+
+.section-icon {
+    margin-right: 6px;
+    font-size: 16px;
+}
+
+.toggle-button {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 12px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.toggle-button:hover {
+    background: #f0f0f0;
+}
+
+.toggle-button .toggle-icon {
+    transition: transform 0.3s ease;
+}
+
+.toggle-button.collapsed .toggle-icon {
+    transform: rotate(-90deg);
+}
+
+.section-content {
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+    max-height: 1000px;
+    opacity: 1;
+    overflow: hidden;
+}
+
+.section-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+/* Button Row */
+.button-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.button-row .btn {
+    flex: 1;
+}
+
+/* Test Buttons */
+#test-section-content .button-row {
     margin-bottom: 12px;
 }
 
@@ -282,8 +357,51 @@ main {
     transform: none;
 }
 
+.btn-secondary {
+    background: #f8f9fa;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #e9ecef;
+    transform: translateY(-1px);
+}
+
+.btn-secondary:disabled {
+    background: #f8f9fa;
+    color: #aaa;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .btn-icon {
     font-size: 14px;
+}
+
+/* Disabled button with reason styling */
+.btn.disabled-with-reason {
+    position: relative;
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    border: 1px dashed #999;
+}
+
+.btn.disabled-with-reason::after {
+    content: '⚠️ Select a scenario first';
+    position: absolute;
+    bottom: -20px;
+    left: 0;
+    right: 0;
+    font-size: 10px;
+    color: #f44336;
+    background: rgba(244, 67, 54, 0.1);
+    padding: 2px 4px;
+    border-radius: 2px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
 /* Test Result */
@@ -484,4 +602,159 @@ footer {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #999;
+}
+
+/* Event Definition System Styles */
+#event-definition {
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.scenario-controls {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed #eee;
+}
+
+.select-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: white;
+    transition: border-color 0.3s ease;
+}
+
+.select-input:focus {
+    outline: none;
+    border-color: #06ac38;
+    box-shadow: 0 0 0 2px rgba(6, 172, 56, 0.1);
+}
+
+.scenario-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 6px;
+    background: #f0f0f0;
+    color: #666;
+}
+
+.scenario-description {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
+    margin-bottom: 12px;
+}
+
+.event-definition-example {
+    font-family: monospace;
+    font-size: 11px;
+    background: #f8f9fa;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #eee;
+    margin-top: 8px;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Trigger Options Styles */
+.trigger-options-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.trigger-option {
+    display: flex;
+    align-items: flex-start;
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 10px;
+    border: 1px solid #eee;
+}
+
+.option-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: #06ac38;
+    color: white;
+    border-radius: 50%;
+    font-weight: bold;
+    font-size: 12px;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.option-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.option-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: #333;
+}
+
+.option-description {
+    font-size: 11px;
+    color: #666;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+    margin-left: auto;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 20px;
+}
+
+.switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .switch-slider {
+    background-color: #06ac38;
+}
+
+input:checked + .switch-slider:before {
+    transform: translateX(20px);
 }
