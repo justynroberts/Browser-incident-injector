@@ -51,8 +51,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Initialize trigger options
     initializeTriggerOptions();
     
-    // Initially disable test scenario button until a scenario is selected
+    // Load event definition if exists
+    const localResult = await chrome.storage.local.get(['event_definition']);
+    if (localResult.event_definition) {
+        console.log('[Event Definition] Found existing event definition, validating...');
+        eventDefinitionTextarea.value = localResult.event_definition;
+        validateEventDefinition(localResult.event_definition);
+    } else {
+        console.log('[Event Definition] No existing event definition found');
+    }
+    
+    // Update scenario button state
     updateScenarioButtonState();
+    
+    // Make sure scenario controls visibility matches validation state
+    const definition = eventDefinitionTextarea.value.trim();
+    if (definition) {
+        try {
+            JSON.parse(definition);
+            scenarioControls.style.display = 'block';
+        } catch (e) {
+            scenarioControls.style.display = 'none';
+        }
+    } else {
+        scenarioControls.style.display = 'none';
+    }
     
     // Check if event definition exists, if not, load the sample by default
     try {
@@ -481,17 +504,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Function to update scenario button state based on whether a scenario is defined
     function updateScenarioButtonState() {
-        chrome.storage.sync.get(['active_scenario_id'], (result) => {
+        console.log('[Event Definition] Updating scenario button state');
+        
+        chrome.storage.sync.get(['active_scenario_id', 'pagerduty_integration_key'], (result) => {
             const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
-            testScenarioButton.disabled = !hasActiveScenario;
+            const hasIntegrationKey = result.pagerduty_integration_key && result.pagerduty_integration_key.trim() !== '';
             
-            // Update button appearance to indicate why it's disabled
+            // Button should be disabled if either condition is not met
+            const shouldBeEnabled = hasActiveScenario && hasIntegrationKey;
+            testScenarioButton.disabled = !shouldBeEnabled;
+            
+            // Update button appearance and tooltip based on state
             if (!hasActiveScenario) {
                 testScenarioButton.title = 'Please select a scenario first';
                 testScenarioButton.classList.add('disabled-with-reason');
+                console.log('[Event Definition] Button disabled: No active scenario');
+            } else if (!hasIntegrationKey) {
+                testScenarioButton.title = 'Please configure PagerDuty integration key first';
+                testScenarioButton.classList.add('disabled-with-reason');
+                console.log('[Event Definition] Button disabled: No integration key');
             } else {
                 testScenarioButton.title = 'Test the currently selected scenario';
                 testScenarioButton.classList.remove('disabled-with-reason');
+                console.log('[Event Definition] Button enabled: All requirements met');
+            }
+            
+            // Also update the run scenario toggle if it exists
+            if (runScenarioToggle) {
+                runScenarioToggle.disabled = !hasActiveScenario;
+                if (hasActiveScenario) {
+                    // Restore the previous state or default to true
+                    chrome.storage.sync.get(['run_scenario_on_submit'], (toggleResult) => {
+                        runScenarioToggle.checked = toggleResult.run_scenario_on_submit !== false;
+                    });
+                } else {
+                    runScenarioToggle.checked = false;
+                }
             }
         });
     }
@@ -645,7 +693,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Validate event definition JSON
     function validateEventDefinition(definitionJson) {
+        console.log('[Event Definition] Validating event definition');
+        
         if (!definitionJson) {
+            console.warn('[Event Definition] Empty definition provided');
             definitionValidation.textContent = '';
             definitionValidation.className = 'validation-message';
             scenarioControls.style.display = 'none';
@@ -658,57 +709,66 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Check for schema version
             if (definition.schema_version) {
-                console.log(`Event definition schema version: ${definition.schema_version}`);
+                console.log(`[Event Definition] Schema version: ${definition.schema_version}`);
+            } else {
+                console.warn('[Event Definition] No schema version specified');
             }
             
             // Basic validation - check for event_definitions (new schema) or scenarios (old schema)
             let hasValidDefinitions = false;
+            let scenarioCount = 0;
             
             // Check new schema format
-            if (definition.event_definitions && definition.event_definitions.length > 0) {
+            if (definition.event_definitions && Array.isArray(definition.event_definitions)) {
+                console.log(`[Event Definition] Found ${definition.event_definitions.length} event definitions`);
+                
                 // Check if at least one event definition has events
                 for (const eventDef of definition.event_definitions) {
-                    if (eventDef.events && eventDef.events.length > 0) {
-                        hasValidDefinitions = true;
-                        break;
+                    if (!eventDef.id) {
+                        throw new Error(`Event definition at index ${scenarioCount} missing required 'id' field`);
                     }
+                    
+                    if (!eventDef.events || !Array.isArray(eventDef.events) || eventDef.events.length === 0) {
+                        console.warn(`[Event Definition] Event definition '${eventDef.id}' has no events`);
+                        continue;
+                    }
+                    
+                    hasValidDefinitions = true;
+                    scenarioCount++;
                 }
                 
                 if (!hasValidDefinitions) {
-                    definitionValidation.textContent = '✗ Invalid format: No events defined in any event definition';
-                    definitionValidation.className = 'validation-message invalid';
-                    scenarioControls.style.display = 'none';
-                    return false;
+                    throw new Error('No valid events found in any event definition');
                 }
             }
             // Check old schema format
-            else if (definition.scenarios && Object.keys(definition.scenarios).length > 0) {
+            else if (definition.scenarios && typeof definition.scenarios === 'object') {
+                console.log('[Event Definition] Using legacy scenarios format');
+                
                 // Check if at least one scenario has events
                 for (const scenarioId in definition.scenarios) {
                     const scenario = definition.scenarios[scenarioId];
-                    if (scenario.events && scenario.events.length > 0) {
-                        hasValidDefinitions = true;
-                        break;
+                    if (!scenario.events || !Array.isArray(scenario.events) || scenario.events.length === 0) {
+                        console.warn(`[Event Definition] Scenario '${scenarioId}' has no events`);
+                        continue;
                     }
+                    
+                    hasValidDefinitions = true;
+                    scenarioCount++;
                 }
                 
                 if (!hasValidDefinitions) {
-                    definitionValidation.textContent = '✗ Invalid format: No events defined in any scenario';
-                    definitionValidation.className = 'validation-message invalid';
-                    scenarioControls.style.display = 'none';
-                    return false;
+                    throw new Error('No valid events found in any scenario');
                 }
             }
-            // No valid definitions found
             else {
-                definitionValidation.textContent = '✗ Invalid format: No event definitions or scenarios found';
-                definitionValidation.className = 'validation-message invalid';
-                scenarioControls.style.display = 'none';
-                return false;
+                throw new Error('Invalid format: No event definitions or scenarios found');
             }
             
-            // Valid definition
-            definitionValidation.textContent = '✓ Valid event definition format';
+            console.log(`[Event Definition] Validation successful: Found ${scenarioCount} valid scenarios`);
+            
+            // Update UI
+            definitionValidation.textContent = `✓ Valid event definition format (${scenarioCount} scenarios)`;
             definitionValidation.className = 'validation-message valid';
             scenarioControls.style.display = 'block';
             
@@ -718,9 +778,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 definition: definitionJson
             }, (response) => {
                 if (response && response.success) {
+                    console.log('[Event Definition] Successfully loaded into background script');
                     populateScenarioDropdown(response.scenarios);
                 } else {
-                    console.error('Failed to load event definition:', response?.error);
+                    console.error('[Event Definition] Failed to load:', response?.error);
+                    showError(`Failed to load event definition: ${response?.error || 'Unknown error'}`);
                 }
             });
             
@@ -735,10 +797,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Populate scenario dropdown
     function populateScenarioDropdown(scenarios) {
+        console.log('[Event Definition] Populating scenarios:', scenarios);
+        
         // Clear existing options except the first one
         while (scenarioSelect.options.length > 1) {
             scenarioSelect.remove(1);
         }
+        
+        if (!Array.isArray(scenarios) || scenarios.length === 0) {
+            console.warn('[Event Definition] No scenarios available to populate');
+            scenarioSelect.disabled = true;
+            return;
+        }
+        
+        scenarioSelect.disabled = false;
         
         // Add scenarios to dropdown
         scenarios.forEach(scenario => {
@@ -770,20 +842,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                         break;
                     }
                 }
+            } else {
+                // If no previous selection, select the first scenario by default
+                if (scenarioSelect.options.length > 1) {
+                    scenarioSelect.selectedIndex = 1;
+                    handleScenarioSelect();
+                }
             }
             
             // Enable/disable run button based on selection
-            runScenarioButton.disabled = scenarioSelect.value === '';
+            updateScenarioButtonState();
         });
     }
     
     // Handle scenario selection
     function handleScenarioSelect() {
+        console.log('[Event Definition] Handling scenario selection');
         const selectedOption = scenarioSelect.options[scenarioSelect.selectedIndex];
-        runScenarioButton.disabled = scenarioSelect.value === '';
         
         // Show scenario details if available
         if (selectedOption && selectedOption.value) {
+            console.log(`[Event Definition] Selected scenario: ${selectedOption.value}`);
             const eventCount = selectedOption.dataset.eventCount;
             const description = selectedOption.dataset.description;
             
@@ -802,47 +881,55 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Set this as the active scenario for trigger options
             chrome.storage.sync.set({
-                active_scenario_id: selectedOption.value
-            });
-            console.log(`[Event Definition] Set active scenario to: ${selectedOption.value}`);
-            
-            
-            // Update run scenario toggle if it exists
-            if (runScenarioToggle) {
-                runScenarioToggle.disabled = false;
-                runScenarioToggle.checked = true; // Automatically enable the toggle
+                active_scenario_id: selectedOption.value,
+                run_scenario_on_submit: true  // Enable scenario running by default
+            }, () => {
+                if (chrome.runtime.lastError) {
+                    console.error('[Event Definition] Error saving scenario:', chrome.runtime.lastError);
+                    return;
+                }
+                console.log(`[Event Definition] Set active scenario to: ${selectedOption.value}`);
                 
-                // Save the setting
-                chrome.storage.sync.set({
-                    run_scenario_on_submit: true
-                });
-                console.log('[Event Definition] Automatically enabled Run Scenario toggle');
-            }
-            
-            // Update test scenario button state
-            testScenarioButton.disabled = false;
-            testScenarioButton.title = 'Test the currently selected scenario';
-            testScenarioButton.classList.remove('disabled-with-reason');
+                // Update run scenario toggle if it exists
+                if (runScenarioToggle) {
+                    runScenarioToggle.disabled = false;
+                    runScenarioToggle.checked = true;
+                }
+                
+                // Update test scenario button state
+                testScenarioButton.disabled = false;
+                testScenarioButton.title = 'Test the currently selected scenario';
+                testScenarioButton.classList.remove('disabled-with-reason');
+            });
         } else {
+            console.log('[Event Definition] No scenario selected');
             scenarioResult.textContent = '';
             
             // Clear active scenario
             chrome.storage.sync.set({
-                active_scenario_id: ""
+                active_scenario_id: '',
+                run_scenario_on_submit: false
+            }, () => {
+                if (chrome.runtime.lastError) {
+                    console.error('[Event Definition] Error clearing scenario:', chrome.runtime.lastError);
+                    return;
+                }
+                
+                // Disable run scenario toggle if it exists
+                if (runScenarioToggle) {
+                    runScenarioToggle.disabled = true;
+                    runScenarioToggle.checked = false;
+                }
+                
+                // Disable test scenario button
+                testScenarioButton.disabled = true;
+                testScenarioButton.title = 'Please select a scenario first';
+                testScenarioButton.classList.add('disabled-with-reason');
             });
-            
-            
-            // Disable run scenario toggle if it exists
-            if (runScenarioToggle) {
-                runScenarioToggle.disabled = true;
-                runScenarioToggle.checked = false;
-            }
-            
-            // Disable test scenario button
-            testScenarioButton.disabled = true;
-            testScenarioButton.title = 'Please select a scenario first';
-            testScenarioButton.classList.add('disabled-with-reason');
         }
+        
+        // Update button state
+        updateScenarioButtonState();
     }
     
     
