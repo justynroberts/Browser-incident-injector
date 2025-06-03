@@ -31,6 +31,8 @@
         showAlert = result.show_alert !== false; // Default to true
         allowFormContinuation = result.allow_form_continuation || false;
         redirectTo500 = result.redirect_to_500 || false;
+
+        console.log('[PagerDuty Simulator] Show alert setting:', showAlert);
         
         // Only enable run_scenario_on_submit if there's an active scenario
         const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
@@ -64,8 +66,9 @@
             if (changes.extension_enabled) {
                 extensionEnabled = changes.extension_enabled.newValue;
             }
-            if (changes.show_alert) {
-                showAlert = changes.show_alert.newValue;
+            if (changes.show_alert !== undefined) {
+                showAlert = changes.show_alert.newValue !== false;
+                console.log('[PagerDuty Simulator] Show alert setting changed:', showAlert);
             }
             if (changes.allow_form_continuation) {
                 allowFormContinuation = changes.allow_form_continuation.newValue;
@@ -342,8 +345,8 @@
             }
         });
 
-        // Show alert if extension is enabled
-        if (extensionEnabled) {
+        // Show alert if enabled and configured
+        if (extensionEnabled && showAlert) {
             showAlertMessage(customAlertMessage);
         }
 
@@ -403,8 +406,8 @@
             }
         });
 
-        // Show alert if extension is enabled
-        if (extensionEnabled) {
+        // Show alert if enabled and configured
+        if (extensionEnabled && showAlert) {
             showAlertMessage(customAlertMessage);
         }
 
@@ -690,24 +693,25 @@
                 continue;
             }
             
-            // Check if element text matches any of the target texts (exact match or contains)
+            // Check if element text exactly matches any of the target texts
             const matchesTargetText = targetElementTexts.some(targetText => {
                 const lowerTargetText = targetText.toLowerCase().trim();
-                
-                // More strict matching - either exact match or element text is short and contains target
                 const exactMatch = elementText === lowerTargetText;
-                const containsMatch = elementText.length <= 50 && elementText.includes(lowerTargetText);
-                const attributeMatch = element.getAttribute('aria-label')?.toLowerCase().includes(lowerTargetText) ||
-                                     element.title?.toLowerCase().includes(lowerTargetText) ||
-                                     element.getAttribute('alt')?.toLowerCase().includes(lowerTargetText);
+                
+                // Only check attributes if there's no exact text match
+                const attributeMatch = !exactMatch && (
+                    element.getAttribute('aria-label')?.toLowerCase().trim() === lowerTargetText ||
+                    element.title?.toLowerCase().trim() === lowerTargetText ||
+                    element.getAttribute('alt')?.toLowerCase().trim() === lowerTargetText
+                );
                 
                 // Log matching attempts for debugging
-                if (exactMatch || containsMatch || attributeMatch) {
-                    console.log(`[PagerDuty Simulator] Element text "${elementText}" matched target "${lowerTargetText}"`,
-                        { exactMatch, containsMatch, attributeMatch });
+                if (exactMatch || attributeMatch) {
+                    console.log(`[PagerDuty Simulator] Element matched target "${lowerTargetText}"`,
+                        { exactMatch, attributeMatch });
                 }
                 
-                return exactMatch || containsMatch || attributeMatch;
+                return exactMatch || attributeMatch;
             });
 
             if (matchesTargetText) {
@@ -802,7 +806,9 @@
                     };
                     
                     createIncident(formData);
-                    showAlertMessage(customAlertMessage);
+                    if (showAlert) {
+                        showAlertMessage(customAlertMessage);
+                    }
                 }
             }
             
@@ -835,7 +841,9 @@
                 };
                 
                 createIncident(formData);
-                showAlertMessage(customAlertMessage);
+                if (showAlert) {
+                    showAlertMessage(customAlertMessage);
+                }
             }
             
             return originalXHRSend.apply(this, arguments);

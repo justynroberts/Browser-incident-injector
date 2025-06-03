@@ -76,9 +76,9 @@
                             <span class="option-number">1</span>
                             <div class="option-content">
                                 <div class="option-title">Show Custom Alert</div>
-                                <div class="option-description">Alert always shown when extension is enabled</div>
+                                <div class="option-description">Display alert message on trigger</div>
                                 <label class="toggle-switch">
-                                    <input type="checkbox" id="option-create-alert" checked disabled>
+                                    <input type="checkbox" id="option-create-alert" checked>
                                     <span class="switch-slider"></span>
                                 </label>
                             </div>
@@ -171,17 +171,6 @@
                             <select id="scenario-select" class="select-input">
                                 <option value="">-- Select a scenario --</option>
                             </select>
-                        </div>
-                        
-                        <div class="checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="dry-run-mode">
-                                <span class="checkmark"></span>
-                                Dry Run Mode
-                            </label>
-                            <div class="checkbox-help">
-                                Simulate scenario execution without sending actual PagerDuty events
-                            </div>
                         </div>
                         
                         <div id="scenario-result" class="test-result"></div>

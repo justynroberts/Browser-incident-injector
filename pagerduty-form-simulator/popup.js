@@ -28,7 +28,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const definitionValidation = document.getElementById('definition-validation');
     const scenarioControls = document.getElementById('scenario-controls');
     const scenarioSelect = document.getElementById('scenario-select');
-    const dryRunCheckbox = document.getElementById('dry-run-mode');
     const scenarioResult = document.getElementById('scenario-result');
     const loadSampleButton = document.getElementById('load-sample');
     
@@ -98,8 +97,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     integrationKeyInput.addEventListener('input', handleKeyInput);
     integrationKeyInput.addEventListener('blur', saveSettings);
     alertMessageTextarea.addEventListener('input', saveSettings);
-    // These elements are already handled by the trigger options event listeners
-    // No need to add duplicate event listeners here
+    showAlertCheckbox.addEventListener('change', saveSettings);
     targetElementsTextarea.addEventListener('input', saveSettings);
     toggleButtonVisibleCheckbox.addEventListener('change', saveSettings);
     testIncidentButton.addEventListener('click', handleTestIncident);
@@ -156,7 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (integrationKeyInput) integrationKeyInput.value = result.pagerduty_integration_key || '';
             if (alertMessageTextarea) alertMessageTextarea.value = result.custom_alert_message ||
                 'Oops ⛓️‍💥 Error: UX Failure -  Our team are Working on it now.';
-            // These values will be set in initializeTriggerOptions() function
+            if (showAlertCheckbox) showAlertCheckbox.checked = result.show_alert !== false; // Default to true
             if (targetElementsTextarea) targetElementsTextarea.value = result.target_element_texts || '';
             if (toggleButtonVisibleCheckbox) toggleButtonVisibleCheckbox.checked = result.toggle_button_visible !== false; // Default to true
 
@@ -191,7 +189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 extension_enabled: extensionEnabledToggle.checked,
                 pagerduty_integration_key: integrationKeyInput.value.trim(),
                 custom_alert_message: alertMessageTextarea.value.trim(),
-                show_alert: true, // Always show alert when extension is enabled
+                show_alert: showAlertCheckbox.checked,
                 allow_form_continuation: continueDestinationToggle.checked,
                 redirect_to_500: add500ErrorToggle.checked,
                 run_scenario_on_submit: runScenarioToggle.checked,
@@ -373,10 +371,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const response = await new Promise((resolve) => {
                 chrome.runtime.sendMessage({
                     action: 'run_scenario',
-                    scenarioId: activeScenarioId,
-                    options: {
-                        dryRun: false
-                    }
+                    scenarioId: activeScenarioId
                 }, resolve);
             });
 
@@ -622,8 +617,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         ], (result) => {
             // Add null checks before setting properties
             if (createAlertToggle) {
-                createAlertToggle.checked = true; // Always show alert when extension is enabled
-                createAlertToggle.disabled = true; // Disable the toggle since it's always on
+                createAlertToggle.checked = result.show_alert !== false; // Default to true
+                createAlertToggle.addEventListener('change', saveTriggerOptions);
             }
             if (runScenarioToggle) {
                 runScenarioToggle.checked = result.run_scenario_on_submit === true;
@@ -644,7 +639,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Save trigger options to storage
     function saveTriggerOptions() {
         chrome.storage.sync.set({
-            show_alert: true, // Always show alert when extension is enabled
+            show_alert: createAlertToggle ? createAlertToggle.checked : true,
             run_scenario_on_submit: runScenarioToggle ? runScenarioToggle.checked : false,
             redirect_to_500: add500ErrorToggle.checked,
             allow_form_continuation: continueDestinationToggle.checked
