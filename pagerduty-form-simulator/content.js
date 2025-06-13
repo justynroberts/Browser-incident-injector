@@ -13,7 +13,7 @@
     const SUBMISSION_COOLDOWN = 0; // No cooldown - allow immediate resubmission
     let lastProcessedElement = null;
     let lastProcessedTime = 0;
-    let toggleButtonVisible = true; // Control visibility of the toggle button
+    let toggleButtonVisible = false; // Control visibility of the toggle button
 
     // Load extension settings
     chrome.storage.sync.get([
@@ -431,139 +431,123 @@
                                     * { margin: 0; padding: 0; box-sizing: border-box; }
                                     body {
                                         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                        background: #f5f5f5;
                                         min-height: 100vh;
                                         display: flex;
                                         align-items: center;
                                         justify-content: center;
                                         color: #333;
+                                        line-height: 1.6;
                                     }
                                     .error-container {
-                                        background: rgba(255, 255, 255, 0.95);
-                                        backdrop-filter: blur(10px);
-                                        border-radius: 20px;
-                                        padding: 60px 40px;
+                                        background: white;
+                                        border-radius: 8px;
+                                        padding: 50px 40px;
                                         text-align: center;
-                                        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                                        box-shadow: 0 2px 20px rgba(0, 0, 0, 0.05);
                                         max-width: 600px;
                                         width: 90%;
-                                        border: 1px solid rgba(255, 255, 255, 0.2);
-                                    }
-                                    .error-icon {
-                                        font-size: 80px;
-                                        margin-bottom: 20px;
-                                        color: #ff6b6b;
-                                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                                        border: 1px solid #e0e0e0;
                                     }
                                     .error-code {
-                                        font-size: 120px;
-                                        font-weight: 800;
-                                        color: #ff6b6b;
-                                        margin-bottom: 10px;
-                                        text-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                                        font-size: 96px;
+                                        font-weight: 300;
+                                        color: #666;
+                                        margin-bottom: 20px;
                                         letter-spacing: -2px;
                                     }
                                     h1 {
-                                        font-size: 32px;
-                                        color: #2c3e50;
-                                        margin-bottom: 20px;
-                                        font-weight: 600;
+                                        font-size: 28px;
+                                        color: #333;
+                                        margin-bottom: 16px;
+                                        font-weight: 400;
                                     }
                                     .error-message {
-                                        font-size: 18px;
-                                        color: #7f8c8d;
+                                        font-size: 16px;
+                                        color: #666;
                                         margin-bottom: 30px;
-                                        line-height: 1.6;
-                                    }
-                                    .status-box {
-                                        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-                                        color: white;
-                                        padding: 20px;
-                                        border-radius: 12px;
-                                        margin: 30px 0;
-                                        font-weight: 500;
-                                        box-shadow: 0 8px 16px rgba(79, 172, 254, 0.3);
-                                    }
-                                    .status-icon {
-                                        font-size: 24px;
-                                        margin-right: 10px;
-                                        vertical-align: middle;
+                                        line-height: 1.5;
                                     }
                                     .details {
-                                        background: #f8f9fa;
-                                        border-radius: 12px;
-                                        padding: 25px;
+                                        background: #f9f9f9;
+                                        border-radius: 4px;
+                                        padding: 20px;
                                         margin: 25px 0;
                                         text-align: left;
-                                        border-left: 4px solid #ff6b6b;
+                                        border: 1px solid #e8e8e8;
                                     }
                                     .details h3 {
-                                        color: #2c3e50;
-                                        margin-bottom: 15px;
-                                        font-size: 18px;
+                                        color: #333;
+                                        margin-bottom: 12px;
+                                        font-size: 16px;
+                                        font-weight: 500;
                                     }
                                     .details p {
-                                        margin: 8px 0;
-                                        color: #5a6c7d;
+                                        margin: 6px 0;
+                                        color: #666;
                                         font-size: 14px;
                                     }
                                     .details strong {
-                                        color: #2c3e50;
-                                        font-weight: 600;
+                                        color: #333;
+                                        font-weight: 500;
                                     }
                                     .timestamp {
-                                        color: #95a5a6;
-                                        font-family: 'Monaco', 'Menlo', monospace;
+                                        color: #888;
+                                        font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
                                         font-size: 12px;
                                     }
                                     .back-button {
-                                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                        background: #007bff;
                                         color: white;
                                         border: none;
-                                        padding: 15px 30px;
-                                        border-radius: 25px;
-                                        font-size: 16px;
-                                        font-weight: 600;
+                                        padding: 12px 24px;
+                                        border-radius: 4px;
+                                        font-size: 14px;
+                                        font-weight: 500;
                                         cursor: pointer;
-                                        transition: all 0.3s ease;
-                                        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                                        transition: background-color 0.2s ease;
                                         margin-top: 20px;
                                     }
                                     .back-button:hover {
-                                        transform: translateY(-2px);
-                                        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+                                        background: #0056b3;
+                                    }
+                                    .server-info {
+                                        color: #888;
+                                        font-size: 13px;
+                                        margin-top: 30px;
+                                        padding-top: 20px;
+                                        border-top: 1px solid #e8e8e8;
                                     }
                                     @media (max-width: 768px) {
-                                        .error-container { padding: 40px 20px; }
-                                        .error-code { font-size: 80px; }
+                                        .error-container { padding: 30px 20px; }
+                                        .error-code { font-size: 72px; }
                                         h1 { font-size: 24px; }
-                                        .error-message { font-size: 16px; }
+                                        .error-message { font-size: 15px; }
                                     }
                                 </style>
                             </head>
                             <body>
                                 <div class="error-container">
-                                    <div class="error-icon">⚠️</div>
                                     <div class="error-code">500</div>
                                     <h1>Internal Server Error</h1>
-                                    <p class="error-message">We're experiencing technical difficulties and our team has been automatically notified.</p>
-                                    
-                                    <div class="status-box">
-                                        <span class="status-icon">🔧</span>
-                                        We are working now on solving this issue
-                                    </div>
+                                    <p class="error-message">The server encountered an internal error and was unable to complete your request.</p>
                                     
                                     <div class="details">
-                                        <h3>Technical Information</h3>
+                                        <h3>Error Details</h3>
                                         <p><strong>Error Code:</strong> HTTP 500 Internal Server Error</p>
-                                        <p><strong>Timestamp:</strong> <span class="timestamp">${new Date().toLocaleString()}</span></p>
-                                        <p><strong>Request URL:</strong> ${window.location.href}</p>
-                                        <p><strong>Incident ID:</strong> #${Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+                                        <p><strong>Timestamp:</strong> <span class="timestamp">${new Date().toISOString()}</span></p>
+                                        <p><strong>Request URI:</strong> ${window.location.pathname}</p>
+                                        <p><strong>Server:</strong> nginx/1.18.0</p>
+                                        <p><strong>Reference ID:</strong> #${Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
                                     </div>
                                     
-                                    <p style="color: #7f8c8d; margin-bottom: 20px;">Please try again in a few minutes or contact support if the problem persists.</p>
+                                    <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Please try again later. If the problem persists, contact the system administrator.</p>
                                     
                                     <button class="back-button" onclick="history.back()">← Go Back</button>
+                                    
+                                    <div class="server-info">
+                                        Apache/2.4.41 (Ubuntu) Server at ${window.location.hostname} Port ${window.location.port || (window.location.protocol === 'https:' ? '443' : '80')}
+                                    </div>
                                 </div>
                             </body>
                         </html>
@@ -575,7 +559,7 @@
                     document.body.innerHTML = `
                         <div style="
                             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            background: #f5f5f5;
                             min-height: 100vh;
                             display: flex;
                             align-items: center;
@@ -583,47 +567,58 @@
                             margin: 0;
                             padding: 20px;
                             box-sizing: border-box;
+                            color: #333;
+                            line-height: 1.6;
                         ">
                             <div style="
-                                background: rgba(255, 255, 255, 0.95);
-                                backdrop-filter: blur(10px);
-                                border-radius: 20px;
-                                padding: 60px 40px;
+                                background: white;
+                                border-radius: 8px;
+                                padding: 50px 40px;
                                 text-align: center;
-                                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                                box-shadow: 0 2px 20px rgba(0, 0, 0, 0.05);
                                 max-width: 600px;
                                 width: 100%;
+                                border: 1px solid #e0e0e0;
                             ">
-                                <div style="font-size: 80px; margin-bottom: 20px;">⚠️</div>
-                                <div style="font-size: 120px; font-weight: 800; color: #ff6b6b; margin-bottom: 10px; text-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">500</div>
-                                <h1 style="font-size: 32px; color: #2c3e50; margin-bottom: 20px; font-weight: 600;">Internal Server Error</h1>
-                                <p style="font-size: 18px; color: #7f8c8d; margin-bottom: 30px;">We're experiencing technical difficulties and our team has been automatically notified.</p>
+                                <div style="font-size: 96px; font-weight: 300; color: #666; margin-bottom: 20px; letter-spacing: -2px;">500</div>
+                                <h1 style="font-size: 28px; color: #333; margin-bottom: 16px; font-weight: 400;">Internal Server Error</h1>
+                                <p style="font-size: 16px; color: #666; margin-bottom: 30px; line-height: 1.5;">The server encountered an internal error and was unable to complete your request.</p>
                                 <div style="
-                                    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-                                    color: white;
+                                    background: #f9f9f9;
+                                    border-radius: 4px;
                                     padding: 20px;
-                                    border-radius: 12px;
-                                    margin: 30px 0;
-                                    font-weight: 500;
-                                    box-shadow: 0 8px 16px rgba(79, 172, 254, 0.3);
+                                    margin: 25px 0;
+                                    text-align: left;
+                                    border: 1px solid #e8e8e8;
                                 ">
-                                    <span style="font-size: 24px; margin-right: 10px;">🔧</span>
-                                    We are working now on solving this issue
+                                    <h3 style="color: #333; margin-bottom: 12px; font-size: 16px; font-weight: 500;">Error Details</h3>
+                                    <p style="margin: 6px 0; color: #666; font-size: 14px;"><strong style="color: #333; font-weight: 500;">Error Code:</strong> HTTP 500 Internal Server Error</p>
+                                    <p style="margin: 6px 0; color: #666; font-size: 14px;"><strong style="color: #333; font-weight: 500;">Timestamp:</strong> <span style="color: #888; font-family: 'Monaco', 'Menlo', 'Consolas', monospace; font-size: 12px;">${new Date().toISOString()}</span></p>
+                                    <p style="margin: 6px 0; color: #666; font-size: 14px;"><strong style="color: #333; font-weight: 500;">Request URI:</strong> ${window.location.pathname}</p>
+                                    <p style="margin: 6px 0; color: #666; font-size: 14px;"><strong style="color: #333; font-weight: 500;">Server:</strong> nginx/1.18.0</p>
+                                    <p style="margin: 6px 0; color: #666; font-size: 14px;"><strong style="color: #333; font-weight: 500;">Reference ID:</strong> #${Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
                                 </div>
-                                <p style="color: #7f8c8d; margin-bottom: 20px;">Please try again in a few minutes or contact support if the problem persists.</p>
-                                <p style="color: #95a5a6; font-size: 12px;">Incident ID: #${Math.random().toString(36).substr(2, 9).toUpperCase()} | ${new Date().toLocaleString()}</p>
+                                <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Please try again later. If the problem persists, contact the system administrator.</p>
                                 <button onclick="history.back()" style="
-                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    background: #007bff;
                                     color: white;
                                     border: none;
-                                    padding: 15px 30px;
-                                    border-radius: 25px;
-                                    font-size: 16px;
-                                    font-weight: 600;
+                                    padding: 12px 24px;
+                                    border-radius: 4px;
+                                    font-size: 14px;
+                                    font-weight: 500;
                                     cursor: pointer;
                                     margin-top: 20px;
-                                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
                                 ">← Go Back</button>
+                                <div style="
+                                    color: #888;
+                                    font-size: 13px;
+                                    margin-top: 30px;
+                                    padding-top: 20px;
+                                    border-top: 1px solid #e8e8e8;
+                                ">
+                                    Apache/2.4.41 (Ubuntu) Server at ${window.location.hostname} Port ${window.location.port || (window.location.protocol === 'https:' ? '443' : '80')}
+                                </div>
                             </div>
                         </div>
                     `;
@@ -677,7 +672,7 @@
         
         // Check the clicked element and its parents up to 3 levels (reduced from 5)
         for (let i = 0; i < 3 && element && element !== document; i++) {
-            // Skip non-interactive elements
+            // Skip non-interactive elements on first iteration
             const tagName = element.tagName.toLowerCase();
             if (i === 0 && !['a', 'button', 'input', 'span', 'div'].includes(tagName)) {
                 element = element.parentElement;
@@ -696,10 +691,13 @@
             // Check if element text exactly matches any of the target texts
             const matchesTargetText = targetElementTexts.some(targetText => {
                 const lowerTargetText = targetText.toLowerCase().trim();
+                
+                // Exact text match - must be exactly the target text, not contain it
                 const exactMatch = elementText === lowerTargetText;
                 
-                // Only check attributes if there's no exact text match
-                const attributeMatch = !exactMatch && (
+                // Only check attributes if there's no exact text match and element is interactive
+                const isInteractive = ['a', 'button', 'input'].includes(tagName);
+                const attributeMatch = !exactMatch && isInteractive && (
                     element.getAttribute('aria-label')?.toLowerCase().trim() === lowerTargetText ||
                     element.title?.toLowerCase().trim() === lowerTargetText ||
                     element.getAttribute('alt')?.toLowerCase().trim() === lowerTargetText
@@ -708,7 +706,7 @@
                 // Log matching attempts for debugging
                 if (exactMatch || attributeMatch) {
                     console.log(`[PagerDuty Simulator] Element matched target "${lowerTargetText}"`,
-                        { exactMatch, attributeMatch });
+                        { exactMatch, attributeMatch, elementText, tagName });
                 }
                 
                 return exactMatch || attributeMatch;
