@@ -115,12 +115,35 @@ header {
 
 .scenario-progress {
     margin-left: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .scenario-progress i {
     font-size: 16px;
     animation: spin 1s linear infinite;
     color: #92400e;
+}
+
+.btn-small {
+    padding: 4px 8px;
+    font-size: 12px;
+    min-width: auto;
+    border-radius: 4px;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    transform: translateY(-1px);
 }
 
 .scenario-progress-bar {
