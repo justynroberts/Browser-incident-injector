@@ -68,9 +68,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.action.openPopup();
         sendResponse({ success: true });
         return true;
-    } else if (request.action === 'forceStopScenario') {
-        handleForceStopScenario(sendResponse);
-        return true;
     } else if (request.action === 'updateScenarioProgress') {
         handleUpdateScenarioProgress(request.progress, request.status, sendResponse);
         return true;
@@ -233,45 +230,6 @@ async function handleRunActiveScenario(formData, sendResponse) {
     }
 }
 
-// Handle force stop scenario
-async function handleForceStopScenario(sendResponse) {
-    try {
-        console.log('[Background] Force stopping any running scenario');
-        
-        // Check if there's a scenario running
-        const result = await chrome.storage.sync.get(['scenario_running']);
-        if (result.scenario_running) {
-            console.log('[Background] Found running scenario, force stopping:', result.scenario_running.name);
-            
-            // Stop the event processor if it's running
-            if (eventProcessor.isRunning) {
-                eventProcessor.stopScenario();
-                console.log('[Background] Event processor stopped');
-            }
-            
-            // Clear the scenario running status
-            await clearScenarioRunningStatus();
-            
-            sendResponse({
-                success: true,
-                message: `Scenario "${result.scenario_running.name}" has been stopped`
-            });
-        } else {
-            console.log('[Background] No scenario currently running');
-            sendResponse({
-                success: true,
-                message: 'No scenario was running'
-            });
-        }
-    } catch (error) {
-        console.error('[Background] Error force stopping scenario:', error);
-        await clearScenarioRunningStatus(); // Clear status anyway
-        sendResponse({
-            success: false,
-            error: error.message
-        });
-    }
-}
 
 // Handle scenario progress updates
 async function handleUpdateScenarioProgress(progress, status, sendResponse) {

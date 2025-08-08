@@ -29,7 +29,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const scenarioIndicator = document.getElementById('scenario-running-indicator');
     const scenarioName = document.getElementById('scenario-name');
     const scenarioProgressFill = document.getElementById('scenario-progress-fill');
-    const stopScenarioButton = document.getElementById('stop-scenario');
     const helpLink = document.getElementById('help-link');
     const setupLink = document.getElementById('setup-link');
     const helpModal = document.getElementById('help-modal');
@@ -126,7 +125,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (testIncidentButton) testIncidentButton.addEventListener('click', handleTestIncident);
         if (testScenarioButton) testScenarioButton.addEventListener('click', handleTestScenario);
         if (testScenarioQuickButton) testScenarioQuickButton.addEventListener('click', handleTestScenarioQuick);
-        if (stopScenarioButton) stopScenarioButton.addEventListener('click', handleStopScenario);
         if (helpLink) helpLink.addEventListener('click', showHelpModal);
         if (setupLink) setupLink.addEventListener('click', showHelpModal);
         if (closeModal) closeModal.addEventListener('click', hideHelpModal);
@@ -556,41 +554,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         helpModal.style.display = 'none';
     }
 
-    // Handle stop scenario button
-    async function handleStopScenario() {
-        try {
-            console.log('[Popup] Stop scenario button clicked');
-            
-            // Update UI to show stopping state
-            if (scenarioName && stopScenarioButton) {
-                scenarioName.textContent = 'Stopping scenario...';
-                stopScenarioButton.disabled = true;
-                stopScenarioButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            }
-            
-            // Send message to background to clear scenario running status
-            chrome.runtime.sendMessage({
-                action: 'forceStopScenario'
-            }, (response) => {
-                if (chrome.runtime.lastError) {
-                    console.error('[Popup] Error sending stop scenario message:', chrome.runtime.lastError);
-                    hideScenarioRunning();
-                    return;
-                }
-                
-                if (response && response.success) {
-                    console.log('[Popup] Scenario stopped successfully');
-                    // Don't hide UI here - let the storage change listener handle it
-                } else {
-                    console.error('[Popup] Failed to stop scenario:', response?.error || 'Unknown error');
-                    hideScenarioRunning();
-                }
-            });
-            
-        } catch (error) {
-            console.error('[Popup] Error stopping scenario:', error);
-        }
-    }
 
     // Utility functions
     function formatTimestamp(date) {
@@ -1417,11 +1380,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             scenarioName.textContent = scenarioNameText;
             scenarioIndicator.style.display = 'block';
             
-            // Ensure stop button is in normal state (not disabled from previous stop attempt)
-            if (stopScenarioButton) {
-                stopScenarioButton.disabled = false;
-                stopScenarioButton.innerHTML = '<i class="fas fa-stop"></i>';
-            }
             
             // Animate progress bar with null checks
             if (scenarioProgressFill) {
@@ -1460,11 +1418,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Hide scenario running indicator
     function hideScenarioRunning() {
-        // Restore stop button to normal state
-        if (stopScenarioButton) {
-            stopScenarioButton.disabled = false;
-            stopScenarioButton.innerHTML = '<i class="fas fa-stop"></i>';
-        }
         
         if (scenarioIndicator) {
             // Complete the progress bar before hiding
