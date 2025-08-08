@@ -71,6 +71,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'forceStopScenario') {
         handleForceStopScenario(sendResponse);
         return true;
+    } else if (request.action === 'updateScenarioProgress') {
+        handleUpdateScenarioProgress(request.progress, request.status, sendResponse);
+        return true;
     }
 });
 
@@ -267,6 +270,29 @@ async function handleForceStopScenario(sendResponse) {
             success: false,
             error: error.message
         });
+    }
+}
+
+// Handle scenario progress updates
+async function handleUpdateScenarioProgress(progress, status, sendResponse) {
+    try {
+        const result = await chrome.storage.sync.get(['scenario_running']);
+        if (result.scenario_running) {
+            result.scenario_running.progress = progress;
+            result.scenario_running.status = status;
+            result.scenario_running.lastUpdate = Date.now();
+            
+            await chrome.storage.sync.set({ scenario_running: result.scenario_running });
+            console.log(`[Background] Updated scenario progress: ${progress}% - ${status}`);
+            
+            sendResponse({ success: true });
+        } else {
+            console.warn('[Background] No running scenario to update progress for');
+            sendResponse({ success: false, error: 'No running scenario' });
+        }
+    } catch (error) {
+        console.error('[Background] Error updating scenario progress:', error);
+        sendResponse({ success: false, error: error.message });
     }
 }
 

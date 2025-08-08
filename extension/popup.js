@@ -563,25 +563,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             console.log('[Popup] Stop scenario button clicked');
             
+            // Update UI to show stopping state
+            if (scenarioName && stopScenarioButton) {
+                scenarioName.textContent = 'Stopping scenario...';
+                stopScenarioButton.disabled = true;
+                stopScenarioButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            }
+            
             // Send message to background to clear scenario running status
             chrome.runtime.sendMessage({
                 action: 'forceStopScenario'
             }, (response) => {
                 if (chrome.runtime.lastError) {
                     console.error('[Popup] Error sending stop scenario message:', chrome.runtime.lastError);
+                    hideScenarioRunning();
                     return;
                 }
                 
                 if (response && response.success) {
                     console.log('[Popup] Scenario stopped successfully');
-                    hideScenarioRunning();
+                    // Don't hide UI here - let the storage change listener handle it
                 } else {
                     console.error('[Popup] Failed to stop scenario:', response?.error || 'Unknown error');
+                    hideScenarioRunning();
                 }
             });
-            
-            // Also hide the UI immediately for better UX
-            hideScenarioRunning();
             
         } catch (error) {
             console.error('[Popup] Error stopping scenario:', error);
@@ -1401,26 +1407,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Show scenario running indicator
     function showScenarioRunning(scenarioData) {
-        const scenarioNameText = scenarioData.name || scenarioData.id || 'Unknown Scenario';
+        let scenarioNameText = scenarioData.name || scenarioData.id || 'Unknown Scenario';
+        
+        // Add status to name if available
+        if (scenarioData.status) {
+            scenarioNameText = `${scenarioNameText} - ${scenarioData.status}`;
+        }
         
         // Update main indicator with proper null checks
         if (scenarioIndicator && scenarioName) {
             scenarioName.textContent = scenarioNameText;
             scenarioIndicator.style.display = 'block';
             
+            // Ensure stop button is in normal state (not disabled from previous stop attempt)
+            if (stopScenarioButton) {
+                stopScenarioButton.disabled = false;
+                stopScenarioButton.innerHTML = '<i class="fas fa-stop"></i>';
+            }
+            
             // Animate progress bar with null checks
             if (scenarioProgressFill) {
-                if (scenarioData.progress !== undefined) {
-                    scenarioProgressFill.style.width = `${scenarioData.progress}%`;
+                if (scenarioData.progress !== undefined && scenarioData.progress >= 0) {
+                    scenarioProgressFill.style.width = `${Math.min(100, Math.max(0, scenarioData.progress))}%`;
+                    scenarioProgressFill.style.transition = 'width 0.3s ease';
                 } else {
                     // If no specific progress, show indeterminate animation
                     scenarioProgressFill.style.width = '30%';
+                    scenarioProgressFill.style.transition = 'width 1s ease';
                     // Animate to show activity
                     setTimeout(() => {
-                        if (scenarioProgressFill) scenarioProgressFill.style.width = '60%';
+                        if (scenarioProgressFill) {
+                            scenarioProgressFill.style.width = '60%';
+                        }
                     }, 500);
                     setTimeout(() => {
-                        if (scenarioProgressFill) scenarioProgressFill.style.width = '80%';
+                        if (scenarioProgressFill) {
+                            scenarioProgressFill.style.width = '80%';
+                        }
                     }, 1000);
                 }
             }
@@ -1445,6 +1468,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Ensure floating notification stays hidden
         if (floatingNotification) {
             floatingNotification.style.display = 'none';
+        }
+        
+        // Restore stop button to normal state
+        if (stopScenarioButton) {
+            stopScenarioButton.disabled = false;
+            stopScenarioButton.innerHTML = '<i class="fas fa-stop"></i>';
         }
         
         if (scenarioIndicator) {
