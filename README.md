@@ -4,7 +4,7 @@ A Chrome extension for incident response testing and resilience training.
 
 ## Overview
 
-Incident Injector is a defensive security tool designed to help organizations test and improve their incident response procedures. The extension simulates realistic failure scenarios by intercepting user interactions and creating corresponding PagerDuty incidents, enabling teams to practice their response workflows in a controlled environment.
+ The extension simulates realistic failure scenarios by intercepting user interactions and creating corresponding PagerDuty incidents, enabling teams to practice their response workflows in a controlled environment.
 
 ## Quick Start
 
