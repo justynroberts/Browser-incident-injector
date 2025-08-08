@@ -1,241 +1,116 @@
-# Incident Injector - PagerDuty Form Simulator
+# Incident Injector
 
-A Chrome extension that intercepts form submissions and user interactions to trigger PagerDuty incidents, helping teams test and practice incident response procedures.
+A Chrome extension for incident response testing and resilience training.
+
+## Overview
+
+Incident Injector is a defensive security tool designed to help organizations test and improve their incident response procedures. The extension simulates realistic failure scenarios by intercepting user interactions and creating corresponding PagerDuty incidents, enabling teams to practice their response workflows in a controlled environment.
+
+## Quick Start
+
+### Installation
+
+1. **Download the latest release**
+   - Navigate to the [Releases](releases) page
+   - Download `incident-injector-v1.1.zip`
+   - Extract the ZIP file to a local directory
+
+2. **Install in Chrome**
+   - Open Chrome and navigate to `chrome://extensions/`
+   - Enable "Developer mode" using the toggle in the top right corner
+   - Click "Load unpacked" and select the extracted `v1.1` folder (or use `extension` folder for development)
+   - The extension icon should appear in your browser toolbar
+
+3. **Configure PagerDuty Integration**
+   - Obtain an Events API v2 integration key from your PagerDuty service
+   - Click the extension icon to open the configuration panel
+   - Enter your integration key and configure simulation settings
+
+### Development Installation
+
+For developers or contributors:
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/justynroberts/Browser-incident-injector.git
+   cd Browser-incident-injector
+   ```
+
+2. **Install in Chrome**
+   - Open Chrome and navigate to `chrome://extensions/`
+   - Enable "Developer mode"
+   - Click "Load unpacked" and select the `extension` folder
+   - The extension will be installed in development mode
 
 ## Features
 
-### Basic Incident Triggering
-- Intercept form submissions on any website
-- Intercept clicks on specific text elements
-- Send PagerDuty incidents via Events API v2
-- Show customizable error alerts (always shown when extension is enabled)
-- Optionally redirect to a 500 error page
-- Multiple incidents can be triggered in succession
+### Core Functionality
+- **Automated Incident Creation**: Generates PagerDuty incidents based on user interactions
+- **Realistic Error Simulation**: Displays professional error pages mimicking production failures
+- **Click Interception**: Monitors and responds to specific user interface elements
+- **Scenario-Based Testing**: Supports complex, multi-step incident response scenarios
 
-### NEW: Floating Toggle Button
-- Quick access to extension settings from any webpage
-- Configurable visibility (can be hidden if desired)
-- Visual indicator of extension status
+### Advanced Capabilities
+- **Template Variables**: Dynamic incident details using configurable variables
+- **Batch Event Processing**: Efficient handling of multiple incident events
+- **Debug Logging**: Comprehensive logging for troubleshooting and verification
+- **Visual Indicators**: Clear UI feedback during active simulations
 
-### PagerDuty Event Definition System
-- Define complex incident scenarios using JSON
-- Orchestrate realistic PagerDuty event sequences
-- Support for multiple event types:
-  - **Trigger Events**: Create new incidents
-  - **Resolve Events**: Close incidents
-  - **Acknowledge Events**: Simulate team acknowledgment
-  - **Change Events**: Document planned modifications
-- Sophisticated timing controls between events
-- Variable templates for dynamic content
-- Dry-run capability for testing
-- Scenarios automatically triggered on form submissions when extension is enabled
+## Usage
 
-## Installation
+### Basic Incident Simulation
+1. Navigate to any website with form elements
+2. Ensure the extension is active (green indicator in toolbar)
+3. Click on configured target elements (buttons, forms, etc.)
+4. Monitor PagerDuty for generated incidents
 
-### Developer Mode
-1. Download/clone this repository
-2. Open Chrome and go to `chrome://extensions/`
-3. Enable "Developer mode" (toggle in top right)
-4. Click "Load unpacked"
-5. Select the `pagerduty-form-simulator` folder
-6. Extension icon should appear in toolbar
+### Scenario Testing
+1. Load a scenario definition file via the extension popup
+2. Select the desired scenario from the dropdown menu
+3. Click "Test Current Scenario" to execute
+4. Monitor scenario progress through visual indicators
 
-### From Chrome Web Store (Coming Soon)
-1. Visit the Chrome Web Store
-2. Search for "Incident Injector"
-3. Click "Add to Chrome"
-4. Confirm the installation
+## Configuration
 
-## Setup
+### PagerDuty Setup
+1. Obtain an Events API v2 integration key from your PagerDuty service
+2. In the extension popup, navigate to "PagerDuty Configuration"
+3. Enter your integration key and save
 
-### PagerDuty Configuration
-1. Log into PagerDuty
-2. Go to **Services** → Your Service → **Integrations**
-3. Add a new "Events API v2" integration
-4. Copy the Integration Key (32 characters)
-5. Click the extension icon in Chrome toolbar
-6. Paste the Integration Key in the "Integration Key" field
-7. Enable the extension toggle
+### Simulation Settings
+- **Custom Alert Messages**: Configure error messages displayed during simulated failures
+- **500 Error Pages**: Enable realistic server error page redirects with incident tracking
+- **Click Interception**: Customize which button texts trigger incident simulations
+- **Scenario Testing**: Load and execute complex multi-step incident scenarios
 
-### Extension Configuration Options
-- **Extension Enabled**: Master toggle to enable/disable all functionality
-- **Custom Alert Message**: Customize the error message shown to users (always shown when extension is enabled)
-- **Run Scenario**: Automatically run the selected scenario when a form is submitted
-- **Add 500 Error**: Redirect to a simulated 500 error page after form submission
-- **Continue to Destination**: Allow the form to submit normally after triggering the incident
-- **Element Text to Hook**: Comma-separated list of text to match on clickable elements
-- **Show Toggle Button**: Display a floating button on webpages for quick access to the extension
+## Event Definitions
 
-### Scenario Configuration
-1. Navigate to the "Event Definition System" section
-2. Either:
-   - The sample definition will be automatically loaded on first use
-   - Or paste your own JSON event definition
-3. Select a scenario from the dropdown
-4. Optionally enable "Dry Run Mode" to test without sending actual alerts
-5. Click "Run Scenario" to execute manually, or enable "Run Scenario" in the trigger options to run automatically on form submissions
+The extension supports JSON-formatted event definition files containing:
+- Multiple incident scenarios
+- Configurable delay patterns
+- Custom incident details and metadata
+- Template variable substitution
 
-## Basic Usage
-
-### Form Interception
-- Enable the extension
-- Configure the integration key
-- Submit any form on a website
-- A PagerDuty incident will be created
-- A custom alert message will be shown
-- If configured, the extension will redirect to a 500 error page
-- If an active scenario is selected, it will be automatically triggered
-
-### Element Text Targeting
-- Enter comma-separated text in "Element Text to Hook" field
-- Any clickable element containing that text will trigger incidents
-- Example: "submit,login,checkout"
-- When clicked, these elements will trigger both incidents and scenarios
-
-### Using the Toggle Button
-- A floating button appears on webpages when the extension is enabled
-- The button color indicates the extension status (green = enabled, gray = disabled)
-- Click the button to open the extension popup
-- You can hide the button in the extension settings if desired
-
-## Event Definition System Usage
-
-The Event Definition System allows you to create complex, multi-step incident scenarios that unfold automatically with proper timing and realistic patterns.
-
-### Creating Event Definitions
-
-1. Click the extension icon
-2. Scroll to the "Event Definition System" section
-3. The sample definition will be automatically loaded on first use
-4. Or enter your own JSON definition in the textarea
-5. Select a scenario from the dropdown
-6. Click "Run Scenario" to execute manually
-
-### Saving and Loading Scenario Sets
-
-You can save your custom scenario definitions to JSON files and load them later:
-
-1. **Save to File**: After creating or modifying a scenario definition, click "Save to File" to download it as a JSON file
-2. **Load from File**: Click "Load from File" to import a previously saved scenario definition
-3. The loaded scenario will be automatically validated and saved to local storage
-4. Your loaded scenarios will persist between browser sessions
-
-### Automatic Scenario Execution
-
-When the extension is enabled and a scenario is selected:
-1. The scenario will automatically run whenever a form is submitted
-2. The scenario will also run when clicking on elements matching your target text
-3. This allows for testing complex incident response workflows with minimal effort
-
-### Event Definition Format
-
-```json
-{
-  "scenarios": {
-    "scenario_id": {
-      "name": "Human-readable name",
-      "description": "Scenario description",
-      "events": [
-        {
-          "type": "trigger|resolve|acknowledge|change",
-          "summary": "Event summary",
-          "severity": "critical|error|warning|info",
-          "component": "affected component",
-          "details": { 
-            "custom_field": "value",
-            "another_field": "value"
-          },
-          "delay": {
-            "type": "fixed|random",
-            "value": 10000,
-            "min": 5000,
-            "max": 15000
-          }
-        }
-      ]
-    }
-  }
-}
-```
-
-### Variable Substitution
-
-You can use these variables in your event definitions:
-
-- `{{timestamp}}` - Current ISO timestamp
-- `{{random_number}}` - Random number
-- `{{incident_id}}` - Generated incident ID
-
-### Example Scenarios
-
-The extension includes sample scenarios for:
-- Database outage with cascading effects
-- Failed deployment with rollback
-- Multi-service cascading failure
-
-### Advanced Event Definitions
-
-For advanced users who want to create custom event definitions, please refer to the [Developer Documentation](DEVELOPER.md) which provides detailed information about:
-
-- Complete schema reference
-- API field documentation
-- Advanced timing configurations
-- Complex scenario examples
-- Best practices for realistic incident simulation
-
-## Troubleshooting
-
-- **No incidents created**: Verify integration key format (32 alphanumeric characters)
-- **Alerts not showing**: Some sites block alerts with Content Security Policy. The extension attempts to create a custom alert div as a fallback.
-- **Extension not working**: Check browser console for errors (F12 > Console tab)
-- **Toggle button not appearing**: Some sites may block content scripts. Try refreshing the page or check if the "Show Toggle Button" option is enabled.
-- **Scenarios not triggering**: Ensure you have selected a scenario from the dropdown and that the extension is enabled.
-- **Delays not working between events**: Check that the event-processor.js file is properly calculating delays from the event definition.
-- **500 error page not showing**: Some sites have strict Content Security Policies that prevent page modifications.
-
-## Advanced Configuration
-
-### Custom Event Definitions
-
-For advanced users, you can create your own event definitions with complex logic:
-
+Example event definition structure:
 ```json
 {
   "schema_version": "1.0",
+  "global_config": {
+    "variables": {
+      "environment": "production",
+      "region": "us-east-1"
+    }
+  },
   "event_definitions": [
     {
       "id": "database_outage",
       "name": "Database Outage Scenario",
       "description": "Simulates a database failure with cascading effects",
-      "variables": {
-        "service_name": "PostgreSQL Database",
-        "component_name": "Primary DB Cluster"
-      },
       "events": [
         {
           "type": "trigger",
-          "summary": "{{service_name}} connection timeout",
+          "summary": "Database connection timeout",
           "severity": "critical",
-          "component": "{{component_name}}",
-          "delay": {
-            "type": "fixed",
-            "value": 10000
-          }
-        },
-        {
-          "type": "trigger",
-          "summary": "API latency increased by 500%",
-          "severity": "error",
-          "component": "API Gateway",
-          "delay": {
-            "type": "fixed",
-            "value": 10000
-          }
-        },
-        {
-          "type": "acknowledge",
-          "summary": "DBA team investigating",
-          "dedup_key": "{{incident_id}}",
           "delay": {
             "type": "fixed",
             "value": 10000
@@ -247,13 +122,55 @@ For advanced users, you can create your own event definitions with complex logic
 }
 ```
 
-### Browser Compatibility
+## Security Considerations
 
-The extension has been tested with:
-- Google Chrome (version 100+)
-- Microsoft Edge (version 100+)
-- Brave Browser (version 1.40+)
+### Intended Use
+This extension is designed exclusively for **defensive security purposes**:
+- Incident response training and preparation
+- System resilience testing
+- Team readiness assessment
+- Workflow validation exercises
 
-## License
+### Restrictions
+- **Authorized Testing Only**: Use only on systems you own or have explicit permission to test
+- **No Malicious Intent**: This tool must not be used for unauthorized testing or malicious purposes
+- **Data Protection**: Ensure compliance with organizational data protection policies
 
-MIT License
+## Technical Specifications
+- **Platform**: Google Chrome (Manifest v3)
+- **Dependencies**: None (standalone extension)
+- **API Integration**: PagerDuty Events API v2
+- **File Size**: ~50KB (compressed distribution)
+- **Permissions**: Storage, Active Tab, Notifications
+
+## Documentation
+
+- **[Developer Guide](docs/DEVELOPER.md)**: Advanced configuration and event definition development
+- **[Sample Event Definitions](docs/sample-event-definition.json)**: Example scenarios for reference
+
+## Support
+
+For technical support, bug reports, or feature requests:
+1. Check the [GitHub Issues](../../issues) page for existing discussions
+2. Create a new issue with detailed information about your concern
+3. Contact your security team for organization-specific support
+
+## Version History
+
+### Version 1.1 (August 2025)
+- Resolved click interception race condition
+- Enhanced scenario execution indicators
+- Improved error page authenticity
+- Comprehensive error handling implementation
+- Automatic target element configuration
+- Extended debugging capabilities
+
+### Version 1.0 (December 2024)
+- Initial release with core functionality
+- Basic PagerDuty integration
+- Simple click interception
+- Foundation scenario system
+
+---
+
+**Incident Injector v1.1** | [Download Latest Release](releases) | [Report Issues](../../issues)
