@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Incident Injector",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Inject incidents by triggering PagerDuty alerts on form submissions and user interactions",
   "permissions": [
     "storage",
