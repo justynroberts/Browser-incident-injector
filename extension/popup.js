@@ -30,8 +30,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const scenarioName = document.getElementById('scenario-name');
     const scenarioProgressFill = document.getElementById('scenario-progress-fill');
     const stopScenarioButton = document.getElementById('stop-scenario');
-    const floatingNotification = document.getElementById('scenario-floating-notification');
-    const floatingScenarioText = document.getElementById('floating-scenario-text');
     const helpLink = document.getElementById('help-link');
     const setupLink = document.getElementById('setup-link');
     const helpModal = document.getElementById('help-modal');
@@ -1453,9 +1451,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         // Floating notification disabled - top bar is sufficient
-        if (floatingNotification) {
-            floatingNotification.style.display = 'none';
-        }
         
         // Scroll to top to ensure indicator is visible
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1465,11 +1460,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Hide scenario running indicator
     function hideScenarioRunning() {
-        // Ensure floating notification stays hidden
-        if (floatingNotification) {
-            floatingNotification.style.display = 'none';
-        }
-        
         // Restore stop button to normal state
         if (stopScenarioButton) {
             stopScenarioButton.disabled = false;
