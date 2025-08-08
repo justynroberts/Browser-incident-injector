@@ -360,6 +360,10 @@ class PagerDutyEventProcessor {
                     const eventIndex = i + batchIndex;
                     console.log(`[Event Processor] Processing event ${eventIndex + 1}/${events.length}:`, event);
                     
+                    // Update progress before processing this event
+                    const progress = Math.round((eventIndex / events.length) * 100);
+                    this.updateProgress(progress, `Processing event ${eventIndex + 1}/${events.length}`);
+                    
                     // Apply delay if specified
                     const delayMs = this.calculateDelay(event.delay);
                     if (delayMs > 0) {
@@ -400,6 +404,9 @@ class PagerDutyEventProcessor {
                 console.warn(`[Event Processor] Completed with ${this.failedEvents.length} failed events:`, this.failedEvents);
             }
             
+            // Mark as 100% complete
+            this.updateProgress(100, 'Scenario completed successfully');
+            
             console.log(`[Event Processor] Event definition '${eventDefinition.name || 'unnamed'}' completed`);
             return true;
         }
@@ -421,6 +428,10 @@ class PagerDutyEventProcessor {
                 const event = scenario.events[i];
                 console.log(`[Event Processor] Processing event ${i+1}/${scenario.events.length}:`, event);
                 
+                // Update progress
+                const progress = Math.round((i / scenario.events.length) * 100);
+                this.updateProgress(progress, `Processing event ${i + 1}/${scenario.events.length}`);
+                
                 // Apply delay if specified
                 const delayMs = this.calculateDelay(event.delay);
                 if (delayMs > 0) {
@@ -431,6 +442,9 @@ class PagerDutyEventProcessor {
                 // Send the event
                 await this.sendEvent(event);
             }
+            
+            // Mark as complete
+            this.updateProgress(100, 'Scenario completed successfully');
             
             console.log(`[Event Processor] Scenario '${scenarioNameOrIndex}' completed`);
             return true;
@@ -791,6 +805,26 @@ class PagerDutyEventProcessor {
                 success: false,
                 error: error.message
             };
+        }
+    }
+
+    // Update progress for the current scenario
+    updateProgress(progress, status = '') {
+        try {
+            console.log(`[Event Processor] Progress update: ${progress}% - ${status}`);
+            
+            // Send progress update to background script
+            if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
+                chrome.runtime.sendMessage({
+                    action: 'updateScenarioProgress',
+                    progress: progress,
+                    status: status
+                }).catch(error => {
+                    console.warn('[Event Processor] Failed to send progress update:', error);
+                });
+            }
+        } catch (error) {
+            console.warn('[Event Processor] Error updating progress:', error);
         }
     }
 }
