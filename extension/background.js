@@ -68,6 +68,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.action.openPopup();
         sendResponse({ success: true });
         return true;
+    } else if (request.action === 'forceStopScenario') {
+        handleForceStopScenario(sendResponse);
+        return true;
     }
 });
 
@@ -109,11 +112,12 @@ async function handleRunScenario(scenarioId, options, sendResponse) {
         const scenarios = eventProcessor.getAvailableScenarios();
         const scenario = scenarios.find(s => s.id === scenarioId);
         
-        // Set running status
+        // Set running status with timestamp
         await setScenarioRunningStatus({
             id: scenarioId,
             name: scenario ? scenario.name : scenarioId,
-            progress: 0
+            progress: 0,
+            startTime: Date.now()
         });
         
         // Start the scenario
@@ -178,11 +182,12 @@ async function handleRunActiveScenario(formData, sendResponse) {
         const scenarios = eventProcessor.getAvailableScenarios();
         const scenario = scenarios.find(s => s.id === activeScenarioId);
         
-        // Set running status
+        // Set running status with timestamp
         await setScenarioRunningStatus({
             id: activeScenarioId,
             name: scenario ? scenario.name : activeScenarioId,
-            progress: 0
+            progress: 0,
+            startTime: Date.now()
         });
         
         // Start the scenario
@@ -218,6 +223,46 @@ async function handleRunActiveScenario(formData, sendResponse) {
     } catch (error) {
         console.error('[Event Definition] Error running active scenario:', error);
         await clearScenarioRunningStatus();
+        sendResponse({
+            success: false,
+            error: error.message
+        });
+    }
+}
+
+// Handle force stop scenario
+async function handleForceStopScenario(sendResponse) {
+    try {
+        console.log('[Background] Force stopping any running scenario');
+        
+        // Check if there's a scenario running
+        const result = await chrome.storage.sync.get(['scenario_running']);
+        if (result.scenario_running) {
+            console.log('[Background] Found running scenario, force stopping:', result.scenario_running.name);
+            
+            // Stop the event processor if it's running
+            if (eventProcessor.isRunning) {
+                eventProcessor.stopScenario();
+                console.log('[Background] Event processor stopped');
+            }
+            
+            // Clear the scenario running status
+            await clearScenarioRunningStatus();
+            
+            sendResponse({
+                success: true,
+                message: `Scenario "${result.scenario_running.name}" has been stopped`
+            });
+        } else {
+            console.log('[Background] No scenario currently running');
+            sendResponse({
+                success: true,
+                message: 'No scenario was running'
+            });
+        }
+    } catch (error) {
+        console.error('[Background] Error force stopping scenario:', error);
+        await clearScenarioRunningStatus(); // Clear status anyway
         sendResponse({
             success: false,
             error: error.message
@@ -446,8 +491,21 @@ async function setScenarioRunningStatus(scenarioData) {
 
 async function clearScenarioRunningStatus() {
     try {
+        // Check if there was actually a running scenario before clearing
+        const beforeResult = await chrome.storage.sync.get(['scenario_running']);
+        if (beforeResult.scenario_running) {
+            console.log('[Background] Clearing scenario running status for:', beforeResult.scenario_running.name);
+        }
+        
         await chrome.storage.sync.remove(['scenario_running']);
-        console.log('[Background] Cleared scenario running status');
+        
+        // Verify it was actually cleared
+        const afterResult = await chrome.storage.sync.get(['scenario_running']);
+        if (!afterResult.scenario_running) {
+            console.log('[Background] ✅ Scenario running status successfully cleared');
+        } else {
+            console.error('[Background] ❌ Failed to clear scenario running status - still exists:', afterResult.scenario_running);
+        }
     } catch (error) {
         console.error('[Background] Error clearing scenario running status:', error);
     }
@@ -459,6 +517,7 @@ async function updateScenarioProgress(progress) {
         const result = await chrome.storage.sync.get(['scenario_running']);
         if (result.scenario_running) {
             result.scenario_running.progress = progress;
+            result.scenario_running.lastUpdate = Date.now(); // Add timestamp
             await chrome.storage.sync.set({ scenario_running: result.scenario_running });
             console.log('[Background] Updated scenario progress:', progress);
         }
@@ -466,5 +525,48 @@ async function updateScenarioProgress(progress) {
         console.error('[Background] Error updating scenario progress:', error);
     }
 }
+
+// Diagnostic function to check for stuck scenarios
+async function checkForStuckScenarios() {
+    try {
+        const result = await chrome.storage.sync.get(['scenario_running']);
+        if (result.scenario_running) {
+            const runningTime = Date.now() - (result.scenario_running.startTime || 0);
+            const maxRunTime = 10 * 60 * 1000; // 10 minutes max
+            
+            if (runningTime > maxRunTime) {
+                console.warn('[Background] ⚠️ Scenario has been running too long, force clearing:', {
+                    name: result.scenario_running.name,
+                    runningTime: Math.floor(runningTime / 1000) + 's',
+                    maxTime: Math.floor(maxRunTime / 1000) + 's'
+                });
+                await clearScenarioRunningStatus();
+                return true; // Was stuck
+            } else {
+                console.log('[Background] Scenario still running normally:', {
+                    name: result.scenario_running.name,
+                    runningTime: Math.floor(runningTime / 1000) + 's'
+                });
+            }
+        } else {
+            console.log('[Background] No scenario currently running');
+        }
+        return false; // Not stuck
+    } catch (error) {
+        console.error('[Background] Error checking for stuck scenarios:', error);
+        return false;
+    }
+}
+
+// Periodic check for stuck scenarios (every 2 minutes)
+setInterval(async () => {
+    await checkForStuckScenarios();
+}, 2 * 60 * 1000);
+
+// Check for stuck scenarios on startup
+chrome.runtime.onStartup.addListener(async () => {
+    console.log('[Background] Extension startup - checking for stuck scenarios');
+    await checkForStuckScenarios();
+});
 
 console.log('[Incident Injector] Background script loaded');

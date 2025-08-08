@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const scenarioIndicator = document.getElementById('scenario-running-indicator');
     const scenarioName = document.getElementById('scenario-name');
     const scenarioProgressFill = document.getElementById('scenario-progress-fill');
+    const stopScenarioButton = document.getElementById('stop-scenario');
     const floatingNotification = document.getElementById('scenario-floating-notification');
     const floatingScenarioText = document.getElementById('floating-scenario-text');
     const helpLink = document.getElementById('help-link');
@@ -127,6 +128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (testIncidentButton) testIncidentButton.addEventListener('click', handleTestIncident);
         if (testScenarioButton) testScenarioButton.addEventListener('click', handleTestScenario);
         if (testScenarioQuickButton) testScenarioQuickButton.addEventListener('click', handleTestScenarioQuick);
+        if (stopScenarioButton) stopScenarioButton.addEventListener('click', handleStopScenario);
         if (helpLink) helpLink.addEventListener('click', showHelpModal);
         if (setupLink) setupLink.addEventListener('click', showHelpModal);
         if (closeModal) closeModal.addEventListener('click', hideHelpModal);
@@ -554,6 +556,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Hide help modal
     function hideHelpModal() {
         helpModal.style.display = 'none';
+    }
+
+    // Handle stop scenario button
+    async function handleStopScenario() {
+        try {
+            console.log('[Popup] Stop scenario button clicked');
+            
+            // Send message to background to clear scenario running status
+            chrome.runtime.sendMessage({
+                action: 'forceStopScenario'
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error('[Popup] Error sending stop scenario message:', chrome.runtime.lastError);
+                    return;
+                }
+                
+                if (response && response.success) {
+                    console.log('[Popup] Scenario stopped successfully');
+                    hideScenarioRunning();
+                } else {
+                    console.error('[Popup] Failed to stop scenario:', response?.error || 'Unknown error');
+                }
+            });
+            
+            // Also hide the UI immediately for better UX
+            hideScenarioRunning();
+            
+        } catch (error) {
+            console.error('[Popup] Error stopping scenario:', error);
+        }
     }
 
     // Utility functions
