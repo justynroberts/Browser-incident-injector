@@ -34,14 +34,15 @@ chrome.runtime.onInstalled.addListener(() => {
     // Set default values
     chrome.storage.sync.set({
         extension_enabled: false, // Disabled by default
-        show_alert: true, // Always show alert when extension is enabled
+        show_alert: false, // Default to off - user must opt-in to see alerts
         allow_form_continuation: false,
         redirect_to_500: false,
         run_scenario_on_submit: false,
-        custom_alert_message: "Oops ⛓️‍ Error: UX Failure -  Our team are Working on it now.",
-        target_element_texts: "", // No defaults - user must configure
+        custom_alert_message: "Error: UX Failure - Our team are working on it now.",
+        target_element_texts: "sign in, login, submit, checkout, buy now, purchase, order, register, sign up", // Default common targets
         active_scenario_id: "", // No default active scenario
-        toggle_button_visible: true // Show toggle button by default
+        toggle_button_visible: false, // Hide toggle button by default - user must opt-in
+        trigger_on_click_enabled: true // Click interception enabled by default
     });
 });
 
@@ -104,8 +105,22 @@ async function handleRunScenario(scenarioId, options, sendResponse) {
         // Re-initialize to ensure integration key is loaded
         await eventProcessor.initialize();
         
+        // Get scenario details for the indicator
+        const scenarios = eventProcessor.getAvailableScenarios();
+        const scenario = scenarios.find(s => s.id === scenarioId);
+        
+        // Set running status
+        await setScenarioRunningStatus({
+            id: scenarioId,
+            name: scenario ? scenario.name : scenarioId,
+            progress: 0
+        });
+        
         // Start the scenario
         const success = await eventProcessor.startScenario(scenarioId, options);
+        
+        // Clear running status
+        await clearScenarioRunningStatus();
         
         if (success) {
             sendResponse({
@@ -126,6 +141,7 @@ async function handleRunScenario(scenarioId, options, sendResponse) {
         }
     } catch (error) {
         console.error('[Event Definition] Error running event definition:', error);
+        await clearScenarioRunningStatus();
         sendResponse({
             success: false,
             error: error.message
@@ -158,6 +174,17 @@ async function handleRunActiveScenario(formData, sendResponse) {
         // Re-initialize to ensure integration key is loaded
         await eventProcessor.initialize();
         
+        // Get scenario details for the indicator
+        const scenarios = eventProcessor.getAvailableScenarios();
+        const scenario = scenarios.find(s => s.id === activeScenarioId);
+        
+        // Set running status
+        await setScenarioRunningStatus({
+            id: activeScenarioId,
+            name: scenario ? scenario.name : activeScenarioId,
+            progress: 0
+        });
+        
         // Start the scenario
         console.log('[Event Definition] Running scenario:', activeScenarioId);
         
@@ -167,6 +194,9 @@ async function handleRunActiveScenario(formData, sendResponse) {
         
         const success = await eventProcessor.runScenario(activeScenarioId);
         console.log('[Event Definition] Scenario run result:', success);
+        
+        // Clear running status
+        await clearScenarioRunningStatus();
         
         if (success) {
             sendResponse({
@@ -187,6 +217,7 @@ async function handleRunActiveScenario(formData, sendResponse) {
         }
     } catch (error) {
         console.error('[Event Definition] Error running active scenario:', error);
+        await clearScenarioRunningStatus();
         sendResponse({
             success: false,
             error: error.message
@@ -402,5 +433,38 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 chrome.notifications.onClicked.addListener((notificationId) => {
     chrome.notifications.clear(notificationId);
 });
+
+// Scenario running status helpers
+async function setScenarioRunningStatus(scenarioData) {
+    try {
+        await chrome.storage.sync.set({ scenario_running: scenarioData });
+        console.log('[Background] Set scenario running status:', scenarioData);
+    } catch (error) {
+        console.error('[Background] Error setting scenario running status:', error);
+    }
+}
+
+async function clearScenarioRunningStatus() {
+    try {
+        await chrome.storage.sync.remove(['scenario_running']);
+        console.log('[Background] Cleared scenario running status');
+    } catch (error) {
+        console.error('[Background] Error clearing scenario running status:', error);
+    }
+}
+
+// Update scenario progress
+async function updateScenarioProgress(progress) {
+    try {
+        const result = await chrome.storage.sync.get(['scenario_running']);
+        if (result.scenario_running) {
+            result.scenario_running.progress = progress;
+            await chrome.storage.sync.set({ scenario_running: result.scenario_running });
+            console.log('[Background] Updated scenario progress:', progress);
+        }
+    } catch (error) {
+        console.error('[Background] Error updating scenario progress:', error);
+    }
+}
 
 console.log('[Incident Injector] Background script loaded');

@@ -5,14 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Incident Injector</title>
     <link rel="stylesheet" href="popup.css">
+    <link href="https://fonts.googleapis.com/css2?family=Grandstander:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
+    <!-- Floating Scenario Notification -->
+    <div id="scenario-floating-notification" class="scenario-floating-notification">
+        <i class="fas fa-exclamation-circle"></i>
+        <span id="floating-scenario-text">Scenario Running...</span>
+    </div>
+    
     <div class="container">
         <header>
-            <h1>❇️ Event Injection</h1>
-            <div class="status-indicator">
-                <span id="status-dot" class="status-dot"></span>
-                <span id="status-text">Loading...</span>
+            <!-- Scenario Running Indicator -->
+            <div id="scenario-running-indicator" class="scenario-indicator" style="display: none;">
+                <div class="scenario-indicator-content">
+                    <i class="fas fa-exclamation-triangle scenario-icon"></i>
+                    <div class="scenario-info">
+                        <span class="scenario-label">⚡ SCENARIO RUNNING</span>
+                        <span id="scenario-name" class="scenario-name">Loading...</span>
+                    </div>
+                    <div class="scenario-progress">
+                        <i class="fas fa-cog fa-spin"></i>
+                    </div>
+                </div>
+                <div class="scenario-progress-bar">
+                    <div id="scenario-progress-fill" class="progress-fill"></div>
+                </div>
+            </div>
+            
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-icon">
+                        <i class="fas fa-bolt"></i>
+                    </div>
+                    <div class="title-section">
+                        <h1>Incident Injector</h1>
+                        <p class="subtitle">PagerDuty Event Simulator</p>
+                    </div>
+                </div>
+                <div class="status-indicator">
+                    <span id="status-dot" class="status-dot"></span>
+                    <span id="status-text">Loading...</span>
+                </div>
             </div>
         </header>
 
@@ -28,12 +63,28 @@
                 </div>
             </div>
 
+            <!-- Quick Actions -->
+            <div class="section quick-actions-section">
+                <div class="section-header">
+                    <h3><span class="section-icon"><i class="fas fa-rocket"></i></span> Quick Actions</h3>
+                </div>
+                <div class="section-content">
+                    <div class="button-row">
+                        <button id="test-scenario-quick" class="btn btn-primary">
+                            <span class="btn-icon"><i class="fas fa-play"></i></span>
+                            Test Current Scenario
+                        </button>
+                    </div>
+                    <div id="test-result-quick" class="test-result"></div>
+                </div>
+            </div>
+
             <!-- PagerDuty Configuration -->
             <div class="section">
                 <div class="section-header">
-                    <h3><span class="section-icon">🟩</span> PagerDuty Configuration</h3>
+                    <h3><span class="section-icon"><i class="fas fa-cog"></i></span> PagerDuty Configuration</h3>
                     <button class="toggle-button" id="toggle-pagerduty-config">
-                        <span class="toggle-icon">▼</span>
+                        <span class="toggle-icon"><i class="fas fa-chevron-down"></i></span>
                     </button>
                 </div>
                 <div class="section-content" id="pagerduty-config-content">
@@ -50,15 +101,26 @@
                         </div>
                         <div id="key-validation" class="validation-message"></div>
                     </div>
+                    
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="toggle-button-visible">
+                            <span class="checkmark"></span>
+                            Show Toggle Button on Pages
+                        </label>
+                        <div class="checkbox-help">
+                            Display a floating button on web pages to quickly access this extension
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Alert & Trigger Configuration -->
             <div class="section">
                 <div class="section-header">
-                    <h3><span class="section-icon">🟩</span> Alert & Trigger Configuration</h3>
+                    <h3><span class="section-icon"><i class="fas fa-bell"></i></span> Alert & Trigger Configuration</h3>
                     <button class="toggle-button" id="toggle-alert-config">
-                        <span class="toggle-icon">▼</span>
+                        <span class="toggle-icon"><i class="fas fa-chevron-down"></i></span>
                     </button>
                 </div>
                 <div class="section-content" id="alert-config-content">
@@ -67,7 +129,7 @@
                         <textarea
                             id="alert-message"
                             rows="3"
-                            placeholder="🟩 Incident Injected: Form submission failed! PagerDuty incident created."
+                            placeholder="Incident Injected: Form submission failed! PagerDuty incident created."
                         ></textarea>
                     </div>
                     
@@ -76,9 +138,9 @@
                             <span class="option-number">1</span>
                             <div class="option-content">
                                 <div class="option-title">Show Custom Alert</div>
-                                <div class="option-description">Alert always shown when extension is enabled</div>
+                                <div class="option-description">Display alert message when form is intercepted</div>
                                 <label class="toggle-switch">
-                                    <input type="checkbox" id="option-create-alert" checked disabled>
+                                    <input type="checkbox" id="option-create-alert">
                                     <span class="switch-slider"></span>
                                 </label>
                             </div>
@@ -126,9 +188,9 @@
             <!-- PagerDuty Event Definition System -->
             <div class="section">
                 <div class="section-header">
-                    <h3><span class="section-icon">🟩</span> Scenarios </h3>
+                    <h3><span class="section-icon"><i class="fas fa-play-circle"></i></span> Scenarios </h3>
                     <button class="toggle-button" id="toggle-event-definition">
-                        <span class="toggle-icon">▼</span>
+                        <span class="toggle-icon"><i class="fas fa-chevron-down"></i></span>
                     </button>
                 </div>
                 <div class="section-content" id="event-definition-content">
@@ -145,21 +207,21 @@
                         <div id="definition-validation" class="validation-message"></div>
                         <div class="button-row">
                             <button id="load-sample" class="btn btn-secondary">
-                                <span class="btn-icon">📋</span>
+                                <span class="btn-icon"><i class="fas fa-file-alt"></i></span>
                                 Load Default Scenarios
                             </button>
                             <button id="edit-json" class="btn btn-secondary">
-                                <span class="btn-icon">✏️</span>
+                                <span class="btn-icon"><i class="fas fa-edit"></i></span>
                                 Edit JSON
                             </button>
                         </div>
                         <div class="button-row" style="margin-top: 10px;">
                             <button id="save-to-file" class="btn btn-secondary">
-                                <span class="btn-icon">💾</span>
+                                <span class="btn-icon"><i class="fas fa-download"></i></span>
                                 Save to File
                             </button>
                             <button id="load-from-file" class="btn btn-secondary">
-                                <span class="btn-icon">📂</span>
+                                <span class="btn-icon"><i class="fas fa-upload"></i></span>
                                 Load from File
                             </button>
                         </div>
@@ -173,15 +235,12 @@
                             </select>
                         </div>
                         
-                        <div class="checkbox-group">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="dry-run-mode">
-                                <span class="checkmark"></span>
-                                Dry Run Mode
-                            </label>
-                            <div class="checkbox-help">
-                                Simulate scenario execution without sending actual PagerDuty events
-                            </div>
+                        
+                        <div class="button-row" style="margin-top: 15px;">
+                            <button id="test-scenario" class="btn btn-primary">
+                                <span class="btn-icon"><i class="fas fa-play"></i></span>
+                                Test Current Scenario
+                            </button>
                         </div>
                         
                         <div id="scenario-result" class="test-result"></div>
@@ -192,32 +251,35 @@
             <!-- Target Element Configuration -->
             <div class="section">
                 <div class="section-header">
-                    <h3><span class="section-icon">🟩</span> Trigger on Click</h3>
+                    <h3><span class="section-icon"><i class="fas fa-mouse-pointer"></i></span> Trigger on Click</h3>
                     <button class="toggle-button" id="toggle-target-config">
-                        <span class="toggle-icon">▼</span>
+                        <span class="toggle-icon"><i class="fas fa-chevron-down"></i></span>
                     </button>
                 </div>
                 <div class="section-content" id="target-config-content">
-                    <div class="form-group">
-                        <label for="target-elements">Element Text to Hook (comma-separated):</label>
-                        <textarea
-                            id="target-elements"
-                            rows="2"
-                            placeholder="Enter text to match (e.g., sign in, checkout, submit)"
-                        ></textarea>
-                        <div class="input-help">
-                            Enter text to intercept on buttons, links, or other clickable elements (case-insensitive). Leave empty to disable interception.
+                    <div class="trigger-option">
+                        <span class="option-number">🎯</span>
+                        <div class="option-content">
+                            <div class="option-title">Enable Click Interception</div>
+                            <div class="option-description">Intercept clicks on specific page elements</div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="trigger-on-click-enabled">
+                                <span class="switch-slider"></span>
+                            </label>
                         </div>
                     </div>
                     
-                    <div class="checkbox-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="toggle-button-visible" checked>
-                            <span class="checkmark"></span>
-                            Show Toggle Button
-                        </label>
-                        <div class="checkbox-help">
-                            Display a floating button on pages to quickly access the extension
+                    <div id="click-interception-config" style="display: none; margin-top: 20px;">
+                        <div class="form-group">
+                            <label for="target-elements">Element Text to Hook (comma-separated):</label>
+                            <textarea
+                                id="target-elements"
+                                rows="2"
+                                placeholder="Enter text to match (e.g., sign in, checkout, submit)"
+                            ></textarea>
+                            <div class="input-help">
+                                Enter text to intercept on buttons, links, or other clickable elements (case-insensitive). Leave empty to disable interception.
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -227,20 +289,16 @@
             <!-- Test Section -->
             <div class="section">
                 <div class="section-header">
-                    <h3><span class="section-icon">🟩</span> Test Options</h3>
+                    <h3><span class="section-icon"><i class="fas fa-flask"></i></span> Test Options</h3>
                     <button class="toggle-button" id="toggle-test-section">
-                        <span class="toggle-icon">▼</span>
+                        <span class="toggle-icon"><i class="fas fa-chevron-down"></i></span>
                     </button>
                 </div>
                 <div class="section-content" id="test-section-content">
                     <div class="button-row">
                         <button id="test-incident" class="btn btn-secondary">
-                            <span class="btn-icon">🧪</span>
+                            <span class="btn-icon"><i class="fas fa-vial"></i></span>
                             Send Test Alert
-                        </button>
-                        <button id="test-scenario" class="btn btn-primary">
-                            <span class="btn-icon">▶️</span>
-                            Test Current Scenario
                         </button>
                     </div>
                     <div id="test-result" class="test-result"></div>
@@ -250,9 +308,9 @@
             <!-- Status Section -->
             <div class="section">
                 <div class="section-header">
-                    <h3><span class="section-icon">🟩</span> Status</h3>
+                    <h3><span class="section-icon"><i class="fas fa-chart-line"></i></span> Status</h3>
                     <button class="toggle-button" id="toggle-status-section">
-                        <span class="toggle-icon">▼</span>
+                        <span class="toggle-icon"><i class="fas fa-chevron-down"></i></span>
                     </button>
                 </div>
                 <div class="section-content" id="status-section-content">
@@ -289,7 +347,7 @@
                 <h3>Setup Instructions:</h3>
                 <ol>
                     <li>Log into your PagerDuty account</li>
-                    <li>Go to Services → Your Service → Integrations</li>
+                    <li>Go to Services &rarr; Your Service &rarr; Integrations</li>
                     <li>Add a new "Events API v2" integration</li>
                     <li>Copy the Integration Key (32 characters)</li>
                     <li>Paste it into the field above</li>

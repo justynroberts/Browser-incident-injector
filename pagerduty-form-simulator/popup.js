@@ -1,5 +1,9 @@
 // Incident Injector - Popup Script
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('[Popup] Starting popup initialization...');
+    
+    try {
+    
     // We'll communicate with the event processor through messages
     // instead of trying to access it directly
     // DOM elements
@@ -13,11 +17,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     const targetElementsTextarea = document.getElementById('target-elements');
     const testIncidentButton = document.getElementById('test-incident');
     const testScenarioButton = document.getElementById('test-scenario');
+    const testScenarioQuickButton = document.getElementById('test-scenario-quick');
     const testResult = document.getElementById('test-result');
+    const testResultQuick = document.getElementById('test-result-quick');
     const lastIncidentSpan = document.getElementById('last-incident');
     const statusDot = document.getElementById('status-dot');
     const statusText = document.getElementById('status-text');
     const keyValidation = document.getElementById('key-validation');
+    
+    // Scenario running indicator elements
+    const scenarioIndicator = document.getElementById('scenario-running-indicator');
+    const scenarioName = document.getElementById('scenario-name');
+    const scenarioProgressFill = document.getElementById('scenario-progress-fill');
+    const floatingNotification = document.getElementById('scenario-floating-notification');
+    const floatingScenarioText = document.getElementById('floating-scenario-text');
     const helpLink = document.getElementById('help-link');
     const setupLink = document.getElementById('setup-link');
     const helpModal = document.getElementById('help-modal');
@@ -28,7 +41,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const definitionValidation = document.getElementById('definition-validation');
     const scenarioControls = document.getElementById('scenario-controls');
     const scenarioSelect = document.getElementById('scenario-select');
-    const dryRunCheckbox = document.getElementById('dry-run-mode');
     const scenarioResult = document.getElementById('scenario-result');
     const loadSampleButton = document.getElementById('load-sample');
     
@@ -37,6 +49,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const runScenarioToggle = document.getElementById('option-run-scenario');
     const add500ErrorToggle = document.getElementById('option-add-500-error');
     const continueDestinationToggle = document.getElementById('option-continue-destination');
+    
+    // Click Interception elements
+    const triggerOnClickEnabledToggle = document.getElementById('trigger-on-click-enabled');
+    const clickInterceptionConfig = document.getElementById('click-interception-config');
     const toggleButtonVisibleCheckbox = document.getElementById('toggle-button-visible');
 
     // Load saved settings
@@ -50,6 +66,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Initialize trigger options
     initializeTriggerOptions();
+    
+    // Initialize click interception
+    initializeClickInterception();
     
     // Load event definition if exists
     const localResult = await chrome.storage.local.get(['event_definition']);
@@ -93,32 +112,50 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('[Incident Injector] Error checking for event definition:', error);
     }
 
-    // Event listeners
-    extensionEnabledToggle.addEventListener('change', saveSettings);
-    integrationKeyInput.addEventListener('input', handleKeyInput);
-    integrationKeyInput.addEventListener('blur', saveSettings);
-    alertMessageTextarea.addEventListener('input', saveSettings);
-    // These elements are already handled by the trigger options event listeners
-    // No need to add duplicate event listeners here
-    targetElementsTextarea.addEventListener('input', saveSettings);
-    toggleButtonVisibleCheckbox.addEventListener('change', saveSettings);
-    testIncidentButton.addEventListener('click', handleTestIncident);
-    testScenarioButton.addEventListener('click', handleTestScenario);
-    helpLink.addEventListener('click', showHelpModal);
-    setupLink.addEventListener('click', showHelpModal);
-    closeModal.addEventListener('click', hideHelpModal);
+    // Event listeners with error handling
+    try {
+        console.log('[Popup] Adding event listeners...');
+        
+        if (extensionEnabledToggle) extensionEnabledToggle.addEventListener('change', saveSettings);
+        if (integrationKeyInput) {
+            integrationKeyInput.addEventListener('input', handleKeyInput);
+            integrationKeyInput.addEventListener('blur', saveSettings);
+        }
+        if (alertMessageTextarea) alertMessageTextarea.addEventListener('input', saveSettings);
+        if (targetElementsTextarea) targetElementsTextarea.addEventListener('input', saveSettings);
+        if (toggleButtonVisibleCheckbox) toggleButtonVisibleCheckbox.addEventListener('change', saveSettings);
+        if (testIncidentButton) testIncidentButton.addEventListener('click', handleTestIncident);
+        if (testScenarioButton) testScenarioButton.addEventListener('click', handleTestScenario);
+        if (testScenarioQuickButton) testScenarioQuickButton.addEventListener('click', handleTestScenarioQuick);
+        if (helpLink) helpLink.addEventListener('click', showHelpModal);
+        if (setupLink) setupLink.addEventListener('click', showHelpModal);
+        if (closeModal) closeModal.addEventListener('click', hideHelpModal);
+        
+        console.log('[Popup] Event listeners added successfully');
+    } catch (error) {
+        console.error('[Popup] Error adding event listeners:', error);
+    }
     
     // Event Definition System event listeners
-    eventDefinitionTextarea.addEventListener('input', handleEventDefinitionInput);
-    scenarioSelect.addEventListener('change', handleScenarioSelect);
-    loadSampleButton.addEventListener('click', handleLoadSample);
-    
-    // Add event listener for the Edit JSON button
-    document.getElementById('edit-json').addEventListener('click', handleEditJson);
-    
-    // Add event listeners for save/load file buttons
-    document.getElementById('save-to-file').addEventListener('click', handleSaveToFile);
-    document.getElementById('load-from-file').addEventListener('click', handleLoadFromFile);
+    try {
+        if (eventDefinitionTextarea) eventDefinitionTextarea.addEventListener('input', handleEventDefinitionInput);
+        if (scenarioSelect) scenarioSelect.addEventListener('change', handleScenarioSelect);
+        if (loadSampleButton) loadSampleButton.addEventListener('click', handleLoadSample);
+        
+        // Add event listener for the Edit JSON button
+        const editJsonButton = document.getElementById('edit-json');
+        if (editJsonButton) editJsonButton.addEventListener('click', handleEditJson);
+        
+        // Add event listeners for save/load file buttons
+        const saveToFileButton = document.getElementById('save-to-file');
+        const loadFromFileButton = document.getElementById('load-from-file');
+        if (saveToFileButton) saveToFileButton.addEventListener('click', handleSaveToFile);
+        if (loadFromFileButton) loadFromFileButton.addEventListener('click', handleLoadFromFile);
+        
+        console.log('[Popup] Event definition listeners added successfully');
+    } catch (error) {
+        console.error('[Popup] Error adding event definition listeners:', error);
+    }
     
     // Close modal when clicking outside
     window.addEventListener('click', (event) => {
@@ -142,7 +179,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 'last_incident_timestamp',
                 'active_scenario_id',
                 'run_scenario_on_submit',
-                'toggle_button_visible'
+                'toggle_button_visible',
+                'trigger_on_click_enabled'
             ]);
             
             // Load event definition from local storage (can be larger)
@@ -155,10 +193,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (extensionEnabledToggle) extensionEnabledToggle.checked = result.extension_enabled === true; // Default to false
             if (integrationKeyInput) integrationKeyInput.value = result.pagerduty_integration_key || '';
             if (alertMessageTextarea) alertMessageTextarea.value = result.custom_alert_message ||
-                'Oops ⛓️‍💥 Error: UX Failure -  Our team are Working on it now.';
+                'Error: UX Failure - Our team are working on it now.';
             // These values will be set in initializeTriggerOptions() function
             if (targetElementsTextarea) targetElementsTextarea.value = result.target_element_texts || '';
-            if (toggleButtonVisibleCheckbox) toggleButtonVisibleCheckbox.checked = result.toggle_button_visible !== false; // Default to true
+            if (toggleButtonVisibleCheckbox) toggleButtonVisibleCheckbox.checked = result.toggle_button_visible === true; // Default to false (user must opt-in)
+            if (triggerOnClickEnabledToggle) triggerOnClickEnabledToggle.checked = result.trigger_on_click_enabled === true; // Default to false (user must opt-in)
 
             // Update last incident timestamp
             if (result.last_incident_timestamp) {
@@ -191,12 +230,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 extension_enabled: extensionEnabledToggle.checked,
                 pagerduty_integration_key: integrationKeyInput.value.trim(),
                 custom_alert_message: alertMessageTextarea.value.trim(),
-                show_alert: true, // Always show alert when extension is enabled
+                show_alert: createAlertToggle ? createAlertToggle.checked : false, // Respect user's alert toggle setting
                 allow_form_continuation: continueDestinationToggle.checked,
                 redirect_to_500: add500ErrorToggle.checked,
                 run_scenario_on_submit: runScenarioToggle.checked,
                 target_element_texts: targetElementsTextarea.value.trim(),
-                toggle_button_visible: toggleButtonVisibleCheckbox.checked
+                toggle_button_visible: toggleButtonVisibleCheckbox ? toggleButtonVisibleCheckbox.checked : false, // Default to false
+                trigger_on_click_enabled: triggerOnClickEnabledToggle ? triggerOnClickEnabledToggle.checked : false // Default to false
             };
 
             // Save event definition to local storage (can handle larger data)
@@ -223,7 +263,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Handle integration key input
     function handleKeyInput() {
         const key = integrationKeyInput.value.trim();
-        validateIntegrationKey(key);
+        const wasValid = validateIntegrationKey(key);
+        
+        // Auto-minimize PagerDuty Configuration when valid API key is entered
+        if (wasValid && key.length === 32) {
+            const toggleButton = document.getElementById('toggle-pagerduty-config');
+            const contentElement = document.getElementById('pagerduty-config-content');
+            
+            if (toggleButton && contentElement && !contentElement.classList.contains('collapsed')) {
+                // Minimize the section with a slight delay for better UX
+                setTimeout(() => {
+                    contentElement.classList.add('collapsed');
+                    toggleButton.classList.add('collapsed');
+                    saveToggleState('toggle-pagerduty-config', true);
+                    console.log('[PagerDuty Configuration] Auto-minimized after valid API key entered');
+                }, 800);
+            }
+        }
         
         // Debounced save
         clearTimeout(handleKeyInput.timeout);
@@ -239,11 +295,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             keyValidation.className = 'validation-message';
             return false;
         } else if (keyRegex.test(key)) {
-            keyValidation.textContent = '✓ Valid integration key format';
+            keyValidation.textContent = 'Valid integration key format';
+            keyValidation.innerHTML = '<i class="fas fa-check"></i> Valid integration key format';
             keyValidation.className = 'validation-message valid';
             return true;
         } else {
-            keyValidation.textContent = '✗ Invalid format (must be 32 alphanumeric characters)';
+            keyValidation.textContent = 'Invalid format (must be 32 alphanumeric characters)';
+            keyValidation.innerHTML = '<i class="fas fa-times"></i> Invalid format (must be 32 alphanumeric characters)';
             keyValidation.className = 'validation-message invalid';
             return false;
         }
@@ -275,7 +333,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Disable button and show loading
         testIncidentButton.disabled = true;
-        testIncidentButton.innerHTML = '<span class="btn-icon">⏳</span>Sending...';
+        testIncidentButton.innerHTML = '<span class="btn-icon"><i class="fas fa-spinner fa-spin"></i></span>Sending...';
         testResult.textContent = '';
 
         try {
@@ -305,7 +363,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             // Re-enable button
             testIncidentButton.disabled = false;
-            testIncidentButton.innerHTML = '<span class="btn-icon">🧪</span>Send Test Incident';
+            testIncidentButton.innerHTML = '<span class="btn-icon"><i class="fas fa-vial"></i></span>Send Test Alert';
         }
     }
     
@@ -365,7 +423,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // Disable button and show loading
         testScenarioButton.disabled = true;
-        testScenarioButton.innerHTML = '<span class="btn-icon">⏳</span>Running...';
+        testScenarioButton.innerHTML = '<span class="btn-icon"><i class="fas fa-spinner fa-spin"></i></span>Running...';
         testResult.textContent = '';
 
         try {
@@ -373,10 +431,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const response = await new Promise((resolve) => {
                 chrome.runtime.sendMessage({
                     action: 'run_scenario',
-                    scenarioId: activeScenarioId,
-                    options: {
-                        dryRun: false
-                    }
+                    scenarioId: activeScenarioId
                 }, resolve);
             });
 
@@ -399,7 +454,94 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             // Re-enable button
             testScenarioButton.disabled = false;
-            testScenarioButton.innerHTML = '<span class="btn-icon">▶️</span>Test Current Scenario';
+            testScenarioButton.innerHTML = '<span class="btn-icon"><i class="fas fa-play"></i></span>Test Current Scenario';
+        }
+    }
+    
+    // Handle test scenario (quick action button)
+    async function handleTestScenarioQuick() {
+        // Check for valid integration key
+        if (!validateIntegrationKey(integrationKeyInput.value.trim())) {
+            showTestError('Please enter a valid PagerDuty integration key first', true);
+            testScenarioQuickButton.disabled = true;
+            
+            // Automatically open the PagerDuty Configuration section
+            const toggleButton = document.getElementById('toggle-pagerduty-config');
+            const contentElement = document.getElementById('pagerduty-config-content');
+            
+            if (toggleButton && contentElement) {
+                // Expand the section if it's collapsed
+                if (contentElement.classList.contains('collapsed')) {
+                    contentElement.classList.remove('collapsed');
+                    toggleButton.classList.remove('collapsed');
+                    // Save the expanded state
+                    saveToggleState('toggle-pagerduty-config', false);
+                }
+                
+                // Focus on the integration key input
+                setTimeout(() => {
+                    integrationKeyInput.focus();
+                }, 100);
+            }
+            
+            return;
+        }
+        
+        // Get the active scenario ID
+        const result = await chrome.storage.sync.get(['active_scenario_id']);
+        const activeScenarioId = result.active_scenario_id;
+        
+        if (!activeScenarioId) {
+            showTestError('Please select a scenario first', true);
+            testScenarioQuickButton.disabled = true;
+            
+            // Automatically open the Event Definition section
+            const toggleButton = document.getElementById('toggle-event-definition');
+            const contentElement = document.getElementById('event-definition-content');
+            
+            if (toggleButton && contentElement) {
+                // Expand the section if it's collapsed
+                if (contentElement.classList.contains('collapsed')) {
+                    contentElement.classList.remove('collapsed');
+                    toggleButton.classList.remove('collapsed');
+                    // Save the expanded state
+                    saveToggleState('toggle-event-definition', false);
+                }
+                
+                // Focus on the scenario select
+                setTimeout(() => {
+                    scenarioSelect.focus();
+                }, 100);
+            }
+            
+            return;
+        }
+        
+        try {
+            // Show loading state
+            testScenarioQuickButton.disabled = true;
+            testScenarioQuickButton.innerHTML = '<span class="btn-icon"><i class="fas fa-spinner fa-spin"></i></span>Running...';
+            
+            // Run the scenario
+            const response = await chrome.runtime.sendMessage({
+                action: 'run_scenario',
+                scenarioId: activeScenarioId,
+                options: {}
+            });
+            
+            if (response.success) {
+                showTestSuccess(`Scenario executed successfully: ${response.message}`, true);
+            } else {
+                showTestError(`Failed to run scenario: ${response.error}`, true);
+            }
+            
+        } catch (error) {
+            console.error('Error running scenario:', error);
+            showTestError(`Error: ${error.message}`, true);
+        } finally {
+            // Re-enable button
+            testScenarioQuickButton.disabled = false;
+            testScenarioQuickButton.innerHTML = '<span class="btn-icon"><i class="fas fa-play"></i></span>Test Current Scenario';
         }
     }
 
@@ -443,21 +585,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         showMessage(message, 'error');
     }
 
-    function showTestSuccess(message) {
-        testResult.textContent = message;
-        testResult.className = 'test-result success';
+    function showTestSuccess(message, useQuick = false) {
+        const resultElement = useQuick ? testResultQuick : testResult;
+        resultElement.textContent = message;
+        resultElement.className = 'test-result success';
         setTimeout(() => {
-            testResult.textContent = '';
-            testResult.className = 'test-result';
+            resultElement.textContent = '';
+            resultElement.className = 'test-result';
         }, 5000);
     }
 
-    function showTestError(message) {
-        testResult.textContent = message;
-        testResult.className = 'test-result error';
+    function showTestError(message, useQuick = false) {
+        const resultElement = useQuick ? testResultQuick : testResult;
+        resultElement.textContent = message;
+        resultElement.className = 'test-result error';
         setTimeout(() => {
-            testResult.textContent = '';
-            testResult.className = 'test-result';
+            resultElement.textContent = '';
+            resultElement.className = 'test-result';
         }, 5000);
     }
 
@@ -499,6 +643,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (changes.active_scenario_id) {
                 updateScenarioButtonState();
             }
+            
+            // Update scenario running indicator
+            if (changes.scenario_running !== undefined) {
+                if (changes.scenario_running.newValue) {
+                    showScenarioRunning(changes.scenario_running.newValue);
+                } else {
+                    hideScenarioRunning();
+                }
+            }
         }
     });
     
@@ -510,22 +663,41 @@ document.addEventListener('DOMContentLoaded', async () => {
             const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
             const hasIntegrationKey = result.pagerduty_integration_key && result.pagerduty_integration_key.trim() !== '';
             
-            // Button should be disabled if either condition is not met
+            // Buttons should be disabled if either condition is not met
             const shouldBeEnabled = hasActiveScenario && hasIntegrationKey;
-            testScenarioButton.disabled = !shouldBeEnabled;
+            if (testScenarioButton) testScenarioButton.disabled = !shouldBeEnabled;
+            if (testScenarioQuickButton) testScenarioQuickButton.disabled = !shouldBeEnabled;
             
             // Update button appearance and tooltip based on state
             if (!hasActiveScenario) {
-                testScenarioButton.title = 'Please select a scenario first';
-                testScenarioButton.classList.add('disabled-with-reason');
+                if (testScenarioButton) {
+                    testScenarioButton.title = 'Please select a scenario first';
+                    testScenarioButton.classList.add('disabled-with-reason');
+                }
+                if (testScenarioQuickButton) {
+                    testScenarioQuickButton.title = 'Please select a scenario first';
+                    testScenarioQuickButton.classList.add('disabled-with-reason');
+                }
                 console.log('[Event Definition] Button disabled: No active scenario');
             } else if (!hasIntegrationKey) {
-                testScenarioButton.title = 'Please configure PagerDuty integration key first';
-                testScenarioButton.classList.add('disabled-with-reason');
+                if (testScenarioButton) {
+                    testScenarioButton.title = 'Please configure PagerDuty integration key first';
+                    testScenarioButton.classList.add('disabled-with-reason');
+                }
+                if (testScenarioQuickButton) {
+                    testScenarioQuickButton.title = 'Please configure PagerDuty integration key first';
+                    testScenarioQuickButton.classList.add('disabled-with-reason');
+                }
                 console.log('[Event Definition] Button disabled: No integration key');
             } else {
-                testScenarioButton.title = 'Test the currently selected scenario';
-                testScenarioButton.classList.remove('disabled-with-reason');
+                if (testScenarioButton) {
+                    testScenarioButton.title = 'Test the currently selected scenario';
+                    testScenarioButton.classList.remove('disabled-with-reason');
+                }
+                if (testScenarioQuickButton) {
+                    testScenarioQuickButton.title = 'Test the currently selected scenario';
+                    testScenarioQuickButton.classList.remove('disabled-with-reason');
+                }
                 console.log('[Event Definition] Button enabled: All requirements met');
             }
             
@@ -582,13 +754,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     contentElement.classList.add('collapsed');
                     toggleButton.classList.add('collapsed');
                     
-                    // Special case: If this is the PagerDuty config section and no key is defined,
-                    // expand it automatically
+                    // Special cases for default expanded sections
                     if (section.toggle === 'toggle-pagerduty-config' && !hasIntegrationKey) {
                         console.log('[Incident Injector] No PagerDuty integration key defined, expanding config section');
                         contentElement.classList.remove('collapsed');
                         toggleButton.classList.remove('collapsed');
                         saveToggleState(section.toggle, false);
+                    } else if (section.toggle === 'toggle-event-definition') {
+                        // Keep scenarios section collapsed by default - user must expand manually
+                        console.log('[Incident Injector] Scenarios section collapsed by default');
+                        // Don't auto-expand even if saved state says to expand
                     } else {
                         // Load saved state (only if explicitly set to expanded)
                         chrome.storage.local.get([section.toggle], (result) => {
@@ -622,8 +797,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         ], (result) => {
             // Add null checks before setting properties
             if (createAlertToggle) {
-                createAlertToggle.checked = true; // Always show alert when extension is enabled
-                createAlertToggle.disabled = true; // Disable the toggle since it's always on
+                createAlertToggle.checked = result.show_alert === true; // Default to false (off)
+                createAlertToggle.disabled = false; // Allow user to toggle
             }
             if (runScenarioToggle) {
                 runScenarioToggle.checked = result.run_scenario_on_submit === true;
@@ -635,16 +810,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         
         // Add event listeners with null checks
-        // Alert toggle is now always enabled when extension is enabled
+        // Add event listeners for all toggles
+        if (createAlertToggle) createAlertToggle.addEventListener('change', saveTriggerOptions);
         if (runScenarioToggle) runScenarioToggle.addEventListener('change', saveTriggerOptions);
         if (add500ErrorToggle) add500ErrorToggle.addEventListener('change', saveTriggerOptions);
         if (continueDestinationToggle) continueDestinationToggle.addEventListener('change', saveTriggerOptions);
     }
     
+    // Initialize click interception
+    function initializeClickInterception() {
+        // Show/hide the config section based on toggle state
+        function toggleConfigVisibility() {
+            if (triggerOnClickEnabledToggle && clickInterceptionConfig) {
+                clickInterceptionConfig.style.display = triggerOnClickEnabledToggle.checked ? 'block' : 'none';
+            }
+        }
+        
+        // Set initial visibility
+        toggleConfigVisibility();
+        
+        // Add event listener for toggle change
+        if (triggerOnClickEnabledToggle) {
+            triggerOnClickEnabledToggle.addEventListener('change', () => {
+                toggleConfigVisibility();
+                saveSettings(); // Save the setting
+            });
+        }
+        
+        // Add event listener for target elements textarea
+        if (targetElementsTextarea) {
+            targetElementsTextarea.addEventListener('input', saveSettings);
+        }
+    }
+    
     // Save trigger options to storage
     function saveTriggerOptions() {
         chrome.storage.sync.set({
-            show_alert: true, // Always show alert when extension is enabled
+            show_alert: createAlertToggle ? createAlertToggle.checked : false, // User can toggle alert on/off
             run_scenario_on_submit: runScenarioToggle ? runScenarioToggle.checked : false,
             redirect_to_500: add500ErrorToggle.checked,
             allow_form_continuation: continueDestinationToggle.checked
@@ -768,7 +970,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.log(`[Event Definition] Validation successful: Found ${scenarioCount} valid scenarios`);
             
             // Update UI
-            definitionValidation.textContent = `✓ Valid event definition format (${scenarioCount} scenarios)`;
+            definitionValidation.innerHTML = `<i class="fas fa-check"></i> Valid event definition format (${scenarioCount} scenarios)`;
             definitionValidation.className = 'validation-message valid';
             scenarioControls.style.display = 'block';
             
@@ -788,7 +990,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             return true;
         } catch (error) {
-            definitionValidation.textContent = `✗ Invalid JSON: ${error.message}`;
+            definitionValidation.innerHTML = `<i class="fas fa-times"></i> Invalid JSON: ${error.message}`;
             definitionValidation.className = 'validation-message invalid';
             scenarioControls.style.display = 'none';
             return false;
@@ -897,9 +1099,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 // Update test scenario button state
-                testScenarioButton.disabled = false;
-                testScenarioButton.title = 'Test the currently selected scenario';
-                testScenarioButton.classList.remove('disabled-with-reason');
+                if (testScenarioButton) {
+                    testScenarioButton.disabled = false;
+                    testScenarioButton.title = 'Test the currently selected scenario';
+                    testScenarioButton.classList.remove('disabled-with-reason');
+                }
             });
         } else {
             console.log('[Event Definition] No scenario selected');
@@ -922,9 +1126,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 // Disable test scenario button
-                testScenarioButton.disabled = true;
-                testScenarioButton.title = 'Please select a scenario first';
-                testScenarioButton.classList.add('disabled-with-reason');
+                if (testScenarioButton) {
+                    testScenarioButton.disabled = true;
+                    testScenarioButton.title = 'Please select a scenario first';
+                    testScenarioButton.classList.add('disabled-with-reason');
+                }
             });
         }
         
@@ -950,7 +1156,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             // Disable button and show loading
             loadSampleButton.disabled = true;
-            loadSampleButton.innerHTML = '<span class="btn-icon">⏳</span>Loading...';
+            loadSampleButton.innerHTML = '<span class="btn-icon"><i class="fas fa-spinner fa-spin"></i></span>Loading...';
             
             // Make sure the Event Definition section is expanded
             const toggleButton = document.getElementById('toggle-event-definition');
@@ -1020,7 +1226,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         } finally {
             // Re-enable button
             loadSampleButton.disabled = false;
-            loadSampleButton.innerHTML = '<span class="btn-icon">📋</span>Load Sample Definition';
+            loadSampleButton.innerHTML = '<span class="btn-icon"><i class="fas fa-file-alt"></i></span>Load Default Scenarios';
         }
     }
     
@@ -1147,5 +1353,100 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             reader.readAsText(file);
         });
+    }
+    
+    // Check if a scenario is currently running on popup load
+    async function checkScenarioRunningStatus() {
+        try {
+            const result = await chrome.storage.sync.get(['scenario_running']);
+            if (result.scenario_running) {
+                showScenarioRunning(result.scenario_running);
+            }
+        } catch (error) {
+            console.error('Error checking scenario running status:', error);
+        }
+    }
+    
+    // Show scenario running indicator
+    function showScenarioRunning(scenarioData) {
+        const scenarioNameText = scenarioData.name || scenarioData.id || 'Unknown Scenario';
+        
+        // Update main indicator with proper null checks
+        if (scenarioIndicator && scenarioName) {
+            scenarioName.textContent = scenarioNameText;
+            scenarioIndicator.style.display = 'block';
+            
+            // Animate progress bar with null checks
+            if (scenarioProgressFill) {
+                if (scenarioData.progress !== undefined) {
+                    scenarioProgressFill.style.width = `${scenarioData.progress}%`;
+                } else {
+                    // If no specific progress, show indeterminate animation
+                    scenarioProgressFill.style.width = '30%';
+                    // Animate to show activity
+                    setTimeout(() => {
+                        if (scenarioProgressFill) scenarioProgressFill.style.width = '60%';
+                    }, 500);
+                    setTimeout(() => {
+                        if (scenarioProgressFill) scenarioProgressFill.style.width = '80%';
+                    }, 1000);
+                }
+            }
+            
+            // Add visual pulse to draw attention
+            scenarioIndicator.style.animation = 'pulse-warning 1.5s ease-in-out infinite';
+        }
+        
+        // Floating notification disabled - top bar is sufficient
+        if (floatingNotification) {
+            floatingNotification.style.display = 'none';
+        }
+        
+        // Scroll to top to ensure indicator is visible
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        console.log('[Popup] Showing scenario running indicator:', scenarioData);
+    }
+    
+    // Hide scenario running indicator
+    function hideScenarioRunning() {
+        // Ensure floating notification stays hidden
+        if (floatingNotification) {
+            floatingNotification.style.display = 'none';
+        }
+        
+        if (scenarioIndicator) {
+            // Complete the progress bar before hiding
+            if (scenarioProgressFill) {
+                scenarioProgressFill.style.width = '100%';
+                setTimeout(() => {
+                    if (scenarioIndicator) scenarioIndicator.style.display = 'none';
+                    if (scenarioProgressFill) scenarioProgressFill.style.width = '0%';
+                }, 500);
+            } else {
+                scenarioIndicator.style.display = 'none';
+            }
+            console.log('[Popup] Hiding scenario running indicator');
+        }
+    }
+    
+    // Initialize scenario status check
+    checkScenarioRunningStatus();
+    
+    } catch (error) {
+        console.error('[Popup] Critical error during initialization:', error);
+        // Show error message to user
+        const container = document.querySelector('.container');
+        if (container) {
+            const errorDiv = document.createElement('div');
+            errorDiv.innerHTML = `
+                <div style="background: #ff3d71; color: white; padding: 15px; margin: 10px; border-radius: 8px;">
+                    <h3>Extension Error</h3>
+                    <p>The extension failed to initialize properly. Please reload the extension or check the console for details.</p>
+                    <small>Error: ${error.message}</small>
+                </div>
+            `;
+            container.prepend(errorDiv);
+        }
     }
 });
