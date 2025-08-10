@@ -12,13 +12,13 @@ A Chrome extension for incident response testing and resilience training.
 
 1. **Download the latest release**
    - Navigate to the [Releases](releases) page
-   - Download `incident-injector-v1.1.zip`
+   - Download `incident-injector-v1.2.zip`
    - Extract the ZIP file to a local directory
 
 2. **Install in Chrome**
    - Open Chrome and navigate to `chrome://extensions/`
    - Enable "Developer mode" using the toggle in the top right corner
-   - Click "Load unpacked" and select the extracted `v1.1` folder (or use `extension` folder for development)
+   - Click "Load unpacked" and select the extracted folder
    - The extension icon should appear in your browser toolbar
 
 3. **Configure PagerDuty Integration**
@@ -45,16 +45,19 @@ For developers or contributors:
 ## Features
 
 ### Core Functionality
+- **Slide-out Panel Interface**: Modern, non-intrusive panel that slides in from the right side
 - **Automated Incident Creation**: Generates PagerDuty incidents based on user interactions
 - **Realistic Error Simulation**: Displays professional error pages mimicking production failures
 - **Click Interception**: Monitors and responds to specific user interface elements
 - **Scenario-Based Testing**: Supports complex, multi-step incident response scenarios
 
 ### Advanced Capabilities
+- **Persistent Settings**: All configurations and custom scenarios are preserved across tabs and browser sessions
+- **Auto-collapsing Sections**: Clean, organized interface with collapsible configuration sections
 - **Template Variables**: Dynamic incident details using configurable variables
 - **Batch Event Processing**: Efficient handling of multiple incident events
-- **Debug Logging**: Comprehensive logging for troubleshooting and verification
-- **Visual Indicators**: Clear UI feedback during active simulations
+- **CSP-Safe Icons**: Unicode fallback icons ensure compatibility across all websites
+- **Visual Indicators**: Clear UI feedback during active simulations with progress tracking
 
 ## Usage
 
@@ -157,6 +160,15 @@ For technical support, bug reports, or feature requests:
 
 ## Version History
 
+### Version 1.2 (January 2025)
+- **Major UI Overhaul**: Converted from popup to slide-out panel for better usability
+- **Enhanced Persistence**: Complete state preservation across tabs and browser sessions
+- **CSP Compliance**: Removed Font Awesome dependency, using Unicode fallback icons
+- **Improved UX**: Consolidated save buttons, auto-collapsing sections, minimized default view
+- **Better Error Handling**: Robust Chrome API fallbacks with message relay system
+- **Auto-save Features**: Event definitions and scenario selections save automatically
+- **Visual Refinements**: Clean, modern interface with improved spacing and organization
+
 ### Version 1.1 (August 2025)
 - Resolved click interception race condition
 - Enhanced scenario execution indicators
@@ -173,4 +185,4 @@ For technical support, bug reports, or feature requests:
 
 ---
 
-**Incident Injector v1.1** | [Download Latest Release](releases) | [Report Issues](../../issues)
+**Incident Injector v1.2** | [Download Latest Release](releases) | [Report Issues](../../issues)
