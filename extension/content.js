@@ -1,6 +1,60 @@
 // Incident Injector - Content Script
 (function() {
     'use strict';
+    
+    // Prevent multiple executions of the content script
+    if (window.incidentInjectorLoaded) {
+        console.log('[Incident Injector] Content script already loaded, skipping');
+        return;
+    }
+    window.incidentInjectorLoaded = true;
+    
+    // Debug function for users to check click interception status
+    window.debugClickInterception = function() {
+        console.log('🔧 Click Interception Debug Info:');
+        console.log('Extension Enabled:', extensionEnabled);
+        console.log('Trigger On Click Enabled:', triggerOnClickEnabled);
+        console.log('Target Element Texts:', targetElementTexts);
+        console.log('Target Element Texts Length:', targetElementTexts.length);
+        console.log('Click Listener Active:', triggerOnClickEnabled && targetElementTexts.length > 0);
+        
+        if (!extensionEnabled) {
+            console.log('❌ Extension is disabled. Enable it in the panel.');
+        } else if (!triggerOnClickEnabled) {
+            console.log('❌ Click interception is disabled. Enable it in the panel under "Trigger on Click".');
+        } else if (targetElementTexts.length === 0) {
+            console.log('❌ No target element texts configured. Add some in the panel under "Trigger on Click".');
+        } else {
+            console.log('✅ Click interception should be working! Try clicking buttons with text like:', targetElementTexts.slice(0, 3));
+        }
+        
+        return {
+            extensionEnabled,
+            triggerOnClickEnabled,
+            targetElementTexts,
+            active: extensionEnabled && triggerOnClickEnabled && targetElementTexts.length > 0
+        };
+    };
+    
+    // Helper function to safely send messages to background script
+    function safeRuntimeSendMessage(message, callback = null) {
+        if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.sendMessage) {
+            console.error('[Content] Chrome runtime API not available');
+            const errorResponse = { success: false, error: 'Chrome runtime API not available' };
+            if (callback) {
+                callback(errorResponse);
+                return;
+            }
+            return Promise.resolve(errorResponse);
+        }
+        
+        if (callback) {
+            return chrome.runtime.sendMessage(message, callback);
+        } else {
+            return chrome.runtime.sendMessage(message);
+        }
+    }
+    console.log('[Incident Injector] Loading content script...');
 
     let extensionEnabled = true;
     let showAlert = false; // Default to false - user must opt-in
@@ -13,7 +67,6 @@
     const SUBMISSION_COOLDOWN = 0; // No cooldown - allow immediate resubmission
     let lastProcessedElement = null;
     let lastProcessedTime = 0;
-    let toggleButtonVisible = false; // Control visibility of the toggle button - default to false (opt-in)
     let triggerOnClickEnabled = true; // Control click interception functionality - default to true
 
     // Load extension settings
@@ -26,7 +79,6 @@
         'custom_alert_message',
         'target_element_texts',
         'active_scenario_id',
-        'toggle_button_visible',
         'trigger_on_click_enabled'
     ], (result) => {
         extensionEnabled = result.extension_enabled !== false; // Default to true
@@ -68,21 +120,60 @@
             targetElementTexts = defaultTargets.split(',').map(text => text.trim().toLowerCase());
             
             // Update storage with defaults
-            chrome.storage.sync.set({
-                target_element_texts: defaultTargets
-            });
-            console.log('[PagerDuty Simulator] ✅ Default target texts applied:', targetElementTexts);
+            try {
+                chrome.storage.sync.set({
+                    target_element_texts: defaultTargets
+                });
+                console.log('[PagerDuty Simulator] ✅ Default target texts applied and saved:', targetElementTexts);
+            } catch (error) {
+                console.log('[PagerDuty Simulator] ✅ Default target texts applied (storage save failed):', targetElementTexts);
+            }
         }
         
         // Load toggle button visibility setting (default to false - user must opt-in)
-        toggleButtonVisible = result.toggle_button_visible === true;
         
         // Load click interception setting (default to true)
         triggerOnClickEnabled = result.trigger_on_click_enabled !== false;
         
+        // Debug logging for click interception settings
+        console.log('[PagerDuty Simulator] 🔧 Click interception settings:', {
+            triggerOnClickEnabled: triggerOnClickEnabled,
+            rawValue: result.trigger_on_click_enabled,
+            targetElementTextsLength: targetElementTexts.length,
+            targetElementTexts: targetElementTexts
+        });
+        
         // Reinitialize listeners after all settings are loaded
         console.log('[PagerDuty Simulator] 🔄 Settings loaded, reinitializing listeners...');
         reinitializeListeners();
+    });
+
+    // Listen for messages from background script (for panel toggle)
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.action === 'toggle_panel') {
+            console.log('[Incident Injector] Received panel toggle message');
+            
+            try {
+                const existingPanel = document.getElementById('incident-injector-panel');
+                if (!existingPanel) {
+                    console.log('[Incident Injector] Creating new panel...');
+                    createPanel();
+                    // Wait a bit longer for panel to be created and styled
+                    setTimeout(() => {
+                        showPanel();
+                        sendResponse({ success: true });
+                    }, 200);
+                } else {
+                    console.log('[Incident Injector] Toggling existing panel...');
+                    togglePanel();
+                    sendResponse({ success: true });
+                }
+                return true; // Keep message channel open for async response
+            } catch (error) {
+                console.error('[Incident Injector] Error handling panel toggle:', error);
+                sendResponse({ success: false, error: error.message });
+            }
+        }
     });
 
     // Listen for storage changes
@@ -166,11 +257,7 @@
                 console.log('[Incident Injector] Target texts changed, reinitializing...');
                 reinitializeListeners();
             }
-            if (changes.toggle_button_visible) {
-                toggleButtonVisible = changes.toggle_button_visible.newValue;
-                // Update toggle button visibility
-                updateToggleButtonVisibility();
-            }
+            // toggle_button_visible removed
             if (changes.trigger_on_click_enabled) {
                 triggerOnClickEnabled = changes.trigger_on_click_enabled.newValue;
                 console.log('[Incident Injector] Click interception toggled:', triggerOnClickEnabled);
@@ -255,11 +342,11 @@
         }
         lastSubmissionTime = now;
 
-        chrome.runtime.sendMessage({
+        safeRuntimeSendMessage({
             action: "create_incident",
             data: formData
         }, (response) => {
-            if (chrome.runtime.lastError) {
+            if (chrome.runtime && chrome.runtime.lastError) {
                 console.error('[PagerDuty Simulator] Error sending message:', chrome.runtime.lastError);
                 return;
             }
@@ -366,11 +453,11 @@
             if (hasActiveScenario) {
                 console.log('[PagerDuty Simulator] Running active scenario on form submission:', result.active_scenario_id);
                 console.log('[PagerDuty Simulator] Sending message to background script with data:', elementData);
-                chrome.runtime.sendMessage({
+                safeRuntimeSendMessage({
                     action: "run_active_scenario",
                     data: elementData
                 }, (response) => {
-                    if (chrome.runtime.lastError) {
+                    if (chrome.runtime && chrome.runtime.lastError) {
                         console.error('[PagerDuty Simulator] Error running scenario:', chrome.runtime.lastError);
                         return;
                     }
@@ -428,11 +515,11 @@
             if (hasActiveScenario) {
                 console.log('[PagerDuty Simulator] Running active scenario on element click:', result.active_scenario_id);
                 console.log('[PagerDuty Simulator] Sending message to background script with data:', elementData);
-                chrome.runtime.sendMessage({
+                safeRuntimeSendMessage({
                     action: "run_active_scenario",
                     data: elementData
                 }, (response) => {
-                    if (chrome.runtime.lastError) {
+                    if (chrome.runtime && chrome.runtime.lastError) {
                         console.error('[PagerDuty Simulator] Error running scenario:', chrome.runtime.lastError);
                         return;
                     }
@@ -1011,11 +1098,11 @@
             // Add click listener only if click interception is enabled AND target texts are configured
             if (triggerOnClickEnabled && targetElementTexts.length > 0) {
                 document.addEventListener('click', handleElementClick, true);
-                console.log('[PagerDuty Simulator] Click listener added for target texts:', targetElementTexts);
+                console.log('[PagerDuty Simulator] ✅ Click listener added for target texts:', targetElementTexts);
             } else if (triggerOnClickEnabled && targetElementTexts.length === 0) {
-                console.log('[PagerDuty Simulator] Click interception enabled but no target texts configured');
+                console.log('[PagerDuty Simulator] ⚠️ Click interception enabled but no target texts configured');
             } else {
-                console.log('[PagerDuty Simulator] Click interception disabled');
+                console.log('[PagerDuty Simulator] ❌ Click interception disabled - triggerOnClickEnabled:', triggerOnClickEnabled);
             }
         } else {
             console.log('[PagerDuty Simulator] Extension disabled, no listeners added');
@@ -1114,84 +1201,1099 @@
         };
     }
 
-    // Create and add the toggle button to open the extension popup
-    function createToggleButton() {
-        // Check if button already exists
-        const existingButton = document.getElementById('pagerduty-toggle-button');
-        if (existingButton) {
-            return existingButton;
+    // Panel management variables
+    let panelInstance = null;
+    
+    // Create and inject the panel
+    function createPanel() {
+        // Check if panel already exists
+        const existingPanel = document.getElementById('incident-injector-panel');
+        if (existingPanel) {
+            return existingPanel;
         }
         
-        // Create the button element
-        const toggleButton = document.createElement('div');
-        toggleButton.id = 'pagerduty-toggle-button';
+        console.log('[Incident Injector] Creating new panel...');
         
-        // Set styles individually to avoid CSP issues
-        toggleButton.style.position = 'fixed';
-        toggleButton.style.bottom = '20px';
-        toggleButton.style.right = '20px';
-        toggleButton.style.width = '50px';
-        toggleButton.style.height = '50px';
-        toggleButton.style.borderRadius = '50%';
-        toggleButton.style.backgroundColor = extensionEnabled ? '#06ac38' : '#ccc';
-        toggleButton.style.color = 'white';
-        toggleButton.style.display = 'flex';
-        toggleButton.style.alignItems = 'center';
-        toggleButton.style.justifyContent = 'center';
-        toggleButton.style.fontSize = '24px';
-        toggleButton.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
-        toggleButton.style.cursor = 'pointer';
-        toggleButton.style.zIndex = '999999';
-        toggleButton.style.transition = 'all 0.3s ease';
-        toggleButton.style.border = 'none';
-        toggleButton.style.fontFamily = 'Arial, sans-serif';
+        // Load CSS first before creating panel
+        loadPanelCSS();
         
-        // Set button content
-        toggleButton.textContent = '🚨';
+        // Create panel container
+        const panel = document.createElement('div');
+        panel.id = 'incident-injector-panel';
+        panel.className = 'incident-injector-panel';
+        panel.style.display = 'none';
         
-        // Add hover effect
-        toggleButton.addEventListener('mouseover', () => {
-            toggleButton.style.transform = 'scale(1.1)';
-            toggleButton.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.3)';
-        });
-        
-        toggleButton.addEventListener('mouseout', () => {
-            toggleButton.style.transform = 'scale(1)';
-            toggleButton.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.2)';
-        });
-        
-        // Add click handler to open the extension popup
-        toggleButton.addEventListener('click', () => {
-            // Send message to background script to open the popup
-            chrome.runtime.sendMessage({
-                action: 'open_popup'
+        // Load panel HTML
+        fetch(chrome.runtime.getURL('panel.html'))
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.text();
+            })
+            .then(html => {
+                // Extract just the content inside the panel div
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = html;
+                const panelContent = tempDiv.querySelector('.incident-injector-panel');
+                if (panelContent) {
+                    panel.innerHTML = panelContent.innerHTML;
+                } else {
+                    console.warn('[Incident Injector] Panel content not found in HTML, using full content');
+                    panel.innerHTML = html;
+                }
+                
+                // Add panel to page
+                document.body.appendChild(panel);
+                
+                // Initialize panel functionality with longer delay to ensure all CSS is loaded
+                setTimeout(() => {
+                    console.log('[Incident Injector] Initializing panel with full resources...');
+                    
+                    // Ensure panel has all correct styles applied
+                    panel.style.width = '320px';
+                    panel.style.right = '-340px';
+                    panel.style.fontFamily = "'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+                    panel.style.fontSize = '13px';
+                    
+                    initializePanelEventListeners();
+                    // Verify and force font loading
+                    verifyFontLoading();
+                    
+                    console.log('[Incident Injector] Panel fully initialized with compact styles and fonts');
+                }, 500);
+                
+                console.log('[Incident Injector] Panel created and initialized');
+            })
+            .catch(error => {
+                console.error('[Incident Injector] Error loading panel HTML:', error);
+                
+                // Fallback: create a minimal panel structure
+                panel.innerHTML = `
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <i class="fas fa-bolt"></i>
+                            <span>Incident Injector</span>
+                        </div>
+                        <button id="panel-close" class="panel-close">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="panel-content">
+                        <div class="status-indicator">
+                            <span class="status-dot inactive"></span>
+                            <span>Error loading panel - Please reload page</span>
+                        </div>
+                    </div>
+                `;
+                
+                // Add minimal styles with compact dimensions
+                panel.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    right: -340px;
+                    width: 320px;
+                    height: 100vh;
+                    background: #0f0f0f;
+                    color: white;
+                    z-index: 999999;
+                    font-family: 'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+                    font-size: 13px;
+                    transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                    display: flex;
+                    flex-direction: column;
+                `;
+                
+                document.body.appendChild(panel);
+                // Ensure CSS and fonts are loaded even in fallback
+                loadPanelCSS();
+                setTimeout(() => {
+                    initializePanelEventListeners();
+                    verifyFontLoading();
+                }, 200);
             });
-        });
         
-        // Add to the page
-        document.body.appendChild(toggleButton);
-        
-        return toggleButton;
+        panelInstance = panel;
+        return panel;
     }
     
-    // Update toggle button visibility
-    function updateToggleButtonVisibility() {
-        const toggleButton = document.getElementById('pagerduty-toggle-button');
+    // Show/hide panel
+    function togglePanel() {
+        const panel = document.getElementById('incident-injector-panel');
+        if (!panel) {
+            console.log('[Incident Injector] No panel found, creating...');
+            createPanel();
+            setTimeout(() => showPanel(), 300);
+            return;
+        }
         
-        if (toggleButtonVisible) {
-            // Create button if it doesn't exist
-            if (!toggleButton) {
-                createToggleButton();
-            } else {
-                toggleButton.style.display = 'flex';
-            }
+        const isVisible = panel.classList.contains('visible');
+        console.log('[Incident Injector] Panel visible state:', isVisible);
+        if (isVisible) {
+            hidePanel();
         } else {
-            // Hide button if it exists
-            if (toggleButton) {
-                toggleButton.style.display = 'none';
-            }
+            showPanel();
         }
     }
+    
+    function showPanel() {
+        const panel = document.getElementById('incident-injector-panel');
+        if (panel) {
+            console.log('[Incident Injector] Showing panel...');
+            
+            // Ensure fonts and CSS are loaded
+            console.log('[Incident Injector] Loading panel CSS and fonts...');
+            loadPanelCSS();
+            
+            panel.style.display = 'flex';
+            
+            // Force a reflow to ensure display change is processed
+            panel.offsetHeight;
+            
+            // Ensure all styles are applied before showing
+            applyCompactStyles();
+            
+            // Force apply font to panel
+            const fontCSS = document.querySelector('style[data-font-applied]');
+            if (!fontCSS) {
+                const tempFontCSS = document.createElement('style');
+                tempFontCSS.setAttribute('data-font-applied', 'true');
+                tempFontCSS.textContent = `
+                    #incident-injector-panel {
+                        font-family: 'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+                    }
+                    #incident-injector-panel * {
+                        font-family: inherit !important;
+                    }
+                `;
+                document.head.appendChild(tempFontCSS);
+                console.log('[Incident Injector] Force-applied font to panel');
+            }
+            
+            // Add visible class to trigger CSS transition
+            setTimeout(() => {
+                panel.classList.add('visible');
+                console.log('[Incident Injector] Added visible class - panel should slide in');
+            }, 10);
+            
+            console.log('[Incident Injector] Panel show initiated');
+        } else {
+            console.error('[Incident Injector] Panel element not found for showing');
+        }
+    }
+    
+    function hidePanel() {
+        const panel = document.getElementById('incident-injector-panel');
+        if (panel) {
+            panel.classList.remove('visible', 'animate-in');
+            // Wait for animation to complete before hiding
+            setTimeout(() => {
+                panel.style.display = 'none';
+            }, 400);
+            console.log('[Incident Injector] Panel hidden');
+        }
+    }
+    
+    // Initialize panel event listeners
+    function initializePanelEventListeners() {
+        const panel = document.getElementById('incident-injector-panel');
+        if (!panel) return;
+        
+        // Close button
+        const closeButton = panel.querySelector('#panel-close');
+        if (closeButton) {
+            closeButton.addEventListener('click', hidePanel);
+        }
+        
+        // Click outside panel to close
+        panel.addEventListener('click', (e) => {
+            if (e.target === panel) {
+                hidePanel();
+            }
+        });
+        
+        // Listen for messages from panel
+        window.addEventListener('message', (event) => {
+            if (event.data.source === 'incident-injector-panel') {
+                if (event.data.action === 'hide_panel') {
+                    hidePanel();
+                } else if (event.data.action === 'load_sample_definition') {
+                    handleLoadSampleDefinition();
+                } else if (event.data.action === 'request_status') {
+                    handleStatusRequest();
+                } else if (event.data.action === 'run_scenario_request') {
+                    handleScenarioRunRequest(event.data);
+                } else if (event.data.action === 'save_key_request') {
+                    handleSaveKeyRequest(event.data);
+                } else if (event.data.action === 'load_settings_request') {
+                    handleLoadSettingsRequest(event.data);
+                } else if (event.data.action === 'load_local_settings_request') {
+                    handleLoadLocalSettingsRequest(event.data);
+                } else if (event.data.action === 'update_click_config') {
+                    handleClickConfigUpdate(event.data);
+                } else if (event.data.action === 'save_target_elements_request') {
+                    handleSaveTargetElementsRequest(event.data);
+                } else if (event.data.action === 'save_alert_message_request') {
+                    handleSaveAlertMessageRequest(event.data);
+                } else if (event.data.action === 'save_trigger_options_request') {
+                    handleSaveTriggerOptionsRequest(event.data);
+                } else if (event.data.action === 'save_all_settings_request') {
+                    handleSaveAllSettingsRequest(event.data);
+                } else if (event.data.action === 'save_event_definition_request') {
+                    handleSaveEventDefinitionRequest(event.data);
+                } else if (event.data.action === 'save_scenario_selection_request') {
+                    handleSaveScenarioSelectionRequest(event.data);
+                }
+            }
+        });
+        
+        // Load and initialize the panel script
+        loadPanelScript();
+        
+        console.log('[Incident Injector] Panel event listeners initialized');
+    }
+    
+    // Load panel CSS and fonts
+    function loadPanelCSS() {
+        console.log('[Incident Injector] Loading panel CSS and fonts...');
+        
+        // Use system fonts only - no external fonts to avoid CSP issues
+        const panelFontCSS = document.createElement('style');
+        panelFontCSS.id = 'incident-injector-panel-fonts';
+        panelFontCSS.textContent = `
+            /* Apply system fonts only to panel elements */
+            #incident-injector-panel,
+            #incident-injector-panel *,
+            .incident-injector-panel,
+            .incident-injector-panel * {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Helvetica Neue', Arial, sans-serif !important;
+                font-weight: 500 !important;
+            }
+            
+            #incident-injector-panel .panel-title,
+            #incident-injector-panel h1,
+            #incident-injector-panel h2,
+            #incident-injector-panel h3 {
+                font-weight: 600 !important;
+            }
+        `;
+        
+        document.head.appendChild(panelFontCSS);
+        console.log('[Incident Injector] ✅ System fonts applied to panel');
+        
+        // Skip Font Awesome to avoid CSP violations - use Unicode icons only
+        console.log('[Incident Injector] Using Unicode icons to avoid CSP violations');
+        
+        // Always inject basic fallback icons
+        injectFallbackIcons();
+        
+        // Load panel CSS
+        const existingCSS = document.querySelector('link[href*="panel.css"]');
+        if (!existingCSS) {
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = chrome.runtime.getURL('panel.css');
+            link.onload = () => {
+                console.log('[Incident Injector] Panel CSS loaded successfully');
+                setTimeout(() => {
+                    console.log('[Incident Injector] All CSS should be applied now');
+                }, 100);
+            };
+            link.onerror = (error) => console.error('[Incident Injector] Error loading panel CSS:', error);
+            document.head.appendChild(link);
+            console.log('[Incident Injector] Panel CSS link added to head');
+        } else {
+            console.log('[Incident Injector] Panel CSS already loaded');
+        }
+    }
+
+    // Verify font loading and apply if needed
+    function verifyFontLoading() {
+        console.log('[Incident Injector] Verifying font loading...');
+        
+        // Check if Grandstander font is available
+        const testElement = document.createElement('div');
+        testElement.style.fontFamily = 'Grandstander, sans-serif';
+        testElement.style.position = 'absolute';
+        testElement.style.left = '-9999px';
+        testElement.textContent = 'Font test';
+        document.body.appendChild(testElement);
+        
+        const computedFont = window.getComputedStyle(testElement).fontFamily;
+        document.body.removeChild(testElement);
+        
+        if (computedFont.includes('Grandstander')) {
+            console.log('[Incident Injector] ✅ Grandstander font is active');
+            
+            // Apply the font to the panel specifically
+            const panel = document.getElementById('incident-injector-panel');
+            if (panel) {
+                panel.style.fontFamily = "'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+            }
+        } else {
+            console.log('[Incident Injector] ⚠️ Grandstander font not detected, computed font:', computedFont);
+            console.log('[Incident Injector] Force applying Grandstander font...');
+            
+            // Simple fallback - just apply system fonts to avoid double font loading
+            console.log('[Incident Injector] Using system fonts as fallback');
+        }
+        
+        // Also check the panel element specifically
+        const panel = document.getElementById('incident-injector-panel');
+        if (panel) {
+            const panelFont = window.getComputedStyle(panel).fontFamily;
+            console.log('[Incident Injector] Panel computed font:', panelFont);
+            
+            // Apply font directly to panel
+            panel.style.fontFamily = "'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+        }
+        
+        // Also ensure compact styles are applied
+        setTimeout(() => {
+            applyCompactStyles();
+        }, 500);
+    }
+    
+    // Inject fallback icons in case Font Awesome doesn't load
+    function injectFallbackIcons() {
+        const existingFallback = document.querySelector('#incident-injector-icon-fallback');
+        if (existingFallback) return;
+        
+        const fallbackCSS = document.createElement('style');
+        fallbackCSS.id = 'incident-injector-icon-fallback';
+        fallbackCSS.textContent = `
+            /* Unicode icons for CSP-safe display */
+            .incident-injector-panel .fas:before,
+            .incident-injector-panel .fa:before { 
+                font-family: system-ui, -apple-system, sans-serif !important;
+                font-weight: normal !important;
+                font-style: normal !important;
+                display: inline-block;
+                font-variant: normal;
+                text-transform: none;
+                line-height: 1;
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
+            }
+            
+            /* Complete Unicode icon set */
+            .incident-injector-panel .fa-bolt:before { content: "⚡" !important; }
+            .incident-injector-panel .fa-times:before { content: "✕" !important; }
+            .incident-injector-panel .fa-rocket:before { content: "🚀" !important; }
+            .incident-injector-panel .fa-cog:before { content: "⚙" !important; }
+            .incident-injector-panel .fa-bell:before { content: "🔔" !important; }
+            .incident-injector-panel .fa-flask:before { content: "⚗" !important; }
+            .incident-injector-panel .fa-chart-line:before { content: "📈" !important; }
+            .incident-injector-panel .fa-chevron-down:before { content: "▼" !important; }
+            .incident-injector-panel .fa-chevron-up:before { content: "▲" !important; }
+            .incident-injector-panel .fa-chevron-right:before { content: "❯" !important; }
+            .incident-injector-panel .fa-play:before { content: "▶" !important; }
+            .incident-injector-panel .fa-play-circle:before { content: "▶" !important; }
+            .incident-injector-panel .fa-vial:before { content: "🧪" !important; }
+            .incident-injector-panel .fa-file-alt:before { content: "📄" !important; }
+            .incident-injector-panel .fa-edit:before { content: "✏" !important; }
+            .incident-injector-panel .fa-download:before { content: "⬇" !important; }
+            .incident-injector-panel .fa-upload:before { content: "⬆" !important; }
+            .incident-injector-panel .fa-mouse-pointer:before { content: "👆" !important; }
+            .incident-injector-panel .fa-exclamation-triangle:before { content: "⚠" !important; }
+            .incident-injector-panel .fa-spinner:before { content: "⟲" !important; }
+            
+            /* Spin animation for spinning icons */
+            .incident-injector-panel .fa-spin {
+                animation: fa-spin 1s linear infinite !important;
+            }
+            @keyframes fa-spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(fallbackCSS);
+    }
+    
+    // Force apply compact styles to ensure they're not overridden
+    function applyCompactStyles() {
+        const panel = document.getElementById('incident-injector-panel');
+        if (!panel) return;
+        
+        
+        // Inject comprehensive compact styles
+        const compactCSS = document.createElement('style');
+        compactCSS.id = 'incident-injector-compact-styles';
+        compactCSS.textContent = `
+            #incident-injector-panel {
+                width: 320px !important;
+                right: -340px !important;
+                font-size: 13px !important;
+                font-family: 'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+            }
+            
+            #incident-injector-panel.visible {
+                right: 0 !important;
+            }
+            
+            #incident-injector-panel .panel-header {
+                padding: 10px 14px !important;
+            }
+            
+            #incident-injector-panel .panel-content {
+                padding: 10px 14px !important;
+            }
+            
+            #incident-injector-panel .section-header {
+                padding: 10px 14px !important;
+            }
+            
+            #incident-injector-panel .section-header h3 {
+                font-size: 12px !important;
+            }
+            
+            #incident-injector-panel .form-group {
+                margin-bottom: 12px !important;
+            }
+            
+            #incident-injector-panel .form-group label {
+                font-size: 12px !important;
+                margin-bottom: 6px !important;
+            }
+            
+            #incident-injector-panel .form-group input,
+            #incident-injector-panel .form-group textarea,
+            #incident-injector-panel .form-group select {
+                padding: 8px 10px !important;
+                font-size: 12px !important;
+                font-family: 'Grandstander', sans-serif !important;
+            }
+            
+            #incident-injector-panel .btn {
+                padding: 8px 12px !important;
+                font-size: 11px !important;
+                font-family: 'Grandstander', sans-serif !important;
+            }
+            
+            #incident-injector-panel .panel-close {
+                width: 24px !important;
+                height: 24px !important;
+            }
+        `;
+        
+        // Remove any existing compact styles first
+        const existingCompactCSS = document.getElementById('incident-injector-compact-styles');
+        if (existingCompactCSS) {
+            existingCompactCSS.remove();
+        }
+        
+        document.head.appendChild(compactCSS);
+    }
+    
+    // Handle sample definition loading request from panel
+    async function handleLoadSampleDefinition() {
+        try {
+            const response = await fetch(chrome.runtime.getURL('sample-event-definition.json'));
+            const sampleData = await response.json();
+            
+            // Use the new format directly - no conversion needed
+            const sampleDefinition = JSON.stringify(sampleData, null, 2);
+            
+            // Send back to panel
+            window.postMessage({
+                action: 'sample_definition_loaded',
+                source: 'incident-injector-content',
+                success: true,
+                definition: sampleDefinition
+            }, '*');
+            
+            console.log('[Incident Injector] Sample definition sent to panel');
+            
+        } catch (error) {
+            console.error('[Incident Injector] Error loading sample definition:', error);
+            
+            // Send error back to panel
+            window.postMessage({
+                action: 'sample_definition_loaded',
+                source: 'incident-injector-content',
+                success: false,
+                error: error.message
+            }, '*');
+        }
+    }
+    
+    // Handle status request from panel
+    async function handleStatusRequest() {
+        try {
+            console.log('[Incident Injector] Handling status request from panel...');
+            
+            const result = await chrome.storage.sync.get(['integration_key', 'extension_enabled']);
+            const hasKey = result.integration_key && result.integration_key.length === 32;
+            const enabled = result.extension_enabled !== false;
+            
+            let dotClass, text;
+            if (!enabled) {
+                dotClass = 'inactive';
+                text = 'Disabled';
+            } else if (!hasKey) {
+                dotClass = 'warning';
+                text = 'No Integration Key';
+            } else {
+                dotClass = 'active';
+                text = 'Ready';
+            }
+            
+            // Get last incident time
+            const localResult = await chrome.storage.local.get(['last_incident_time']);
+            let lastIncident = 'Never';
+            if (localResult.last_incident_time) {
+                const date = new Date(localResult.last_incident_time);
+                lastIncident = date.toLocaleString();
+            }
+            
+            // Send status back to panel
+            window.postMessage({
+                action: 'status_update',
+                source: 'incident-injector-content',
+                status: {
+                    dotClass: dotClass,
+                    text: text,
+                    lastIncident: lastIncident
+                }
+            }, '*');
+            
+            console.log('[Incident Injector] Status sent to panel:', text);
+            
+        } catch (error) {
+            console.error('[Incident Injector] Error getting status:', error);
+            
+            // Send error status back to panel
+            window.postMessage({
+                action: 'status_update',
+                source: 'incident-injector-content',
+                status: {
+                    dotClass: 'warning',
+                    text: 'Status Error',
+                    lastIncident: 'Unknown'
+                }
+            }, '*');
+        }
+    }
+
+    // Handle scenario run request from panel
+    async function handleScenarioRunRequest(requestData) {
+        try {
+            console.log('[Content] Relaying scenario run request to background script:', requestData);
+            
+            // Send to background script
+            const response = await safeRuntimeSendMessage({
+                action: 'run_scenario',
+                scenarioId: requestData.scenarioId,
+                options: requestData.options
+            });
+            
+            console.log('[Content] Background script response:', response);
+            
+            // Send response back to panel
+            window.postMessage({
+                action: 'scenario_run_response',
+                source: 'incident-injector-content',
+                response: response
+            }, '*');
+            
+        } catch (error) {
+            console.error('[Content] Error relaying scenario run request:', error);
+            
+            // Send error response back to panel
+            window.postMessage({
+                action: 'scenario_run_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
+        }
+    }
+
+    // Handle save key request from panel
+    async function handleSaveKeyRequest(requestData) {
+        try {
+            console.log('[Content] Saving integration key, length:', requestData.key?.length);
+            console.log('[Content] Key value to save:', requestData.key); // Debug log
+            
+            // Save to Chrome storage
+            await new Promise((resolve, reject) => {
+                chrome.storage.sync.set({ integration_key: requestData.key }, () => {
+                    if (chrome.runtime && chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        console.log('[Content] Integration key saved to storage successfully');
+                        resolve();
+                    }
+                });
+            });
+            
+            // Verify it was saved by reading it back
+            const verification = await chrome.storage.sync.get(['integration_key']);
+            console.log('[Content] Verification - stored key length:', verification.integration_key?.length);
+            console.log('[Content] Verification - stored key value:', verification.integration_key);
+            
+            // Send success response back to panel
+            window.postMessage({
+                action: 'key_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: true,
+                    verified: verification.integration_key === requestData.key
+                }
+            }, '*');
+            
+        } catch (error) {
+            console.error('[Content] Error saving integration key:', error);
+            
+            // Send error response back to panel
+            window.postMessage({
+                action: 'key_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
+        }
+    }
+
+    // Handle load settings request from panel
+    async function handleLoadSettingsRequest(requestData) {
+        try {
+            console.log('[Content] Loading settings from storage...');
+            
+            // Load all settings from storage
+            const result = await chrome.storage.sync.get([
+                'integration_key',
+                'extension_enabled', 
+                'show_alert',
+                'custom_alert_message',
+                'allow_form_continuation',
+                'redirect_to_500',
+                'target_element_texts',
+                'trigger_on_click_enabled',
+                'run_scenario_on_submit'
+            ]);
+            
+            console.log('[Content] Loaded settings:', result);
+            console.log('[Content] Integration key in storage:', result.integration_key ? `${result.integration_key.length} chars` : 'not set');
+            
+            // Send settings back to panel
+            window.postMessage({
+                action: 'settings_load_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: true,
+                    settings: result
+                }
+            }, '*');
+            
+        } catch (error) {
+            console.error('[Content] Error loading settings:', error);
+            
+            // Send error response back to panel
+            window.postMessage({
+                action: 'settings_load_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
+        }
+    }
+    
+    // Load local storage settings handler
+    async function handleLoadLocalSettingsRequest(requestData) {
+        try {
+            console.log('[Content] Loading local storage settings...');
+            
+            // Load settings from local storage
+            const result = await chrome.storage.local.get(['event_definition']);
+            
+            console.log('[Content] Loaded local settings:', result);
+            
+            // Send settings back to panel
+            window.postMessage({
+                action: 'load_local_settings_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: true,
+                    settings: result
+                }
+            }, '*');
+            
+        } catch (error) {
+            console.error('[Content] Error loading local settings:', error);
+            
+            // Send error response back to panel
+            window.postMessage({
+                action: 'load_local_settings_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
+        }
+    }
+    
+    // Handle click configuration updates from panel
+    function handleClickConfigUpdate(data) {
+        console.log('[Content] Updating click configuration:', {
+            enabled: data.enabled,
+            targetElements: data.targetElements
+        });
+        
+        // Update the global variables
+        triggerOnClickEnabled = data.enabled;
+        if (data.targetElements && data.targetElements.trim()) {
+            targetElementTexts = data.targetElements.split(',').map(text => text.trim()).filter(text => text);
+        } else {
+            targetElementTexts = [];
+        }
+        
+        console.log('[Content] Click configuration updated:', {
+            triggerOnClickEnabled: triggerOnClickEnabled,
+            targetElementTexts: targetElementTexts
+        });
+    }
+    
+    // Handle save target elements request from panel
+    async function handleSaveTargetElementsRequest(requestData) {
+        try {
+            console.log('[Content] Saving target elements:', requestData.targetElements);
+            
+            // Save to storage
+            await new Promise((resolve, reject) => {
+                chrome.storage.sync.set({ target_element_texts: requestData.targetElements }, () => {
+                    if (chrome.runtime && chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            
+            // Update local variables
+            if (requestData.targetElements && requestData.targetElements.trim()) {
+                targetElementTexts = requestData.targetElements.split(',').map(text => text.trim()).filter(text => text);
+            } else {
+                targetElementTexts = [];
+            }
+            
+            console.log('[Content] Target elements saved and updated:', targetElementTexts);
+            
+            // Send success response back to panel
+            window.postMessage({
+                action: 'target_elements_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: true,
+                    targetElements: requestData.targetElements
+                }
+            }, '*');
+            
+        } catch (error) {
+            console.error('[Content] Error saving target elements:', error);
+            
+            // Send error response back to panel
+            window.postMessage({
+                action: 'target_elements_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
+        }
+    }
+    
+    // Handle save alert message request from panel
+    async function handleSaveAlertMessageRequest(requestData) {
+        try {
+            console.log('[Content] Saving alert message:', requestData.alertMessage);
+            
+            // Save to storage
+            await new Promise((resolve, reject) => {
+                chrome.storage.sync.set({ custom_alert_message: requestData.alertMessage }, () => {
+                    if (chrome.runtime && chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            
+            // Update local variable
+            customAlertMessage = requestData.alertMessage;
+            
+            console.log('[Content] Alert message saved successfully');
+            
+            // Send success response back to panel
+            window.postMessage({
+                action: 'alert_message_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: true,
+                    alertMessage: requestData.alertMessage
+                }
+            }, '*');
+            
+        } catch (error) {
+            console.error('[Content] Error saving alert message:', error);
+            
+            // Send error response back to panel
+            window.postMessage({
+                action: 'alert_message_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
+        }
+    }
+    
+    // Handle save trigger options request from panel
+    async function handleSaveTriggerOptionsRequest(requestData) {
+        try {
+            console.log('[Content] Saving trigger options:', requestData.options);
+            
+            // Save to storage
+            await new Promise((resolve, reject) => {
+                chrome.storage.sync.set({
+                    show_alert: requestData.options.show_alert,
+                    run_scenario_on_submit: requestData.options.run_scenario_on_submit,
+                    redirect_to_500: requestData.options.redirect_to_500,
+                    allow_form_continuation: requestData.options.allow_form_continuation
+                }, () => {
+                    if (chrome.runtime && chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            
+            // Update local variables
+            showAlert = requestData.options.show_alert;
+            runScenarioOnSubmit = requestData.options.run_scenario_on_submit;
+            redirectTo500 = requestData.options.redirect_to_500;
+            allowFormContinuation = requestData.options.allow_form_continuation;
+            
+            console.log('[Content] Trigger options saved successfully');
+            
+            // Send success response back to panel
+            window.postMessage({
+                action: 'trigger_options_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: true,
+                    options: requestData.options
+                }
+            }, '*');
+            
+        } catch (error) {
+            console.error('[Content] Error saving trigger options:', error);
+            
+            // Send error response back to panel
+            window.postMessage({
+                action: 'trigger_options_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
+        }
+    }
+
+    // Handle save all settings request from panel
+    async function handleSaveAllSettingsRequest(requestData) {
+        try {
+            console.log('[Content] Saving all settings:', requestData.settings);
+            
+            // Save sync settings to storage
+            await new Promise((resolve, reject) => {
+                chrome.storage.sync.set(requestData.settings, () => {
+                    if (chrome.runtime && chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            
+            // Save local settings (event definition) if provided
+            if (requestData.localSettings && chrome.storage.local) {
+                await new Promise((resolve, reject) => {
+                    chrome.storage.local.set(requestData.localSettings, () => {
+                        if (chrome.runtime && chrome.runtime.lastError) {
+                            reject(new Error(chrome.runtime.lastError.message));
+                        } else {
+                            resolve();
+                        }
+                    });
+                });
+                console.log('[Content] Event definition saved to local storage');
+            }
+            
+            // Update all local variables
+            extensionEnabled = requestData.settings.extension_enabled;
+            customAlertMessage = requestData.settings.custom_alert_message;
+            showAlert = requestData.settings.show_alert;
+            runScenarioOnSubmit = requestData.settings.run_scenario_on_submit;
+            redirectTo500 = requestData.settings.redirect_to_500;
+            allowFormContinuation = requestData.settings.allow_form_continuation;
+            triggerOnClickEnabled = requestData.settings.trigger_on_click_enabled;
+            
+            // Update target elements
+            if (requestData.settings.target_element_texts && requestData.settings.target_element_texts.trim()) {
+                targetElementTexts = requestData.settings.target_element_texts.split(',').map(text => text.trim()).filter(text => text);
+            } else {
+                targetElementTexts = [];
+            }
+            
+            console.log('[Content] All settings saved successfully');
+            console.log('[Content] Updated variables:', {
+                extensionEnabled,
+                showAlert,
+                runScenarioOnSubmit,
+                redirectTo500,
+                allowFormContinuation,
+                triggerOnClickEnabled,
+                targetElementTexts
+            });
+            
+            // Send success response back to panel
+            window.postMessage({
+                action: 'save_all_settings_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: true,
+                    settings: requestData.settings
+                }
+            }, '*');
+            
+        } catch (error) {
+            console.error('[Content] Error saving all settings:', error);
+            
+            // Send error response back to panel
+            window.postMessage({
+                action: 'save_all_settings_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
+        }
+    }
+
+    // Handle save event definition request from panel
+    async function handleSaveEventDefinitionRequest(requestData) {
+        try {
+            console.log('[Content] Saving event definition to local storage');
+            
+            // Save to local storage
+            await new Promise((resolve, reject) => {
+                chrome.storage.local.set({ event_definition: requestData.eventDefinition }, () => {
+                    if (chrome.runtime && chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            
+            console.log('[Content] Event definition saved successfully');
+            
+            // Send success response back to panel
+            window.postMessage({
+                action: 'event_definition_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: true
+                }
+            }, '*');
+            
+        } catch (error) {
+            console.error('[Content] Error saving event definition:', error);
+            
+            // Send error response back to panel
+            window.postMessage({
+                action: 'event_definition_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
+        }
+    }
+    
+    // Save scenario selection handler
+    async function handleSaveScenarioSelectionRequest(requestData) {
+        try {
+            console.log('[Content] Saving scenario selection:', requestData.scenarioId);
+            
+            // Save to sync storage
+            await new Promise((resolve, reject) => {
+                chrome.storage.sync.set({ active_scenario_id: requestData.scenarioId }, () => {
+                    if (chrome.runtime && chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        resolve();
+                    }
+                });
+            });
+            
+            console.log('[Content] Scenario selection saved successfully');
+            
+            // Send success response back to panel (optional - panel doesn't wait for response)
+            window.postMessage({
+                action: 'scenario_selection_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: true
+                }
+            }, '*');
+            
+        } catch (error) {
+            console.error('[Content] Error saving scenario selection:', error);
+            
+            // Send error response back to panel
+            window.postMessage({
+                action: 'scenario_selection_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
+        }
+    }
+
+    // Load panel JavaScript functionality
+    function loadPanelScript() {
+        // Import panel.js functionality for the panel
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL('panel.js');
+        script.onload = () => {
+            console.log('[Incident Injector] Panel script loaded');
+        };
+        script.onerror = (error) => {
+            console.error('[Incident Injector] Error loading panel script:', error);
+        };
+        document.head.appendChild(script);
+    }
+
+    // Toggle button functionality completely removed
+    
+    // Toggle button functionality removed
     
     // Initialize the content script
     function initialize() {
@@ -1215,15 +2317,7 @@
             console.error('[Incident Injector] Error during initialization:', error);
         }
         
-        // Only create toggle button if explicitly enabled by user
-        if (toggleButtonVisible) {
-            // Wait a short time for the page to fully load
-            setTimeout(() => {
-                createToggleButton();
-            }, 500);
-        } else {
-            console.log('[Incident Injector] Toggle button disabled by user preference');
-        }
+        // Toggle button functionality removed
         
         console.log('[Incident Injector] Content script initialized');
     }

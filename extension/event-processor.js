@@ -22,8 +22,8 @@ class PagerDutyEventProcessor {
         console.log("[Event Processor] Initializing event processor");
         
         // Load integration key from storage
-        const result = await chrome.storage.sync.get(['pagerduty_integration_key']);
-        this.integrationKey = result.pagerduty_integration_key;
+        const result = await chrome.storage.sync.get(['integration_key']);
+        this.integrationKey = result.integration_key;
         console.log("[Event Processor] Integration key loaded:", this.integrationKey ? "Present" : "Not configured");
         
         // Check if we have a current definition
@@ -259,7 +259,9 @@ class PagerDutyEventProcessor {
 
     // Run a specific scenario or event definition
     async runScenario(scenarioNameOrIndex) {
-        console.log("[Event Processor] runScenario called with:", scenarioNameOrIndex);
+        console.log("[Event Processor] 🎯 runScenario called with:", scenarioNameOrIndex);
+        console.log("[Event Processor] Current definition exists:", !!this.currentDefinition);
+        console.log("[Event Processor] Integration key exists:", !!this.integrationKey);
         
         if (!this.currentDefinition) {
             console.error("[Event Processor] No event definition loaded");
@@ -349,7 +351,23 @@ class PagerDutyEventProcessor {
             
             // Process each event in the definition with improved handling
             const events = eventDefinition.events || [];
-            console.log(`[Event Processor] Found ${events.length} events to process`);
+            console.log(`[Event Processor] 📋 Found ${events.length} events to process`);
+            
+            if (events.length === 0) {
+                console.error("[Event Processor] ❌ No events found in event definition!");
+                console.log("[Event Processor] Event definition structure:", eventDefinition);
+                return false;
+            }
+            
+            // Log each event for debugging
+            events.forEach((event, index) => {
+                console.log(`[Event Processor] Event ${index + 1}:`, {
+                    type: event.type,
+                    summary: event.summary,
+                    severity: event.severity,
+                    hasCustomDetails: !!event.custom_details
+                });
+            });
             
             // Process events in batches to control concurrency
             for (let i = 0; i < events.length; i += this.maxConcurrentEvents) {
@@ -675,7 +693,11 @@ class PagerDutyEventProcessor {
         }
         
         // Send to PagerDuty
-        return await this.sendToPagerDuty(payload);
+        console.log('[Event Processor] About to send event to PagerDuty, integration key present:', !!this.integrationKey);
+        console.log('[Event Processor] Integration key length:', this.integrationKey ? this.integrationKey.length : 'N/A');
+        const result = await this.sendToPagerDuty(payload);
+        console.log('[Event Processor] PagerDuty send result:', result);
+        return result;
     }
 
     // Create payload for trigger event
@@ -771,10 +793,11 @@ class PagerDutyEventProcessor {
 
     // Send payload to PagerDuty
     async sendToPagerDuty(payload) {
-        console.log("[Event Processor] Sending payload to PagerDuty:", payload);
+        console.log("[Event Processor] 🚀 SENDING PAYLOAD TO PAGERDUTY!");
+        console.log("[Event Processor] Payload details:", JSON.stringify(payload, null, 2));
         
         try {
-            console.log("[Event Processor] Making API request to PagerDuty");
+            console.log("[Event Processor] 🌐 Making API request to https://events.pagerduty.com/v2/enqueue");
             const response = await fetch('https://events.pagerduty.com/v2/enqueue', {
                 method: 'POST',
                 headers: {
@@ -813,18 +836,25 @@ class PagerDutyEventProcessor {
         try {
             console.log(`[Event Processor] Progress update: ${progress}% - ${status}`);
             
-            // Send progress update to background script
+            // Send progress update to background script only if in extension context
             if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.sendMessage) {
-                chrome.runtime.sendMessage({
-                    action: 'updateScenarioProgress',
-                    progress: progress,
-                    status: status
-                }).catch(error => {
-                    console.warn('[Event Processor] Failed to send progress update:', error);
-                });
+                try {
+                    chrome.runtime.sendMessage({
+                        action: 'updateScenarioProgress',
+                        progress: progress,
+                        status: status
+                    }).catch(error => {
+                        console.warn('[Event Processor] Failed to send progress update:', error.message);
+                    });
+                } catch (sendError) {
+                    // Chrome API might not be available in this context (e.g., page context)
+                    console.log('[Event Processor] Chrome runtime not available for progress updates');
+                }
+            } else {
+                console.log('[Event Processor] Running in non-extension context - progress updates disabled');
             }
         } catch (error) {
-            console.warn('[Event Processor] Error updating progress:', error);
+            console.warn('[Event Processor] Error updating progress:', error.message);
         }
     }
 }

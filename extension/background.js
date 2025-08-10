@@ -33,7 +33,7 @@ chrome.runtime.onInstalled.addListener(() => {
     
     // Set default values
     chrome.storage.sync.set({
-        extension_enabled: false, // Disabled by default
+        extension_enabled: true, // Enabled by default
         show_alert: false, // Default to off - user must opt-in to see alerts
         allow_form_continuation: false,
         redirect_to_500: false,
@@ -41,10 +41,126 @@ chrome.runtime.onInstalled.addListener(() => {
         custom_alert_message: "Error: UX Failure - Our team are working on it now.",
         target_element_texts: "sign in, login, submit, checkout, buy now, purchase, order, register, sign up", // Default common targets
         active_scenario_id: "", // No default active scenario
-        toggle_button_visible: false, // Hide toggle button by default - user must opt-in
         trigger_on_click_enabled: true // Click interception enabled by default
     });
 });
+
+// Handle extension icon click to open panel
+chrome.action.onClicked.addListener(async (tab) => {
+    console.log('[Incident Injector] Extension icon clicked, opening panel');
+    
+    // Check if we can inject content scripts on this URL
+    if (!canInjectContentScript(tab.url)) {
+        console.warn('[Incident Injector] Cannot inject content script on this URL:', tab.url);
+        
+        // Show notification to user
+        chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'icons/icon48.png',
+            title: 'Incident Injector',
+            message: 'Please navigate to a regular website (not chrome:// or extension pages) to use the panel.'
+        });
+        return;
+    }
+    
+    try {
+        // Send message to content script to toggle panel
+        const response = await chrome.tabs.sendMessage(tab.id, {
+            action: 'toggle_panel'
+        });
+        
+        if (response && response.success) {
+            console.log('[Incident Injector] Panel toggle message sent successfully');
+        } else {
+            console.log('[Incident Injector] No response from content script, attempting injection...');
+            await injectAndTogglePanel(tab.id);
+        }
+    } catch (error) {
+        console.log('[Incident Injector] Content script not found, attempting injection...', error.message);
+        await injectAndTogglePanel(tab.id);
+    }
+});
+
+// Check if we can inject content scripts on a given URL
+function canInjectContentScript(url) {
+    if (!url) return false;
+    
+    // URLs where content scripts cannot be injected
+    const restrictedSchemes = [
+        'chrome://',
+        'chrome-extension://',
+        'moz-extension://',
+        'edge://',
+        'about:',
+        'data:',
+        'file://',
+        'chrome-search://',
+        'chrome-devtools://'
+    ];
+    
+    const restrictedUrls = [
+        'https://chrome.google.com/webstore',
+        'https://addons.mozilla.org',
+        'https://microsoftedge.microsoft.com/addons'
+    ];
+    
+    // Check restricted schemes
+    for (const scheme of restrictedSchemes) {
+        if (url.startsWith(scheme)) {
+            return false;
+        }
+    }
+    
+    // Check restricted URLs
+    for (const restrictedUrl of restrictedUrls) {
+        if (url.startsWith(restrictedUrl)) {
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Inject content script and toggle panel
+async function injectAndTogglePanel(tabId) {
+    try {
+        // Inject the content script
+        await chrome.scripting.executeScript({
+            target: { tabId: tabId },
+            files: ['content.js']
+        });
+        
+        console.log('[Incident Injector] Content script injected successfully');
+        
+        // Wait a moment for the script to initialize, then try to toggle panel
+        setTimeout(async () => {
+            try {
+                const response = await chrome.tabs.sendMessage(tabId, {
+                    action: 'toggle_panel'
+                });
+                
+                if (response && response.success) {
+                    console.log('[Incident Injector] Panel toggled successfully after injection');
+                } else {
+                    console.warn('[Incident Injector] Panel toggle failed after injection');
+                }
+            } catch (retryError) {
+                console.error('[Incident Injector] Retry failed after injection:', retryError.message);
+            }
+        }, 500);
+        
+    } catch (scriptError) {
+        console.error('[Incident Injector] Failed to inject content script:', scriptError.message);
+        
+        // Show user-friendly notification
+        chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'icons/icon48.png',
+            title: 'Incident Injector Error',
+            message: 'Unable to load panel on this page. Please try on a different website.'
+        });
+    }
+}
 
 // Listen for messages from content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -64,9 +180,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         handleRunActiveScenario(request.data, sendResponse);
         return true;
     } else if (request.action === 'open_popup') {
-        // Handle opening the popup
-        chrome.action.openPopup();
-        sendResponse({ success: true });
+        // Handle opening the panel (legacy support)
+        // This action is no longer needed since we use the panel now
+        sendResponse({ success: false, error: 'Popup no longer available - use panel instead' });
         return true;
     } else if (request.action === 'updateScenarioProgress') {
         handleUpdateScenarioProgress(request.progress, request.status, sendResponse);
@@ -108,6 +224,21 @@ async function handleRunScenario(scenarioId, options, sendResponse) {
         // Re-initialize to ensure integration key is loaded
         await eventProcessor.initialize();
         
+        // Load the event definition if provided
+        if (options && options.eventDefinition) {
+            try {
+                const definition = JSON.parse(options.eventDefinition);
+                eventProcessor.loadEventDefinition(definition);
+            } catch (e) {
+                console.error('[Background] Failed to parse event definition:', e);
+                sendResponse({
+                    success: false,
+                    error: 'Invalid event definition JSON'
+                });
+                return;
+            }
+        }
+        
         // Get scenario details for the indicator
         const scenarios = eventProcessor.getAvailableScenarios();
         const scenario = scenarios.find(s => s.id === scenarioId);
@@ -120,8 +251,41 @@ async function handleRunScenario(scenarioId, options, sendResponse) {
             startTime: Date.now()
         });
         
-        // Start the scenario
+        // Check if integration key is configured - REQUIRED for scenarios
+        const result = await chrome.storage.sync.get(['integration_key']);
+        const hasIntegrationKey = result.integration_key && result.integration_key.length === 32;
+        
+        if (!hasIntegrationKey) {
+            console.log('[Background] No valid integration key configured - scenario cannot run');
+            await clearScenarioRunningStatus();
+            sendResponse({
+                success: false,
+                error: 'Valid PagerDuty integration key required. Please configure a 32-character integration key first.'
+            });
+            return;
+        }
+        
+        // Start the scenario with debugging
+        console.log('[Background] Starting scenario with options:', options);
+        console.log('[Background] Event processor integration key:', eventProcessor.integrationKey ? 'Present' : 'Missing');
+        console.log('[Background] Event processor has definition:', eventProcessor.currentDefinition ? 'Yes' : 'No');
+        
+        // Log the event definition being used
+        if (options && options.eventDefinition) {
+            try {
+                const parsed = JSON.parse(options.eventDefinition);
+                console.log('[Background] Event definition schema:', parsed.event_definitions ? 'New' : parsed.scenarios ? 'Legacy' : 'Unknown');
+                const eventCount = parsed.event_definitions ? 
+                    parsed.event_definitions.reduce((sum, def) => sum + (def.events?.length || 0), 0) :
+                    parsed.scenarios ? Object.values(parsed.scenarios).reduce((sum, scenario) => sum + (scenario.events?.length || 0), 0) : 0;
+                console.log('[Background] Total events to process:', eventCount);
+            } catch (e) {
+                console.error('[Background] Failed to parse event definition for logging:', e);
+            }
+        }
+        
         const success = await eventProcessor.startScenario(scenarioId, options);
+        console.log('[Background] Scenario execution result:', success);
         
         // Clear running status
         await clearScenarioRunningStatus();
@@ -133,8 +297,8 @@ async function handleRunScenario(scenarioId, options, sendResponse) {
             });
         } else {
             // Check if integration key is missing
-            const result = await chrome.storage.sync.get(['pagerduty_integration_key']);
-            const errorMessage = !result.pagerduty_integration_key ?
+            const result = await chrome.storage.sync.get(['integration_key']);
+            const errorMessage = !result.integration_key ?
                 'No PagerDuty integration key configured. Please set a key in the extension settings.' :
                 'Failed to start event definition';
                 
@@ -210,8 +374,8 @@ async function handleRunActiveScenario(formData, sendResponse) {
             });
         } else {
             // Check if integration key is missing
-            const keyResult = await chrome.storage.sync.get(['pagerduty_integration_key']);
-            const errorMessage = !keyResult.pagerduty_integration_key ?
+            const keyResult = await chrome.storage.sync.get(['integration_key']);
+            const errorMessage = !keyResult.integration_key ?
                 'No PagerDuty integration key configured. Please set a key in the extension settings.' :
                 'Failed to run active scenario';
                 
@@ -260,8 +424,8 @@ async function handleIncidentCreation(formData, sendResponse) {
         console.log('[PagerDuty Simulator] Creating incident for form data:', formData);
         
         // Get PagerDuty integration key
-        const result = await chrome.storage.sync.get(['pagerduty_integration_key']);
-        const integrationKey = result.pagerduty_integration_key;
+        const result = await chrome.storage.sync.get(['integration_key']);
+        const integrationKey = result.integration_key;
         
         if (!integrationKey) {
             console.error('[PagerDuty Simulator] No integration key configured');

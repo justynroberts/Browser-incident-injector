@@ -6,7 +6,8 @@
   "permissions": [
     "storage",
     "activeTab",
-    "notifications"
+    "notifications",
+    "scripting"
   ],
   "host_permissions": [
     "https://*/*",
@@ -16,7 +17,7 @@
     "service_worker": "background.js"
   },
   "web_accessible_resources": [{
-    "resources": ["sample-event-definition.json"],
+    "resources": ["sample-event-definition.json", "panel.html", "panel.css", "panel.js", "debug-panel.js"],
     "matches": ["<all_urls>"]
   }],
   "content_scripts": [{
@@ -25,11 +26,13 @@
     "run_at": "document_end"
   }],
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png", 
       "128": "icons/icon128.png"
     }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;"
   }
 }
