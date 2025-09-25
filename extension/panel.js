@@ -280,13 +280,29 @@
             const runScenarioToggle = panel.querySelector('#option-run-scenario');
 
             if (integrationKeyInput) integrationKeyInput.value = result.integration_key || '';
-            if (extensionEnabledToggle) extensionEnabledToggle.checked = result.extension_enabled !== false;
+            // Check localStorage first, then chrome.storage, then default to false
+            const savedExtensionEnabled = localStorage.getItem('incident_injector_extension_enabled');
+            let extensionEnabled = false; // Default to false
+            if (result.extension_enabled !== undefined) {
+                extensionEnabled = result.extension_enabled;
+            } else if (savedExtensionEnabled !== null) {
+                extensionEnabled = savedExtensionEnabled === 'true';
+            }
+            if (extensionEnabledToggle) extensionEnabledToggle.checked = extensionEnabled;
             if (showAlertCheckbox) showAlertCheckbox.checked = result.show_alert === true;
             if (alertMessageTextarea) alertMessageTextarea.value = result.custom_alert_message || 'Incident Injected: Form submission failed! PagerDuty incident created.';
             if (allowContinuationCheckbox) allowContinuationCheckbox.checked = result.allow_form_continuation === true;
             if (redirectTo500Checkbox) redirectTo500Checkbox.checked = result.redirect_to_500 === true;
             if (targetElementsTextarea) targetElementsTextarea.value = result.target_element_texts || '';
-            if (triggerOnClickEnabledToggle) triggerOnClickEnabledToggle.checked = result.trigger_on_click_enabled !== false;
+            // Check localStorage first, then chrome.storage, then default to false
+            const savedTriggerOnClick = localStorage.getItem('incident_injector_trigger_on_click');
+            let triggerOnClickEnabled = false; // Default to false
+            if (result.trigger_on_click_enabled !== undefined) {
+                triggerOnClickEnabled = result.trigger_on_click_enabled;
+            } else if (savedTriggerOnClick !== null) {
+                triggerOnClickEnabled = savedTriggerOnClick === 'true';
+            }
+            if (triggerOnClickEnabledToggle) triggerOnClickEnabledToggle.checked = triggerOnClickEnabled;
             if (runScenarioToggle) runScenarioToggle.checked = result.run_scenario_on_submit !== false;
 
             // Add event listeners
@@ -315,16 +331,19 @@
                 const value = e.target.checked;
                 console.log('[Panel] Extension enabled changed to:', value);
                 
+                // Always save to localStorage for persistence
+                localStorage.setItem('incident_injector_extension_enabled', value.toString());
+                
                 if (isExtensionContext()) {
                     try {
                         await chrome.storage.sync.set({ extension_enabled: value });
-                        console.log('[Panel] Extension enabled saved directly');
+                        console.log('[Panel] Extension enabled saved to both chrome.storage and localStorage');
                     } catch (error) {
-                        console.log('[Panel] Direct save failed, using message relay for extension_enabled');
+                        console.log('[Panel] Direct save to chrome.storage failed, saved to localStorage only for extension_enabled');
                         // Fallback to message relay (implementation would go here if needed)
                     }
                 } else {
-                    console.log('[Panel] Extension context not available for extension_enabled');
+                    console.log('[Panel] Extension context not available, saved to localStorage only for extension_enabled');
                 }
             });
         }
@@ -1296,15 +1315,18 @@
                 const value = e.target.checked;
                 console.log('[Panel] Trigger on click enabled changed to:', value);
                 
+                // Always save to localStorage for persistence
+                localStorage.setItem('incident_injector_trigger_on_click', value.toString());
+                
                 if (isExtensionContext()) {
                     try {
                         await chrome.storage.sync.set({ trigger_on_click_enabled: value });
-                        console.log('[Panel] Trigger on click enabled saved directly');
+                        console.log('[Panel] Trigger on click enabled saved to both chrome.storage and localStorage');
                     } catch (error) {
-                        console.log('[Panel] Direct save failed for trigger_on_click_enabled:', error);
+                        console.log('[Panel] Direct save to chrome.storage failed, saved to localStorage only for trigger_on_click_enabled:', error);
                     }
                 } else {
-                    console.log('[Panel] Extension context not available for trigger_on_click_enabled');
+                    console.log('[Panel] Extension context not available, saved to localStorage only for trigger_on_click_enabled');
                 }
                 updateClickConfig();
             });
