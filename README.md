@@ -2,6 +2,8 @@
 
 A Chrome extension for incident response testing and resilience training.
 
+> **⚠️ Security First**: Extension starts completely disabled by default. You must manually enable and configure all features before use.
+
 ## Overview
 
  The extension simulates realistic failure scenarios by intercepting user interactions and creating corresponding PagerDuty incidents, enabling teams to practice their response workflows in a controlled environment.
@@ -12,7 +14,7 @@ A Chrome extension for incident response testing and resilience training.
 
 1. **Download the latest release**
    - Navigate to the [Releases](releases) page
-   - Download `incident-injector-v1.2.zip`
+   - Download `incident-injector-v1.3.zip`
    - Extract the ZIP file to a local directory
 
 2. **Install in Chrome**
@@ -42,6 +44,24 @@ For developers or contributors:
    - Click "Load unpacked" and select the `extension` folder
    - The extension will be installed in development mode
 
+## Getting Started
+
+### First Time Setup
+**⚠️ Important**: This extension starts completely disabled for security. Follow these steps:
+
+1. **Install the extension** following the installation steps above
+2. **Click the extension icon** in your browser toolbar to open the configuration panel
+3. **Enable the extension** by toggling the "Extension Enabled" switch
+4. **Configure PagerDuty** by entering your integration key
+5. **Optional**: Enable "Trigger on Click" and specify which button text should trigger incidents
+
+### Default Security Behavior
+- Extension is **disabled** on first install
+- Click interception is **disabled** by default
+- No hardcoded targets (no automatic "login" or "submit" button interception)
+- You must explicitly configure which text triggers incidents
+- All settings persist across browser restarts via localStorage
+
 ## Features
 
 ### Core Functionality
@@ -62,16 +82,19 @@ For developers or contributors:
 ## Usage
 
 ### Basic Incident Simulation
-1. Navigate to any website with form elements
-2. Ensure the extension is active (green indicator in toolbar)
-3. Click on configured target elements (buttons, forms, etc.)
-4. Monitor PagerDuty for generated incidents
+1. **Enable the extension** - Click the extension icon and toggle "Extension Enabled"
+2. **Configure PagerDuty** - Enter your integration key in the configuration panel
+3. **Set up click targets** (optional) - Enable "Trigger on Click" and specify target button text
+4. Navigate to any website with form elements or your configured targets
+5. Interact with forms or target elements to trigger incidents
+6. Monitor PagerDuty for generated incidents
 
 ### Scenario Testing
-1. Load a scenario definition file via the extension popup
-2. Select the desired scenario from the dropdown menu
-3. Click "Test Current Scenario" to execute
-4. Monitor scenario progress through visual indicators
+1. **Ensure extension is enabled** first
+2. Load a scenario definition file via the extension panel
+3. Select the desired scenario from the dropdown menu
+4. Click "Test Current Scenario" to execute
+5. Monitor scenario progress through visual indicators
 
 ## Configuration
 
@@ -83,7 +106,7 @@ For developers or contributors:
 ### Simulation Settings
 - **Custom Alert Messages**: Configure error messages displayed during simulated failures
 - **500 Error Pages**: Enable realistic server error page redirects with incident tracking
-- **Click Interception**: Customize which button texts trigger incident simulations
+- **Click Interception**: Configure specific button text that triggers incident simulations (disabled by default)
 - **Scenario Testing**: Load and execute complex multi-step incident scenarios
 
 ## Event Definitions
@@ -160,6 +183,13 @@ For technical support, bug reports, or feature requests:
 
 ## Version History
 
+### Version 1.3 (September 2025)
+- **Security Improvements**: Extension now starts completely disabled by default
+- **User-Controlled Targeting**: Removed hardcoded click targets ("login", "submit", etc.)
+- **Enhanced Persistence**: Added localStorage backup for settings across browser restarts
+- **Configurable Click Interception**: Click interception only works with user-specified text
+- **Safer Defaults**: No automatic form or button interception without explicit user configuration
+
 ### Version 1.2 (January 2025)
 - **Major UI Overhaul**: Converted from popup to slide-out panel for better usability
 - **Enhanced Persistence**: Complete state preservation across tabs and browser sessions
@@ -185,4 +215,4 @@ For technical support, bug reports, or feature requests:
 
 ---
 
-**Incident Injector v1.2** | [Download Latest Release](releases) | [Report Issues](../../issues)
+**Incident Injector v1.3** | [Download Latest Release](releases) | [Report Issues](../../issues)
