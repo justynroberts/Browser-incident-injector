@@ -56,7 +56,12 @@
     }
     console.log('[Incident Injector] Loading content script...');
 
-    let extensionEnabled = true;
+    // Check localStorage for persisted state before applying defaults
+    const savedExtensionEnabled = localStorage.getItem('incident_injector_extension_enabled');
+    const savedTriggerOnClick = localStorage.getItem('incident_injector_trigger_on_click');
+    
+    // Use saved state if available, otherwise default to false (disabled)
+    let extensionEnabled = savedExtensionEnabled !== null ? savedExtensionEnabled === 'true' : false;
     let showAlert = false; // Default to false - user must opt-in
     let allowFormContinuation = false;
     let redirectTo500 = false;
@@ -67,7 +72,7 @@
     const SUBMISSION_COOLDOWN = 0; // No cooldown - allow immediate resubmission
     let lastProcessedElement = null;
     let lastProcessedTime = 0;
-    let triggerOnClickEnabled = true; // Control click interception functionality - default to true
+    let triggerOnClickEnabled = savedTriggerOnClick !== null ? savedTriggerOnClick === 'true' : false; // Use saved state or default to false
 
     // Load extension settings
     chrome.storage.sync.get([
@@ -81,7 +86,17 @@
         'active_scenario_id',
         'trigger_on_click_enabled'
     ], (result) => {
-        extensionEnabled = result.extension_enabled !== false; // Default to true
+        // Check if chrome.storage has a value, if not use localStorage, if not use false
+        if (result.extension_enabled !== undefined) {
+            extensionEnabled = result.extension_enabled;
+            // Save to localStorage for persistence
+            localStorage.setItem('incident_injector_extension_enabled', extensionEnabled.toString());
+        } else if (savedExtensionEnabled === null) {
+            // No stored value anywhere, use false as default
+            extensionEnabled = false;
+            localStorage.setItem('incident_injector_extension_enabled', 'false');
+        }
+        // Otherwise keep the localStorage value we loaded initially
         showAlert = result.show_alert === true; // Default to false - must be explicitly enabled
         allowFormContinuation = result.allow_form_continuation || false;
         redirectTo500 = result.redirect_to_500 || false;
@@ -114,26 +129,24 @@
             targetElementTexts = result.target_element_texts.split(',').map(text => text.trim().toLowerCase());
             console.log('[PagerDuty Simulator] ✅ Target texts parsed:', targetElementTexts);
         } else {
-            // If no target texts are configured, set defaults
-            console.log('[PagerDuty Simulator] ⚡ No target texts configured, applying defaults...');
-            const defaultTargets = "sign in, login, submit, checkout, buy now, purchase, order, register, sign up";
-            targetElementTexts = defaultTargets.split(',').map(text => text.trim().toLowerCase());
-            
-            // Update storage with defaults
-            try {
-                chrome.storage.sync.set({
-                    target_element_texts: defaultTargets
-                });
-                console.log('[PagerDuty Simulator] ✅ Default target texts applied and saved:', targetElementTexts);
-            } catch (error) {
-                console.log('[PagerDuty Simulator] ✅ Default target texts applied (storage save failed):', targetElementTexts);
-            }
+            // If no target texts are configured, leave the array empty
+            console.log('[PagerDuty Simulator] ⚠️ No target texts configured, click interception will be disabled');
+            targetElementTexts = [];
         }
         
         // Load toggle button visibility setting (default to false - user must opt-in)
         
-        // Load click interception setting (default to true)
-        triggerOnClickEnabled = result.trigger_on_click_enabled !== false;
+        // Load click interception setting
+        if (result.trigger_on_click_enabled !== undefined) {
+            triggerOnClickEnabled = result.trigger_on_click_enabled;
+            // Save to localStorage for persistence
+            localStorage.setItem('incident_injector_trigger_on_click', triggerOnClickEnabled.toString());
+        } else if (savedTriggerOnClick === null) {
+            // No stored value anywhere, use false as default
+            triggerOnClickEnabled = false;
+            localStorage.setItem('incident_injector_trigger_on_click', 'false');
+        }
+        // Otherwise keep the localStorage value we loaded initially
         
         // Debug logging for click interception settings
         console.log('[PagerDuty Simulator] 🔧 Click interception settings:', {
@@ -182,6 +195,8 @@
             if (changes.extension_enabled) {
                 const wasEnabled = extensionEnabled;
                 extensionEnabled = changes.extension_enabled.newValue;
+                // Save to localStorage for persistence
+                localStorage.setItem('incident_injector_extension_enabled', extensionEnabled.toString());
                 
                 // Reinitialize listeners when extension state changes
                 if (wasEnabled !== extensionEnabled) {
@@ -260,6 +275,8 @@
             // toggle_button_visible removed
             if (changes.trigger_on_click_enabled) {
                 triggerOnClickEnabled = changes.trigger_on_click_enabled.newValue;
+                // Save to localStorage for persistence
+                localStorage.setItem('incident_injector_trigger_on_click', triggerOnClickEnabled.toString());
                 console.log('[Incident Injector] Click interception toggled:', triggerOnClickEnabled);
                 // Reinitialize listeners to respect the new setting
                 reinitializeListeners();

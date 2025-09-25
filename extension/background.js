@@ -28,21 +28,35 @@ eventProcessor.initialize()
         console.error('[Incident Injector] Failed to initialize event processor:', error);
     });
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async () => {
     console.log('[Incident Injector] Extension installed');
     
-    // Set default values
-    chrome.storage.sync.set({
-        extension_enabled: true, // Enabled by default
+    // Check if we have existing stored preferences (for upgrades)
+    const existingSettings = await chrome.storage.sync.get(['extension_enabled', 'trigger_on_click_enabled']);
+    
+    // Only set defaults if these values don't already exist
+    const defaults = {
         show_alert: false, // Default to off - user must opt-in to see alerts
         allow_form_continuation: false,
         redirect_to_500: false,
         run_scenario_on_submit: false,
         custom_alert_message: "Error: UX Failure - Our team are working on it now.",
-        target_element_texts: "sign in, login, submit, checkout, buy now, purchase, order, register, sign up", // Default common targets
-        active_scenario_id: "", // No default active scenario
-        trigger_on_click_enabled: true // Click interception enabled by default
-    });
+        target_element_texts: "", // No default targets - user must configure
+        active_scenario_id: "" // No default active scenario
+    };
+    
+    // Set extension_enabled to false by default ONLY on fresh install
+    if (existingSettings.extension_enabled === undefined) {
+        defaults.extension_enabled = false; // Disabled by default on fresh install
+    }
+    
+    // Set trigger_on_click_enabled to false by default ONLY on fresh install
+    if (existingSettings.trigger_on_click_enabled === undefined) {
+        defaults.trigger_on_click_enabled = false; // Click interception disabled by default on fresh install
+    }
+    
+    chrome.storage.sync.set(defaults);
+    console.log('[Incident Injector] Default settings applied:', defaults);
 });
 
 // Handle extension icon click to open panel
