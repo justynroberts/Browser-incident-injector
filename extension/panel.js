@@ -280,9 +280,9 @@
             const runScenarioToggle = panel.querySelector('#option-run-scenario');
 
             if (integrationKeyInput) integrationKeyInput.value = result.integration_key || '';
-            // Check localStorage first, then chrome.storage, then default to false
+            // Check localStorage first, then chrome.storage, then default to true
             const savedExtensionEnabled = localStorage.getItem('incident_injector_extension_enabled');
-            let extensionEnabled = false; // Default to false
+            let extensionEnabled = true; // Default to true (enabled)
             if (result.extension_enabled !== undefined) {
                 extensionEnabled = result.extension_enabled;
             } else if (savedExtensionEnabled !== null) {
@@ -294,9 +294,9 @@
             if (allowContinuationCheckbox) allowContinuationCheckbox.checked = result.allow_form_continuation === true;
             if (redirectTo500Checkbox) redirectTo500Checkbox.checked = result.redirect_to_500 === true;
             if (targetElementsTextarea) targetElementsTextarea.value = result.target_element_texts || '';
-            // Check localStorage first, then chrome.storage, then default to false
+            // Check localStorage first, then chrome.storage, then default to true
             const savedTriggerOnClick = localStorage.getItem('incident_injector_trigger_on_click');
-            let triggerOnClickEnabled = false; // Default to false
+            let triggerOnClickEnabled = true; // Default to true (enabled)
             if (result.trigger_on_click_enabled !== undefined) {
                 triggerOnClickEnabled = result.trigger_on_click_enabled;
             } else if (savedTriggerOnClick !== null) {

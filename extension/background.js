@@ -34,25 +34,25 @@ chrome.runtime.onInstalled.addListener(async () => {
     // Check if we have existing stored preferences (for upgrades)
     const existingSettings = await chrome.storage.sync.get(['extension_enabled', 'trigger_on_click_enabled']);
     
-    // Only set defaults if these values don't already exist
+    // Set sensible defaults for new installs while preserving user settings on upgrades
     const defaults = {
         show_alert: false, // Default to off - user must opt-in to see alerts
         allow_form_continuation: false,
         redirect_to_500: false,
         run_scenario_on_submit: false,
         custom_alert_message: "Error: UX Failure - Our team are working on it now.",
-        target_element_texts: "", // No default targets - user must configure
+        target_element_texts: "Submit, Login, Sign In, Register, Sign Up, Buy Now, Checkout, Purchase, Add to Cart", // Sensible defaults
         active_scenario_id: "" // No default active scenario
     };
-    
-    // Set extension_enabled to false by default ONLY on fresh install
+
+    // Set extension_enabled to true by default ONLY on fresh install (ready to use)
     if (existingSettings.extension_enabled === undefined) {
-        defaults.extension_enabled = false; // Disabled by default on fresh install
+        defaults.extension_enabled = true; // Enabled by default - ready to use out of the box
     }
-    
-    // Set trigger_on_click_enabled to false by default ONLY on fresh install
+
+    // Set trigger_on_click_enabled to true by default ONLY on fresh install
     if (existingSettings.trigger_on_click_enabled === undefined) {
-        defaults.trigger_on_click_enabled = false; // Click interception disabled by default on fresh install
+        defaults.trigger_on_click_enabled = true; // Click interception enabled with sensible defaults
     }
     
     chrome.storage.sync.set(defaults);

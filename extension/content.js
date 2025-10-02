@@ -59,20 +59,20 @@
     // Check localStorage for persisted state before applying defaults
     const savedExtensionEnabled = localStorage.getItem('incident_injector_extension_enabled');
     const savedTriggerOnClick = localStorage.getItem('incident_injector_trigger_on_click');
-    
-    // Use saved state if available, otherwise default to false (disabled)
-    let extensionEnabled = savedExtensionEnabled !== null ? savedExtensionEnabled === 'true' : false;
+
+    // Use saved state if available, otherwise default to true (enabled for immediate use)
+    let extensionEnabled = savedExtensionEnabled !== null ? savedExtensionEnabled === 'true' : true;
     let showAlert = false; // Default to false - user must opt-in
     let allowFormContinuation = false;
     let redirectTo500 = false;
     let runScenarioOnSubmit = false;
     let customAlertMessage = "Error: UX Failure - Our team are working on it now.";
-    let targetElementTexts = []; // No defaults - user must configure
+    let targetElementTexts = []; // Will be loaded from storage with sensible defaults
     let lastSubmissionTime = 0;
     const SUBMISSION_COOLDOWN = 0; // No cooldown - allow immediate resubmission
     let lastProcessedElement = null;
     let lastProcessedTime = 0;
-    let triggerOnClickEnabled = savedTriggerOnClick !== null ? savedTriggerOnClick === 'true' : false; // Use saved state or default to false
+    let triggerOnClickEnabled = savedTriggerOnClick !== null ? savedTriggerOnClick === 'true' : true; // Use saved state or default to true
 
     // Load extension settings
     chrome.storage.sync.get([
@@ -86,15 +86,15 @@
         'active_scenario_id',
         'trigger_on_click_enabled'
     ], (result) => {
-        // Check if chrome.storage has a value, if not use localStorage, if not use false
+        // Check if chrome.storage has a value, if not use localStorage, if not use true
         if (result.extension_enabled !== undefined) {
             extensionEnabled = result.extension_enabled;
             // Save to localStorage for persistence
             localStorage.setItem('incident_injector_extension_enabled', extensionEnabled.toString());
         } else if (savedExtensionEnabled === null) {
-            // No stored value anywhere, use false as default
-            extensionEnabled = false;
-            localStorage.setItem('incident_injector_extension_enabled', 'false');
+            // No stored value anywhere, use true as default (enabled)
+            extensionEnabled = true;
+            localStorage.setItem('incident_injector_extension_enabled', 'true');
         }
         // Otherwise keep the localStorage value we loaded initially
         showAlert = result.show_alert === true; // Default to false - must be explicitly enabled
@@ -142,9 +142,9 @@
             // Save to localStorage for persistence
             localStorage.setItem('incident_injector_trigger_on_click', triggerOnClickEnabled.toString());
         } else if (savedTriggerOnClick === null) {
-            // No stored value anywhere, use false as default
-            triggerOnClickEnabled = false;
-            localStorage.setItem('incident_injector_trigger_on_click', 'false');
+            // No stored value anywhere, use true as default (enabled with sensible defaults)
+            triggerOnClickEnabled = true;
+            localStorage.setItem('incident_injector_trigger_on_click', 'true');
         }
         // Otherwise keep the localStorage value we loaded initially
         
