@@ -809,29 +809,23 @@
             // Auto-save on blur (when user leaves the field)
             targetElementsTextarea.addEventListener('blur', async () => {
                 const value = targetElementsTextarea.value;
-                console.log('[Panel] Saving target elements:', value);
+                console.log('[Panel] Target elements blur - attempting to save:', value);
 
-                // Auto-save to storage (silent, no UI feedback)
                 try {
                     if (isExtensionContext()) {
-                        await chrome.storage.sync.set({ target_element_texts: value });
-                        console.log('[Panel] Target elements auto-saved successfully');
-                    }
-                } catch (error) {
-                    // Silently handle extension context invalidation
-                    if (error.message && error.message.includes('Extension context invalidated')) {
-                        console.log('[Panel] Extension was reloaded, skipping auto-save');
-                        return; // Exit early
-                    }
-                    console.log('[Panel] Failed to auto-save target_element_texts:', error.message);
-                }
-
-                // If direct save failed or not in extension context, try message relay
-                if (!isExtensionContext()) {
-                    console.log('[Panel] Extension context not available - using message relay');
-
-                    // Use message relay to save
-                    try {
+                        await new Promise((resolve, reject) => {
+                            chrome.storage.sync.set({ target_element_texts: value }, () => {
+                                if (chrome.runtime.lastError) {
+                                    reject(new Error(chrome.runtime.lastError.message));
+                                } else {
+                                    console.log('[Panel] ✅ Target elements auto-saved to chrome.storage');
+                                    resolve();
+                                }
+                            });
+                        });
+                    } else {
+                        // Use message relay to save via content script
+                        console.log('[Panel] Using message relay to save target elements');
                         const response = await new Promise((resolve, reject) => {
                             const messageHandler = (event) => {
                                 if (event.data.action === 'target_elements_save_response' && event.data.source === 'incident-injector-content') {
@@ -841,30 +835,33 @@
                             };
 
                             window.addEventListener('message', messageHandler);
-                            
+
                             window.postMessage({
                                 action: 'save_target_elements_request',
                                 source: 'incident-injector-panel',
                                 targetElements: value
                             }, '*');
-                            
-                            // Timeout after 5 seconds
+
                             setTimeout(() => {
                                 window.removeEventListener('message', messageHandler);
-                                reject(new Error('Save request timed out'));
+                                reject(new Error('Target elements save request timed out'));
                             }, 5000);
                         });
-                        
+
                         if (response.success) {
-                            console.log('[Panel] Target elements auto-saved via message relay');
+                            console.log('[Panel] ✅ Target elements saved via message relay');
                         } else {
-                            console.log('[Panel] Auto-save failed:', response.error);
+                            throw new Error(response.error || 'Failed to save target elements via message relay');
                         }
-                    } catch (relayError) {
-                        console.log('[Panel] Message relay auto-save failed:', relayError);
+                    }
+                } catch (error) {
+                    if (error.message && error.message.includes('Extension context invalidated')) {
+                        console.log('[Panel] Extension was reloaded, skipping auto-save');
+                    } else {
+                        console.log('[Panel] Failed to auto-save target elements:', error.message);
                     }
                 }
-                
+
                 // Notify content script of configuration change
                 const triggerEnabled = panel.querySelector('#trigger-on-click-enabled')?.checked || false;
                 console.log('[Panel] Sending click config update - enabled:', triggerEnabled, 'targetElements:', value);
@@ -884,28 +881,23 @@
             console.log('[Panel] Adding alert message auto-save listener');
             alertMessageTextarea.addEventListener('blur', async () => {
                 const value = alertMessageTextarea.value;
-                console.log('[Panel] Saving alert message:', value);
+                console.log('[Panel] Alert message blur - attempting to save:', value);
 
                 try {
                     if (isExtensionContext()) {
-                        await chrome.storage.sync.set({ custom_alert_message: value });
-                        console.log('[Panel] Alert message auto-saved successfully');
-                    }
-                } catch (error) {
-                    // Silently handle extension context invalidation
-                    if (error.message && error.message.includes('Extension context invalidated')) {
-                        console.log('[Panel] Extension was reloaded, skipping auto-save');
-                        return; // Exit early
-                    }
-                    console.log('[Panel] Failed to auto-save custom_alert_message:', error.message);
-                }
-
-                // If not in extension context, try message relay
-                if (!isExtensionContext()) {
-                    console.log('[Panel] Extension context not available - using message relay for alert message');
-                    
-                    // Use message relay to save alert message
-                    try {
+                        await new Promise((resolve, reject) => {
+                            chrome.storage.sync.set({ custom_alert_message: value }, () => {
+                                if (chrome.runtime.lastError) {
+                                    reject(new Error(chrome.runtime.lastError.message));
+                                } else {
+                                    console.log('[Panel] ✅ Alert message auto-saved to chrome.storage');
+                                    resolve();
+                                }
+                            });
+                        });
+                    } else {
+                        // Use message relay to save via content script
+                        console.log('[Panel] Using message relay to save alert message');
                         const response = await new Promise((resolve, reject) => {
                             const messageHandler = (event) => {
                                 if (event.data.action === 'alert_message_save_response' && event.data.source === 'incident-injector-content') {
@@ -913,41 +905,32 @@
                                     resolve(event.data.response);
                                 }
                             };
-                            
+
                             window.addEventListener('message', messageHandler);
-                            
+
                             window.postMessage({
                                 action: 'save_alert_message_request',
                                 source: 'incident-injector-panel',
                                 alertMessage: value
                             }, '*');
-                            
-                            // Timeout after 5 seconds
+
                             setTimeout(() => {
                                 window.removeEventListener('message', messageHandler);
-                                reject(new Error('Save request timed out'));
+                                reject(new Error('Alert message save request timed out'));
                             }, 5000);
                         });
-                        
+
                         if (response.success) {
-                            console.log('[Panel] Alert message saved via message relay');
-                            if (alertMessageValidation) {
-                                alertMessageValidation.textContent = 'Alert message saved successfully';
-                                alertMessageValidation.className = 'validation-message valid';
-                                setTimeout(() => {
-                                    alertMessageValidation.textContent = '';
-                                    alertMessageValidation.className = 'validation-message';
-                                }, 3000);
-                            }
+                            console.log('[Panel] ✅ Alert message saved via message relay');
                         } else {
-                            throw new Error(response.error || 'Failed to save alert message');
+                            throw new Error(response.error || 'Failed to save alert message via message relay');
                         }
-                    } catch (relayError) {
-                        console.log('[Panel] Message relay save failed:', relayError);
-                        if (alertMessageValidation) {
-                            alertMessageValidation.textContent = 'Failed to save: ' + relayError.message;
-                            alertMessageValidation.className = 'validation-message error';
-                        }
+                    }
+                } catch (error) {
+                    if (error.message && error.message.includes('Extension context invalidated')) {
+                        console.log('[Panel] Extension was reloaded, skipping auto-save');
+                    } else {
+                        console.log('[Panel] Failed to auto-save alert message:', error.message);
                     }
                 }
             });
