@@ -1490,6 +1490,8 @@
                     handleScenarioRunRequest(event.data);
                 } else if (event.data.action === 'save_key_request') {
                     handleSaveKeyRequest(event.data);
+                } else if (event.data.action === 'save_crux_url_request') {
+                    handleSaveCruxUrlRequest(event.data);
                 } else if (event.data.action === 'load_settings_request') {
                     handleLoadSettingsRequest(event.data);
                 } else if (event.data.action === 'load_local_settings_request') {
@@ -1915,6 +1917,50 @@
             // Send error response back to panel
             window.postMessage({
                 action: 'key_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: false,
+                    error: error.message
+                }
+            }, '*');
+        }
+    }
+
+    // Handle save Crux URL request from panel
+    async function handleSaveCruxUrlRequest(requestData) {
+        try {
+            console.log('[Content] Saving Crux URL, length:', requestData.cruxUrl?.length);
+
+            // Save to Chrome storage
+            await new Promise((resolve, reject) => {
+                chrome.storage.sync.set({ crux_url: requestData.cruxUrl }, () => {
+                    if (chrome.runtime && chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        console.log('[Content] Crux URL saved to storage successfully');
+                        resolve();
+                    }
+                });
+            });
+
+            // Update local variable
+            cruxUrl = requestData.cruxUrl;
+
+            // Send success response back to panel
+            window.postMessage({
+                action: 'crux_url_save_response',
+                source: 'incident-injector-content',
+                response: {
+                    success: true
+                }
+            }, '*');
+
+        } catch (error) {
+            console.error('[Content] Error saving Crux URL:', error);
+
+            // Send error response back to panel
+            window.postMessage({
+                action: 'crux_url_save_response',
                 source: 'incident-injector-content',
                 response: {
                     success: false,
