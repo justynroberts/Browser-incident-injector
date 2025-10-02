@@ -2212,22 +2212,26 @@
             showAlert = requestData.settings.show_alert;
             runScenarioOnSubmit = requestData.settings.run_scenario_on_submit;
             redirectTo500 = requestData.settings.redirect_to_500;
+            triggerCrux = requestData.settings.trigger_crux || false;
+            cruxUrl = requestData.settings.crux_url || '';
             allowFormContinuation = requestData.settings.allow_form_continuation;
             triggerOnClickEnabled = requestData.settings.trigger_on_click_enabled;
-            
+
             // Update target elements
             if (requestData.settings.target_element_texts && requestData.settings.target_element_texts.trim()) {
                 targetElementTexts = requestData.settings.target_element_texts.split(',').map(text => text.trim()).filter(text => text);
             } else {
                 targetElementTexts = [];
             }
-            
+
             console.log('[Content] All settings saved successfully');
             console.log('[Content] Updated variables:', {
                 extensionEnabled,
                 showAlert,
                 runScenarioOnSubmit,
                 redirectTo500,
+                triggerCrux,
+                cruxUrl: cruxUrl ? `${cruxUrl.length} chars` : 'empty',
                 allowFormContinuation,
                 triggerOnClickEnabled,
                 targetElementTexts
