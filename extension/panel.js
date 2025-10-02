@@ -271,15 +271,18 @@
 
             const extensionEnabledToggle = panel.querySelector('#extension-enabled');
             const integrationKeyInput = panel.querySelector('#integration-key');
+            const cruxUrlInput = panel.querySelector('#crux-url');
             const alertMessageTextarea = panel.querySelector('#alert-message');
             const showAlertCheckbox = panel.querySelector('#option-create-alert');
             const allowContinuationCheckbox = panel.querySelector('#option-continue-destination');
             const redirectTo500Checkbox = panel.querySelector('#option-add-500-error');
+            const triggerCruxCheckbox = panel.querySelector('#option-trigger-crux');
             const targetElementsTextarea = panel.querySelector('#target-elements');
             const triggerOnClickEnabledToggle = panel.querySelector('#trigger-on-click-enabled');
             const runScenarioToggle = panel.querySelector('#option-run-scenario');
 
             if (integrationKeyInput) integrationKeyInput.value = result.integration_key || '';
+            if (cruxUrlInput) cruxUrlInput.value = result.crux_url || '';
             // Check localStorage first, then chrome.storage, then default to true
             const savedExtensionEnabled = localStorage.getItem('incident_injector_extension_enabled');
             let extensionEnabled = true; // Default to true (enabled)
@@ -293,6 +296,7 @@
             if (alertMessageTextarea) alertMessageTextarea.value = result.custom_alert_message || 'Incident Injected: Form submission failed! PagerDuty incident created.';
             if (allowContinuationCheckbox) allowContinuationCheckbox.checked = result.allow_form_continuation === true;
             if (redirectTo500Checkbox) redirectTo500Checkbox.checked = result.redirect_to_500 === true;
+            if (triggerCruxCheckbox) triggerCruxCheckbox.checked = result.trigger_crux === true;
             if (targetElementsTextarea) {
                 // Use sensible defaults if no value is stored
                 const defaultTargets = "Submit, Login, Sign In, Register, Sign Up, Buy Now, Checkout, Purchase, Add to Cart";
@@ -382,7 +386,29 @@
                 }
             });
         }
-        
+
+        // Crux URL - auto-save on blur
+        const cruxUrlInput = panel.querySelector('#crux-url');
+        if (cruxUrlInput) {
+            // Auto-save when user leaves the field
+            cruxUrlInput.addEventListener('blur', async (e) => {
+                const url = e.target.value;
+                try {
+                    if (isExtensionContext()) {
+                        await chrome.storage.sync.set({ crux_url: url });
+                        console.log('[Panel] Crux URL auto-saved');
+                    }
+                } catch (error) {
+                    // Silently handle extension context invalidation
+                    if (error.message && error.message.includes('Extension context invalidated')) {
+                        console.log('[Panel] Extension was reloaded, skipping auto-save');
+                    } else {
+                        console.log('[Panel] Failed to auto-save Crux URL:', error.message);
+                    }
+                }
+            });
+        }
+
         // Save integration key button
         const saveKeyButton = panel.querySelector('#save-key');
         if (saveKeyButton) {
@@ -1784,10 +1810,12 @@
         const settings = {
             extension_enabled: extensionEnabledCheckbox ? extensionEnabledCheckbox.checked : false,
             integration_key: panel.querySelector('#integration-key')?.value || '',
+            crux_url: panel.querySelector('#crux-url')?.value || '',
             custom_alert_message: panel.querySelector('#alert-message')?.value || '',
             show_alert: panel.querySelector('#option-create-alert')?.checked || false,
             run_scenario_on_submit: panel.querySelector('#option-run-scenario')?.checked || false,
             redirect_to_500: panel.querySelector('#option-add-500-error')?.checked || false,
+            trigger_crux: panel.querySelector('#option-trigger-crux')?.checked || false,
             allow_form_continuation: panel.querySelector('#option-continue-destination')?.checked || false,
             trigger_on_click_enabled: triggerOnClickCheckbox ? triggerOnClickCheckbox.checked : false,
             target_element_texts: panel.querySelector('#target-elements')?.value || '',

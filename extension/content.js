@@ -66,6 +66,8 @@
     let allowFormContinuation = false;
     let redirectTo500 = false;
     let runScenarioOnSubmit = false;
+    let triggerCrux = false; // Default to false - user must opt-in
+    let cruxUrl = ''; // Crux event URL
     let customAlertMessage = "Error: UX Failure - Our team are working on it now.";
     let targetElementTexts = []; // Will be loaded from storage with sensible defaults
     let lastSubmissionTime = 0;
@@ -80,6 +82,8 @@
         'show_alert',
         'allow_form_continuation',
         'redirect_to_500',
+        'trigger_crux',
+        'crux_url',
         'run_scenario_on_submit',
         'custom_alert_message',
         'target_element_texts',
@@ -100,6 +104,8 @@
         showAlert = result.show_alert === true; // Default to false - must be explicitly enabled
         allowFormContinuation = result.allow_form_continuation || false;
         redirectTo500 = result.redirect_to_500 || false;
+        triggerCrux = result.trigger_crux === true; // Default to false - must be explicitly enabled
+        cruxUrl = result.crux_url || '';
         
         // Only enable run_scenario_on_submit if there's an active scenario
         const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
@@ -461,7 +467,12 @@
         // Extract and send data
         const elementData = extractFormData(form, clickedElement);
         createIncident(elementData);
-        
+
+        // Trigger Crux event if enabled
+        if (triggerCrux && cruxUrl) {
+            triggerCruxEvent();
+        }
+
         // Always check for active scenario if extension is enabled
         // Double-check that there's an active scenario before attempting to run it
         chrome.storage.sync.get(['active_scenario_id'], (result) => {
@@ -510,6 +521,25 @@
     }
 
     // Handle element click incidents
+    // Function to trigger Crux event
+    function triggerCruxEvent() {
+        if (!triggerCrux || !cruxUrl) {
+            console.log('[Incident Injector] Crux not configured or not enabled');
+            return;
+        }
+
+        console.log('[Incident Injector] Triggering Crux event:', cruxUrl);
+
+        fetch(cruxUrl, {
+            method: 'GET',
+            mode: 'no-cors' // Allow cross-origin requests
+        }).then(() => {
+            console.log('[Incident Injector] ✅ Crux event triggered successfully');
+        }).catch(error => {
+            console.log('[Incident Injector] ⚠️ Crux event trigger failed:', error.message);
+        });
+    }
+
     function handleElementIncident(event, element) {
         // Exit early if extension is not enabled
         if (!extensionEnabled) return;
@@ -522,6 +552,11 @@
         const form = element.closest('form');
         const elementData = extractFormData(form, element);
         createIncident(elementData);
+
+        // Trigger Crux event if enabled
+        if (triggerCrux && cruxUrl) {
+            triggerCruxEvent();
+        }
         
         // Always check for active scenario if extension is enabled
         console.log('[PagerDuty Simulator] Checking for active scenario on element click');
