@@ -874,186 +874,14 @@
             });
         }
         
-        // Save All Settings button
-        const saveAllButton = panel.querySelector('#save-all-settings');
-        const saveAllValidation = panel.querySelector('#save-all-validation');
-        
-        if (saveAllButton) {
-            console.log('[Panel] Adding save all settings button listener');
-            saveAllButton.addEventListener('click', async () => {
-                console.log('[Panel] Saving all settings...');
-                
-                // Gather all settings
-                const settings = {
-                    extension_enabled: panel.querySelector('#extension-enabled')?.checked || false,
-                    integration_key: panel.querySelector('#integration-key')?.value || '',
-                    custom_alert_message: panel.querySelector('#alert-message')?.value || '',
-                    show_alert: panel.querySelector('#option-create-alert')?.checked || false,
-                    run_scenario_on_submit: panel.querySelector('#option-run-scenario')?.checked || false,
-                    redirect_to_500: panel.querySelector('#option-add-500-error')?.checked || false,
-                    allow_form_continuation: panel.querySelector('#option-continue-destination')?.checked || false,
-                    trigger_on_click_enabled: panel.querySelector('#trigger-on-click-enabled')?.checked || false,
-                    target_element_texts: panel.querySelector('#target-elements')?.value || '',
-                    active_scenario_id: panel.querySelector('#scenario-select')?.value || ''
-                };
-                
-                // Also save the event definition JSON to local storage (it can be large)
-                const eventDefinition = panel.querySelector('#event-definition')?.value || '';
-                const localSettings = {
-                    event_definition: eventDefinition
-                };
-                
-                console.log('[Panel] Settings to save:', settings);
-                
-                let saveSuccessful = false;
-                
-                // Try direct Chrome API save first, but be very defensive
-                try {
-                    if (typeof chrome !== 'undefined' && 
-                        chrome && 
-                        chrome.storage && 
-                        chrome.storage.sync &&
-                        typeof chrome.storage.sync.set === 'function') {
-                        
-                        console.log('[Panel] Attempting direct Chrome API save...');
-                        
-                        // Save sync settings
-                        await new Promise((resolve, reject) => {
-                            try {
-                                chrome.storage.sync.set(settings, () => {
-                                    if (chrome.runtime && chrome.runtime.lastError) {
-                                        reject(new Error(chrome.runtime.lastError.message));
-                                    } else {
-                                        resolve();
-                                    }
-                                });
-                            } catch (e) {
-                                reject(e);
-                            }
-                        });
-                        
-                        console.log('[Panel] Sync settings saved successfully');
-                        
-                        // Save local settings (event definition)
-                        if (chrome.storage.local && typeof chrome.storage.local.set === 'function') {
-                            await new Promise((resolve, reject) => {
-                                try {
-                                    chrome.storage.local.set(localSettings, () => {
-                                        if (chrome.runtime && chrome.runtime.lastError) {
-                                            reject(new Error(chrome.runtime.lastError.message));
-                                        } else {
-                                            resolve();
-                                        }
-                                    });
-                                } catch (e) {
-                                    reject(e);
-                                }
-                            });
-                            console.log('[Panel] Event definition saved to local storage');
-                        }
-                        
-                        saveSuccessful = true;
-                        
-                        // Show success message
-                        if (saveAllValidation) {
-                            saveAllValidation.textContent = 'Settings saved successfully';
-                            saveAllValidation.className = 'validation-message valid';
-                            setTimeout(() => {
-                                saveAllValidation.textContent = '';
-                                saveAllValidation.className = 'validation-message';
-                            }, 3000);
-                        }
-                        
-                        // Update click configuration in content script
-                        window.postMessage({
-                            action: 'update_click_config',
-                            source: 'incident-injector-panel',
-                            enabled: settings.trigger_on_click_enabled,
-                            targetElements: settings.target_element_texts
-                        }, '*');
-                        
-                        // Update status
-                        setTimeout(updateStatus, 300);
-                        
-                        // Collapse all sections after successful save
-                        setTimeout(ensureSectionsCollapsed, 500);
-                    }
-                } catch (error) {
-                    console.log('[Panel] Direct save failed or Chrome APIs not available:', error.message);
-                    saveSuccessful = false;
-                }
-                
-                // If direct save failed or Chrome APIs not available, use message relay
-                if (!saveSuccessful) {
-                    console.log('[Panel] Using message relay to save all settings');
-                    
-                    try {
-                        const response = await new Promise((resolve, reject) => {
-                            const messageHandler = (event) => {
-                                if (event.data.action === 'save_all_settings_response' && event.data.source === 'incident-injector-content') {
-                                    window.removeEventListener('message', messageHandler);
-                                    resolve(event.data.response);
-                                }
-                            };
-                            
-                            window.addEventListener('message', messageHandler);
-                            
-                            window.postMessage({
-                                action: 'save_all_settings_request',
-                                source: 'incident-injector-panel',
-                                settings: settings,
-                                localSettings: localSettings
-                            }, '*');
-                            
-                            // Timeout after 5 seconds
-                            setTimeout(() => {
-                                window.removeEventListener('message', messageHandler);
-                                reject(new Error('Save request timed out'));
-                            }, 5000);
-                        });
-                        
-                        if (response.success) {
-                            console.log('[Panel] All settings saved via message relay');
-                            if (saveAllValidation) {
-                                saveAllValidation.textContent = 'Settings saved successfully';
-                                saveAllValidation.className = 'validation-message valid';
-                                setTimeout(() => {
-                                    saveAllValidation.textContent = '';
-                                    saveAllValidation.className = 'validation-message';
-                                }, 3000);
-                            }
-                            
-                            // Update click configuration in content script
-                            window.postMessage({
-                                action: 'update_click_config',
-                                source: 'incident-injector-panel',
-                                enabled: settings.trigger_on_click_enabled,
-                                targetElements: settings.target_element_texts
-                            }, '*');
-                            
-                            // Update status
-                            setTimeout(updateStatus, 300);
-                            
-                            // Collapse all sections after successful save
-                            setTimeout(ensureSectionsCollapsed, 500);
-                        } else {
-                            throw new Error(response.error || 'Failed to save settings');
-                        }
-                    } catch (relayError) {
-                        console.log('[Panel] Message relay save failed:', relayError);
-                        if (saveAllValidation) {
-                            saveAllValidation.textContent = '✗ Failed to save: ' + relayError.message;
-                            saveAllValidation.className = 'validation-message error';
-                        }
-                    }
-                }
-            });
-        }
+        // Save All Settings button removed - now using auto-save on panel close
         
         // Panel close button
         const panelCloseButton = panel.querySelector('#panel-close');
         if (panelCloseButton) {
-            panelCloseButton.addEventListener('click', () => {
+            panelCloseButton.addEventListener('click', async () => {
+                // Auto-save all settings before closing
+                await autoSaveAllSettings();
                 // Send message to content script to hide panel
                 window.postMessage({ action: 'hide_panel', source: 'incident-injector-panel' }, '*');
             });
@@ -1933,5 +1761,115 @@
             }
         }, 100);
     }
-    
+
+    // Listen for auto-save messages from content script
+    window.addEventListener('message', (event) => {
+        if (event.data.action === 'auto_save_settings' && event.data.source === 'incident-injector-content') {
+            console.log('[Panel] Received auto-save request from content script');
+            autoSaveAllSettings().catch(error => {
+                console.log('[Panel] Auto-save error:', error.message);
+            });
+        }
+    });
+
+    // Auto-save all settings (called when panel closes)
+    async function autoSaveAllSettings() {
+        console.log('[Panel] Auto-saving all settings on panel close...');
+
+        const panel = document.getElementById('incident-injector-panel');
+        if (!panel) return;
+
+        // Gather all settings
+        const settings = {
+            extension_enabled: panel.querySelector('#extension-enabled')?.checked || false,
+            integration_key: panel.querySelector('#integration-key')?.value || '',
+            custom_alert_message: panel.querySelector('#alert-message')?.value || '',
+            show_alert: panel.querySelector('#option-create-alert')?.checked || false,
+            run_scenario_on_submit: panel.querySelector('#option-run-scenario')?.checked || false,
+            redirect_to_500: panel.querySelector('#option-add-500-error')?.checked || false,
+            allow_form_continuation: panel.querySelector('#option-continue-destination')?.checked || false,
+            trigger_on_click_enabled: panel.querySelector('#trigger-on-click-enabled')?.checked || false,
+            target_element_texts: panel.querySelector('#target-elements')?.value || '',
+            active_scenario_id: panel.querySelector('#scenario-select')?.value || ''
+        };
+
+        // Also save the event definition JSON to local storage (it can be large)
+        const eventDefinition = panel.querySelector('#event-definition')?.value || '';
+        const localSettings = {
+            event_definition: eventDefinition
+        };
+
+        // Save to localStorage for persistence
+        Object.keys(settings).forEach(key => {
+            if (key === 'extension_enabled' || key === 'trigger_on_click_enabled') {
+                localStorage.setItem(`incident_injector_${key}`, settings[key].toString());
+            }
+        });
+
+        // Try direct Chrome API save first
+        try {
+            if (typeof chrome !== 'undefined' &&
+                chrome &&
+                chrome.storage &&
+                chrome.storage.sync &&
+                typeof chrome.storage.sync.set === 'function') {
+
+                console.log('[Panel] Auto-saving via Chrome API...');
+
+                // Save sync settings
+                await new Promise((resolve, reject) => {
+                    try {
+                        chrome.storage.sync.set(settings, () => {
+                            if (chrome.runtime && chrome.runtime.lastError) {
+                                reject(new Error(chrome.runtime.lastError.message));
+                            } else {
+                                resolve();
+                            }
+                        });
+                    } catch (e) {
+                        reject(e);
+                    }
+                });
+
+                // Save local settings (event definition)
+                if (chrome.storage.local && typeof chrome.storage.local.set === 'function') {
+                    await new Promise((resolve, reject) => {
+                        try {
+                            chrome.storage.local.set(localSettings, () => {
+                                if (chrome.runtime && chrome.runtime.lastError) {
+                                    reject(new Error(chrome.runtime.lastError.message));
+                                } else {
+                                    resolve();
+                                }
+                            });
+                        } catch (e) {
+                            reject(e);
+                        }
+                    });
+                }
+
+                console.log('[Panel] Auto-save successful');
+
+                // Update click configuration in content script
+                window.postMessage({
+                    action: 'update_click_config',
+                    source: 'incident-injector-panel',
+                    enabled: settings.trigger_on_click_enabled,
+                    targetElements: settings.target_element_texts
+                }, '*');
+
+            }
+        } catch (error) {
+            console.log('[Panel] Auto-save failed, will use message relay as fallback:', error.message);
+
+            // Fallback to message relay (fire and forget)
+            window.postMessage({
+                action: 'save_all_settings_request',
+                source: 'incident-injector-panel',
+                settings: settings,
+                localSettings: localSettings
+            }, '*');
+        }
+    }
+
 })();

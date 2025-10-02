@@ -1402,6 +1402,19 @@
     function hidePanel() {
         const panel = document.getElementById('incident-injector-panel');
         if (panel) {
+            // Trigger auto-save before hiding (for click-outside-to-close)
+            const panelIframe = panel.querySelector('iframe');
+            if (panelIframe) {
+                try {
+                    panelIframe.contentWindow.postMessage({
+                        action: 'auto_save_settings',
+                        source: 'incident-injector-content'
+                    }, '*');
+                } catch (error) {
+                    console.log('[Incident Injector] Could not send auto-save message to panel:', error.message);
+                }
+            }
+
             panel.classList.remove('visible', 'animate-in');
             // Wait for animation to complete before hiding
             setTimeout(() => {
