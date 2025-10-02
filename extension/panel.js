@@ -377,11 +377,19 @@
 
                 try {
                     if (isExtensionContext()) {
-                        await chrome.storage.sync.set({ integration_key: key });
-                        console.log('[Panel] ✅ Integration key auto-saved to chrome.storage');
+                        await new Promise((resolve, reject) => {
+                            chrome.storage.sync.set({ integration_key: key }, () => {
+                                if (chrome.runtime.lastError) {
+                                    reject(new Error(chrome.runtime.lastError.message));
+                                } else {
+                                    console.log('[Panel] ✅ Integration key auto-saved to chrome.storage');
+                                    resolve();
+                                }
+                            });
+                        });
 
-                        // Update status immediately after save
-                        setTimeout(updateStatus, 100);
+                        // Update status after a delay to ensure storage write completes
+                        setTimeout(updateStatus, 250);
                     } else {
                         console.log('[Panel] ⚠️ Extension context not available, key will save on panel close');
                     }
@@ -402,11 +410,19 @@
 
                 try {
                     if (isExtensionContext()) {
-                        await chrome.storage.sync.set({ integration_key: key });
-                        console.log('[Panel] ✅ Integration key auto-saved via change event');
+                        await new Promise((resolve, reject) => {
+                            chrome.storage.sync.set({ integration_key: key }, () => {
+                                if (chrome.runtime.lastError) {
+                                    reject(new Error(chrome.runtime.lastError.message));
+                                } else {
+                                    console.log('[Panel] ✅ Integration key auto-saved via change event');
+                                    resolve();
+                                }
+                            });
+                        });
 
-                        // Update status immediately after save
-                        setTimeout(updateStatus, 100);
+                        // Update status after a delay to ensure storage write completes
+                        setTimeout(updateStatus, 250);
                     }
                 } catch (error) {
                     console.log('[Panel] Change event save failed:', error.message);
@@ -994,14 +1010,15 @@
         
         try {
             let result = {};
-            
+
             if (isExtensionContext()) {
-                // Direct Chrome API access
+                // Direct Chrome API access with additional debugging
                 result = await new Promise((resolve, reject) => {
                     chrome.storage.sync.get(['integration_key', 'extension_enabled'], (storageResult) => {
                         if (chrome.runtime.lastError) {
                             reject(new Error(chrome.runtime.lastError.message));
                         } else {
+                            console.log('[Panel] Raw storage result:', storageResult);
                             resolve(storageResult);
                         }
                     });
