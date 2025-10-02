@@ -364,12 +364,17 @@
             // Auto-save when user leaves the field
             integrationKeyInput.addEventListener('blur', async (e) => {
                 const key = e.target.value;
-                if (isExtensionContext()) {
-                    try {
+                try {
+                    if (isExtensionContext()) {
                         await chrome.storage.sync.set({ integration_key: key });
                         console.log('[Panel] Integration key auto-saved');
-                    } catch (error) {
-                        console.log('[Panel] Failed to auto-save integration key:', error);
+                    }
+                } catch (error) {
+                    // Silently handle extension context invalidation
+                    if (error.message && error.message.includes('Extension context invalidated')) {
+                        console.log('[Panel] Extension was reloaded, skipping auto-save');
+                    } else {
+                        console.log('[Panel] Failed to auto-save integration key:', error.message);
                     }
                 }
             });
@@ -611,16 +616,24 @@
             targetElementsTextarea.addEventListener('blur', async () => {
                 const value = targetElementsTextarea.value;
                 console.log('[Panel] Saving target elements:', value);
-                
+
                 // Auto-save to storage (silent, no UI feedback)
-                if (isExtensionContext()) {
-                    try {
+                try {
+                    if (isExtensionContext()) {
                         await chrome.storage.sync.set({ target_element_texts: value });
                         console.log('[Panel] Target elements auto-saved successfully');
-                    } catch (error) {
-                        console.log('[Panel] Failed to auto-save target_element_texts:', error);
                     }
-                } else {
+                } catch (error) {
+                    // Silently handle extension context invalidation
+                    if (error.message && error.message.includes('Extension context invalidated')) {
+                        console.log('[Panel] Extension was reloaded, skipping auto-save');
+                        return; // Exit early
+                    }
+                    console.log('[Panel] Failed to auto-save target_element_texts:', error.message);
+                }
+
+                // If direct save failed or not in extension context, try message relay
+                if (!isExtensionContext()) {
                     console.log('[Panel] Extension context not available - using message relay');
 
                     // Use message relay to save
@@ -678,15 +691,23 @@
             alertMessageTextarea.addEventListener('blur', async () => {
                 const value = alertMessageTextarea.value;
                 console.log('[Panel] Saving alert message:', value);
-                
-                if (isExtensionContext()) {
-                    try {
+
+                try {
+                    if (isExtensionContext()) {
                         await chrome.storage.sync.set({ custom_alert_message: value });
                         console.log('[Panel] Alert message auto-saved successfully');
-                    } catch (error) {
-                        console.log('[Panel] Failed to auto-save custom_alert_message:', error);
                     }
-                } else {
+                } catch (error) {
+                    // Silently handle extension context invalidation
+                    if (error.message && error.message.includes('Extension context invalidated')) {
+                        console.log('[Panel] Extension was reloaded, skipping auto-save');
+                        return; // Exit early
+                    }
+                    console.log('[Panel] Failed to auto-save custom_alert_message:', error.message);
+                }
+
+                // If not in extension context, try message relay
+                if (!isExtensionContext()) {
                     console.log('[Panel] Extension context not available - using message relay for alert message');
                     
                     // Use message relay to save alert message
@@ -1830,15 +1851,25 @@
 
             }
         } catch (error) {
+            // Silently handle extension context invalidation
+            if (error.message && error.message.includes('Extension context invalidated')) {
+                console.log('[Panel] Extension was reloaded during close, settings not saved');
+                return; // Exit gracefully without showing error to user
+            }
+
             console.log('[Panel] Auto-save failed, will use message relay as fallback:', error.message);
 
             // Fallback to message relay (fire and forget)
-            window.postMessage({
-                action: 'save_all_settings_request',
-                source: 'incident-injector-panel',
-                settings: settings,
-                localSettings: localSettings
-            }, '*');
+            try {
+                window.postMessage({
+                    action: 'save_all_settings_request',
+                    source: 'incident-injector-panel',
+                    settings: settings,
+                    localSettings: localSettings
+                }, '*');
+            } catch (msgError) {
+                console.log('[Panel] Message relay also failed, settings not saved');
+            }
         }
     }
 
