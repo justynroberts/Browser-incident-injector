@@ -293,7 +293,11 @@
             if (alertMessageTextarea) alertMessageTextarea.value = result.custom_alert_message || 'Incident Injected: Form submission failed! PagerDuty incident created.';
             if (allowContinuationCheckbox) allowContinuationCheckbox.checked = result.allow_form_continuation === true;
             if (redirectTo500Checkbox) redirectTo500Checkbox.checked = result.redirect_to_500 === true;
-            if (targetElementsTextarea) targetElementsTextarea.value = result.target_element_texts || '';
+            if (targetElementsTextarea) {
+                // Use sensible defaults if no value is stored
+                const defaultTargets = "Submit, Login, Sign In, Register, Sign Up, Buy Now, Checkout, Purchase, Add to Cart";
+                targetElementsTextarea.value = result.target_element_texts || defaultTargets;
+            }
             // Check localStorage first, then chrome.storage, then default to true
             const savedTriggerOnClick = localStorage.getItem('incident_injector_trigger_on_click');
             let triggerOnClickEnabled = true; // Default to true (enabled)
@@ -348,13 +352,26 @@
             });
         }
         
-        // Integration key
+        // Integration key - validation on input, auto-save on blur
         const integrationKeyInput = panel.querySelector('#integration-key');
         if (integrationKeyInput) {
             integrationKeyInput.addEventListener('input', (e) => {
                 const key = e.target.value;
                 console.log('[Panel] Integration key input:', key.length, 'characters');
                 validateIntegrationKey(key);
+            });
+
+            // Auto-save when user leaves the field
+            integrationKeyInput.addEventListener('blur', async (e) => {
+                const key = e.target.value;
+                if (isExtensionContext()) {
+                    try {
+                        await chrome.storage.sync.set({ integration_key: key });
+                        console.log('[Panel] Integration key auto-saved');
+                    } catch (error) {
+                        console.log('[Panel] Failed to auto-save integration key:', error);
+                    }
+                }
             });
         }
         
@@ -584,44 +601,28 @@
             });
         }
         
-        // Target elements save button
-        const saveTargetElementsButton = panel.querySelector('#save-target-elements');
+        // Target elements auto-save on change (no button needed)
         const targetElementsTextarea = panel.querySelector('#target-elements');
-        const targetElementsValidation = panel.querySelector('#target-elements-validation');
-        
-        if (saveTargetElementsButton && targetElementsTextarea) {
-            console.log('[Panel] Adding target elements save button listener');
-            saveTargetElementsButton.addEventListener('click', async () => {
+
+        if (targetElementsTextarea) {
+            console.log('[Panel] Adding target elements auto-save listener');
+
+            // Auto-save on blur (when user leaves the field)
+            targetElementsTextarea.addEventListener('blur', async () => {
                 const value = targetElementsTextarea.value;
                 console.log('[Panel] Saving target elements:', value);
                 
-                // Save to storage
+                // Auto-save to storage (silent, no UI feedback)
                 if (isExtensionContext()) {
                     try {
                         await chrome.storage.sync.set({ target_element_texts: value });
-                        console.log('[Panel] Target elements saved to storage successfully');
-                        
-                        // Show success message
-                        if (targetElementsValidation) {
-                            targetElementsValidation.textContent = 'Target elements saved successfully';
-                            targetElementsValidation.className = 'validation-message valid';
-                            setTimeout(() => {
-                                targetElementsValidation.textContent = '';
-                                targetElementsValidation.className = 'validation-message';
-                            }, 3000);
-                        }
+                        console.log('[Panel] Target elements auto-saved successfully');
                     } catch (error) {
-                        console.log('[Panel] Failed to save target_element_texts to storage:', error);
-                        
-                        // Show error message
-                        if (targetElementsValidation) {
-                            targetElementsValidation.textContent = 'Failed to save: ' + error.message;
-                            targetElementsValidation.className = 'validation-message error';
-                        }
+                        console.log('[Panel] Failed to auto-save target_element_texts:', error);
                     }
                 } else {
                     console.log('[Panel] Extension context not available - using message relay');
-                    
+
                     // Use message relay to save
                     try {
                         const response = await new Promise((resolve, reject) => {
@@ -631,7 +632,7 @@
                                     resolve(event.data.response);
                                 }
                             };
-                            
+
                             window.addEventListener('message', messageHandler);
                             
                             window.postMessage({
@@ -648,24 +649,12 @@
                         });
                         
                         if (response.success) {
-                            console.log('[Panel] Target elements saved via message relay');
-                            if (targetElementsValidation) {
-                                targetElementsValidation.textContent = 'Target elements saved successfully';
-                                targetElementsValidation.className = 'validation-message valid';
-                                setTimeout(() => {
-                                    targetElementsValidation.textContent = '';
-                                    targetElementsValidation.className = 'validation-message';
-                                }, 3000);
-                            }
+                            console.log('[Panel] Target elements auto-saved via message relay');
                         } else {
-                            throw new Error(response.error);
+                            console.log('[Panel] Auto-save failed:', response.error);
                         }
                     } catch (relayError) {
-                        console.log('[Panel] Message relay save failed:', relayError);
-                        if (targetElementsValidation) {
-                            targetElementsValidation.textContent = 'Failed to save: ' + relayError.message;
-                            targetElementsValidation.className = 'validation-message error';
-                        }
+                        console.log('[Panel] Message relay auto-save failed:', relayError);
                     }
                 }
                 
@@ -679,42 +668,23 @@
                     targetElements: value
                 }, '*');
             });
-        } else {
-            console.log('[Panel] Target elements save button or textarea not found');
         }
         
-        // Alert message save button
-        const saveAlertMessageButton = panel.querySelector('#save-alert-message');
+        // Alert message auto-save on blur (no button needed)
         const alertMessageTextarea = panel.querySelector('#alert-message');
-        const alertMessageValidation = panel.querySelector('#alert-message-validation');
-        
-        if (saveAlertMessageButton && alertMessageTextarea) {
-            console.log('[Panel] Adding alert message save button listener');
-            saveAlertMessageButton.addEventListener('click', async () => {
+
+        if (alertMessageTextarea) {
+            console.log('[Panel] Adding alert message auto-save listener');
+            alertMessageTextarea.addEventListener('blur', async () => {
                 const value = alertMessageTextarea.value;
                 console.log('[Panel] Saving alert message:', value);
                 
                 if (isExtensionContext()) {
                     try {
                         await chrome.storage.sync.set({ custom_alert_message: value });
-                        console.log('[Panel] Alert message saved to storage successfully');
-                        
-                        // Show success message
-                        if (alertMessageValidation) {
-                            alertMessageValidation.textContent = 'Alert message saved successfully';
-                            alertMessageValidation.className = 'validation-message valid';
-                            setTimeout(() => {
-                                alertMessageValidation.textContent = '';
-                                alertMessageValidation.className = 'validation-message';
-                            }, 3000);
-                        }
+                        console.log('[Panel] Alert message auto-saved successfully');
                     } catch (error) {
-                        console.log('[Panel] Failed to save custom_alert_message:', error);
-                        
-                        if (alertMessageValidation) {
-                            alertMessageValidation.textContent = 'Failed to save: ' + error.message;
-                            alertMessageValidation.className = 'validation-message error';
-                        }
+                        console.log('[Panel] Failed to auto-save custom_alert_message:', error);
                     }
                 } else {
                     console.log('[Panel] Extension context not available - using message relay for alert message');
