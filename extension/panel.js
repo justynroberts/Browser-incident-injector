@@ -372,7 +372,7 @@
 
             // Auto-save when user leaves the field
             integrationKeyInput.addEventListener('blur', async (e) => {
-                const key = e.target.value;
+                const key = e.target.value.trim(); // Trim whitespace
                 console.log('[Panel] Integration key blur - attempting to save:', key.length, 'chars');
 
                 try {
@@ -382,11 +382,14 @@
                                 if (chrome.runtime.lastError) {
                                     reject(new Error(chrome.runtime.lastError.message));
                                 } else {
-                                    console.log('[Panel] ✅ Integration key auto-saved to chrome.storage');
+                                    console.log('[Panel] ✅ Integration key auto-saved to chrome.storage:', `"${key}"`);
                                     resolve();
                                 }
                             });
                         });
+
+                        // Update the input field to trimmed value
+                        e.target.value = key;
 
                         // Update status after a delay to ensure storage write completes
                         setTimeout(updateStatus, 250);
@@ -405,7 +408,7 @@
 
             // Also save on change as backup
             integrationKeyInput.addEventListener('change', async (e) => {
-                const key = e.target.value;
+                const key = e.target.value.trim(); // Trim whitespace
                 console.log('[Panel] Integration key changed - attempting to save:', key.length, 'chars');
 
                 try {
@@ -415,11 +418,14 @@
                                 if (chrome.runtime.lastError) {
                                     reject(new Error(chrome.runtime.lastError.message));
                                 } else {
-                                    console.log('[Panel] ✅ Integration key auto-saved via change event');
+                                    console.log('[Panel] ✅ Integration key auto-saved via change event:', `"${key}"`);
                                     resolve();
                                 }
                             });
                         });
+
+                        // Update the input field to trimmed value
+                        e.target.value = key;
 
                         // Update status after a delay to ensure storage write completes
                         setTimeout(updateStatus, 250);
@@ -1853,8 +1859,8 @@
 
         const settings = {
             extension_enabled: extensionEnabledCheckbox ? extensionEnabledCheckbox.checked : false,
-            integration_key: panel.querySelector('#integration-key')?.value || '',
-            crux_url: panel.querySelector('#crux-url')?.value || '',
+            integration_key: (panel.querySelector('#integration-key')?.value || '').trim(),
+            crux_url: (panel.querySelector('#crux-url')?.value || '').trim(),
             custom_alert_message: panel.querySelector('#alert-message')?.value || '',
             show_alert: panel.querySelector('#option-create-alert')?.checked || false,
             run_scenario_on_submit: panel.querySelector('#option-run-scenario')?.checked || false,
