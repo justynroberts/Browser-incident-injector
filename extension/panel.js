@@ -1238,13 +1238,68 @@
         console.log('[Panel] Ensured all sections are collapsed by default');
     }
     
-    // Initialize trigger options (now uses explicit save buttons instead of auto-save)
+    // Initialize trigger options with auto-save on change
     function initializeTriggerOptions() {
         const panel = document.getElementById('incident-injector-panel');
         if (!panel) return;
-        
-        console.log('[Panel] Trigger options initialized - using explicit save buttons');
-        // Note: Auto-save listeners removed - trigger options now require explicit save button clicks
+
+        console.log('[Panel] Initializing trigger options with auto-save...');
+
+        // Get all trigger option checkboxes
+        const showAlertCheckbox = panel.querySelector('#option-create-alert');
+        const runScenarioCheckbox = panel.querySelector('#option-run-scenario');
+        const add500ErrorCheckbox = panel.querySelector('#option-add-500-error');
+        const triggerCruxCheckbox = panel.querySelector('#option-trigger-crux');
+        const continueDestinationCheckbox = panel.querySelector('#option-continue-destination');
+
+        // Auto-save function for trigger options
+        const autoSaveTriggerOptions = async (optionName, value) => {
+            console.log(`[Panel] Auto-saving ${optionName}:`, value);
+
+            const settings = {
+                show_alert: showAlertCheckbox?.checked || false,
+                run_scenario_on_submit: runScenarioCheckbox?.checked || false,
+                redirect_to_500: add500ErrorCheckbox?.checked || false,
+                trigger_crux: triggerCruxCheckbox?.checked || false,
+                allow_form_continuation: continueDestinationCheckbox?.checked || false
+            };
+
+            try {
+                if (isExtensionContext()) {
+                    await chrome.storage.sync.set(settings);
+                    console.log('[Panel] ✅ Trigger options auto-saved');
+                } else {
+                    // Use message relay
+                    window.postMessage({
+                        action: 'save_trigger_options_request',
+                        source: 'incident-injector-panel',
+                        options: settings
+                    }, '*');
+                    console.log('[Panel] ✅ Trigger options sent via message relay');
+                }
+            } catch (error) {
+                console.log('[Panel] Failed to auto-save trigger options:', error.message);
+            }
+        };
+
+        // Add change listeners to all checkboxes
+        if (showAlertCheckbox) {
+            showAlertCheckbox.addEventListener('change', () => autoSaveTriggerOptions('show_alert', showAlertCheckbox.checked));
+        }
+        if (runScenarioCheckbox) {
+            runScenarioCheckbox.addEventListener('change', () => autoSaveTriggerOptions('run_scenario_on_submit', runScenarioCheckbox.checked));
+        }
+        if (add500ErrorCheckbox) {
+            add500ErrorCheckbox.addEventListener('change', () => autoSaveTriggerOptions('redirect_to_500', add500ErrorCheckbox.checked));
+        }
+        if (triggerCruxCheckbox) {
+            triggerCruxCheckbox.addEventListener('change', () => autoSaveTriggerOptions('trigger_crux', triggerCruxCheckbox.checked));
+        }
+        if (continueDestinationCheckbox) {
+            continueDestinationCheckbox.addEventListener('change', () => autoSaveTriggerOptions('allow_form_continuation', continueDestinationCheckbox.checked));
+        }
+
+        console.log('[Panel] Trigger options auto-save listeners added');
     }
     
     // Initialize click interception
