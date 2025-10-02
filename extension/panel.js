@@ -334,20 +334,23 @@
             extensionEnabledToggle.addEventListener('change', async (e) => {
                 const value = e.target.checked;
                 console.log('[Panel] Extension enabled changed to:', value);
-                
+
                 // Always save to localStorage for persistence
                 localStorage.setItem('incident_injector_extension_enabled', value.toString());
-                
-                if (isExtensionContext()) {
-                    try {
+
+                // Try to save to chrome.storage
+                try {
+                    if (isExtensionContext()) {
                         await chrome.storage.sync.set({ extension_enabled: value });
                         console.log('[Panel] Extension enabled saved to both chrome.storage and localStorage');
-                    } catch (error) {
-                        console.log('[Panel] Direct save to chrome.storage failed, saved to localStorage only for extension_enabled');
-                        // Fallback to message relay (implementation would go here if needed)
                     }
-                } else {
-                    console.log('[Panel] Extension context not available, saved to localStorage only for extension_enabled');
+                } catch (error) {
+                    // Silently handle extension context invalidation
+                    if (error.message && error.message.includes('Extension context invalidated')) {
+                        console.log('[Panel] Extension was reloaded, saved to localStorage only');
+                    } else {
+                        console.log('[Panel] Failed to save to chrome.storage:', error.message);
+                    }
                 }
             });
         }
@@ -1133,19 +1136,23 @@
             triggerOnClickEnabledToggle.addEventListener('change', async (e) => {
                 const value = e.target.checked;
                 console.log('[Panel] Trigger on click enabled changed to:', value);
-                
+
                 // Always save to localStorage for persistence
                 localStorage.setItem('incident_injector_trigger_on_click', value.toString());
-                
-                if (isExtensionContext()) {
-                    try {
+
+                // Try to save to chrome.storage
+                try {
+                    if (isExtensionContext()) {
                         await chrome.storage.sync.set({ trigger_on_click_enabled: value });
                         console.log('[Panel] Trigger on click enabled saved to both chrome.storage and localStorage');
-                    } catch (error) {
-                        console.log('[Panel] Direct save to chrome.storage failed, saved to localStorage only for trigger_on_click_enabled:', error);
                     }
-                } else {
-                    console.log('[Panel] Extension context not available, saved to localStorage only for trigger_on_click_enabled');
+                } catch (error) {
+                    // Silently handle extension context invalidation
+                    if (error.message && error.message.includes('Extension context invalidated')) {
+                        console.log('[Panel] Extension was reloaded, saved to localStorage only');
+                    } else {
+                        console.log('[Panel] Failed to save to chrome.storage:', error.message);
+                    }
                 }
                 updateClickConfig();
             });
@@ -1770,19 +1777,27 @@
         const panel = document.getElementById('incident-injector-panel');
         if (!panel) return;
 
-        // Gather all settings
+        // Gather all settings (use ?? false for booleans to preserve explicit false values)
+        const extensionEnabledCheckbox = panel.querySelector('#extension-enabled');
+        const triggerOnClickCheckbox = panel.querySelector('#trigger-on-click-enabled');
+
         const settings = {
-            extension_enabled: panel.querySelector('#extension-enabled')?.checked || false,
+            extension_enabled: extensionEnabledCheckbox ? extensionEnabledCheckbox.checked : false,
             integration_key: panel.querySelector('#integration-key')?.value || '',
             custom_alert_message: panel.querySelector('#alert-message')?.value || '',
             show_alert: panel.querySelector('#option-create-alert')?.checked || false,
             run_scenario_on_submit: panel.querySelector('#option-run-scenario')?.checked || false,
             redirect_to_500: panel.querySelector('#option-add-500-error')?.checked || false,
             allow_form_continuation: panel.querySelector('#option-continue-destination')?.checked || false,
-            trigger_on_click_enabled: panel.querySelector('#trigger-on-click-enabled')?.checked || false,
+            trigger_on_click_enabled: triggerOnClickCheckbox ? triggerOnClickCheckbox.checked : false,
             target_element_texts: panel.querySelector('#target-elements')?.value || '',
             active_scenario_id: panel.querySelector('#scenario-select')?.value || ''
         };
+
+        console.log('[Panel] Auto-save gathering settings:', {
+            extension_enabled: settings.extension_enabled,
+            trigger_on_click_enabled: settings.trigger_on_click_enabled
+        });
 
         // Also save the event definition JSON to local storage (it can be large)
         const eventDefinition = panel.querySelector('#event-definition')?.value || '';
