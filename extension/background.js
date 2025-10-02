@@ -40,6 +40,8 @@ chrome.runtime.onInstalled.addListener(async () => {
         allow_form_continuation: false,
         redirect_to_500: false,
         run_scenario_on_submit: false,
+        trigger_crux: false, // Default to off - user must opt-in to trigger Crux
+        crux_url: "", // No default Crux URL - user must configure
         custom_alert_message: "Error: UX Failure - Our team are working on it now.",
         target_element_texts: "Submit, Login, Sign In, Register, Sign Up, Buy Now, Checkout, Purchase, Add to Cart", // Sensible defaults
         active_scenario_id: "" // No default active scenario
