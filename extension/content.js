@@ -1988,11 +1988,13 @@
             // Load all settings from storage
             const result = await chrome.storage.sync.get([
                 'integration_key',
-                'extension_enabled', 
+                'extension_enabled',
                 'show_alert',
                 'custom_alert_message',
                 'allow_form_continuation',
                 'redirect_to_500',
+                'trigger_crux',
+                'crux_url',
                 'target_element_texts',
                 'trigger_on_click_enabled',
                 'run_scenario_on_submit'
@@ -2000,6 +2002,10 @@
             
             console.log('[Content] Loaded settings:', result);
             console.log('[Content] Integration key in storage:', result.integration_key ? `${result.integration_key.length} chars` : 'not set');
+            console.log('[Content] Crux settings:', {
+                trigger_crux: result.trigger_crux,
+                crux_url: result.crux_url ? `${result.crux_url.length} chars` : 'not set'
+            });
             
             // Send settings back to panel
             window.postMessage({
