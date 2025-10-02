@@ -388,6 +388,11 @@
                             });
                         });
 
+                        // Verify the save by reading it back
+                        chrome.storage.sync.get(['integration_key'], (result) => {
+                            console.log('[Panel] 🔍 Verification read after save:', result.integration_key ? `"${result.integration_key}" (${result.integration_key.length} chars)` : 'not found');
+                        });
+
                         // Update the input field to trimmed value
                         e.target.value = key;
 
