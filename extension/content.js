@@ -2106,14 +2106,19 @@
             }
             
             console.log('[Content] Target elements saved and updated:', targetElementTexts);
-            
+
+            // Verify it was saved by reading it back
+            const verification = await chrome.storage.sync.get(['target_element_texts']);
+            console.log('[Content] 🔍 Verification - stored target elements:', verification.target_element_texts);
+
             // Send success response back to panel
             window.postMessage({
                 action: 'target_elements_save_response',
                 source: 'incident-injector-content',
                 response: {
                     success: true,
-                    targetElements: requestData.targetElements
+                    targetElements: requestData.targetElements,
+                    verified: verification.target_element_texts === requestData.targetElements
                 }
             }, '*');
             
