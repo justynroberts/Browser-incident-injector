@@ -223,11 +223,13 @@
                 console.log('[Panel] Loading settings via direct Chrome API');
                 result = await chrome.storage.sync.get([
                     'integration_key',
-                    'extension_enabled', 
+                    'crux_url',
+                    'extension_enabled',
                     'show_alert',
                     'custom_alert_message',
                     'allow_form_continuation',
                     'redirect_to_500',
+                    'trigger_crux',
                     'target_element_texts',
                     'trigger_on_click_enabled',
                     'run_scenario_on_submit',
@@ -1013,9 +1015,9 @@
             
             console.log('[Panel] Storage result for status update:', result);
             console.log('[Panel] Integration key:', result.integration_key ? `${result.integration_key.length} chars` : 'not set');
-            const hasKey = result.integration_key && result.integration_key.length === 32;
+            const hasKey = result.integration_key && result.integration_key.trim().length > 0; // Just check if key exists, not length
             const enabled = result.extension_enabled !== false;
-            console.log('[Panel] Has valid key:', hasKey, 'Extension enabled:', enabled);
+            console.log('[Panel] Has key:', hasKey, 'Extension enabled:', enabled);
             
             if (statusDot && statusText) {
                 if (!enabled) {
