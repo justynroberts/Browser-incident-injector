@@ -373,10 +373,17 @@
             // Auto-save when user leaves the field
             integrationKeyInput.addEventListener('blur', async (e) => {
                 const key = e.target.value;
+                console.log('[Panel] Integration key blur - attempting to save:', key.length, 'chars');
+
                 try {
                     if (isExtensionContext()) {
                         await chrome.storage.sync.set({ integration_key: key });
-                        console.log('[Panel] Integration key auto-saved');
+                        console.log('[Panel] ✅ Integration key auto-saved to chrome.storage');
+
+                        // Update status immediately after save
+                        setTimeout(updateStatus, 100);
+                    } else {
+                        console.log('[Panel] ⚠️ Extension context not available, key will save on panel close');
                     }
                 } catch (error) {
                     // Silently handle extension context invalidation
@@ -385,6 +392,24 @@
                     } else {
                         console.log('[Panel] Failed to auto-save integration key:', error.message);
                     }
+                }
+            });
+
+            // Also save on change as backup
+            integrationKeyInput.addEventListener('change', async (e) => {
+                const key = e.target.value;
+                console.log('[Panel] Integration key changed - attempting to save:', key.length, 'chars');
+
+                try {
+                    if (isExtensionContext()) {
+                        await chrome.storage.sync.set({ integration_key: key });
+                        console.log('[Panel] ✅ Integration key auto-saved via change event');
+
+                        // Update status immediately after save
+                        setTimeout(updateStatus, 100);
+                    }
+                } catch (error) {
+                    console.log('[Panel] Change event save failed:', error.message);
                 }
             });
         }
@@ -1826,7 +1851,9 @@
 
         console.log('[Panel] Auto-save gathering settings:', {
             extension_enabled: settings.extension_enabled,
-            trigger_on_click_enabled: settings.trigger_on_click_enabled
+            trigger_on_click_enabled: settings.trigger_on_click_enabled,
+            integration_key: settings.integration_key ? `${settings.integration_key.length} chars` : 'empty',
+            crux_url: settings.crux_url ? `${settings.crux_url.length} chars` : 'empty'
         });
 
         // Also save the event definition JSON to local storage (it can be large)
