@@ -512,11 +512,56 @@
         if (cruxUrlInput) {
             // Auto-save when user leaves the field
             cruxUrlInput.addEventListener('blur', async (e) => {
-                const url = e.target.value;
+                const url = e.target.value.trim();
+                console.log('[Panel] Crux URL blur - attempting to save:', url.length, 'chars');
+
                 try {
                     if (isExtensionContext()) {
-                        await chrome.storage.sync.set({ crux_url: url });
-                        console.log('[Panel] Crux URL auto-saved');
+                        await new Promise((resolve, reject) => {
+                            chrome.storage.sync.set({ crux_url: url }, () => {
+                                if (chrome.runtime.lastError) {
+                                    reject(new Error(chrome.runtime.lastError.message));
+                                } else {
+                                    console.log('[Panel] ✅ Crux URL auto-saved to chrome.storage:', `"${url}"`);
+                                    resolve();
+                                }
+                            });
+                        });
+
+                        // Update the input field to trimmed value
+                        e.target.value = url;
+                    } else {
+                        // Use message relay to save via content script
+                        console.log('[Panel] Using message relay to save Crux URL');
+                        const response = await new Promise((resolve, reject) => {
+                            const messageHandler = (event) => {
+                                if (event.data.action === 'crux_url_save_response' && event.data.source === 'incident-injector-content') {
+                                    window.removeEventListener('message', messageHandler);
+                                    resolve(event.data.response);
+                                }
+                            };
+
+                            window.addEventListener('message', messageHandler);
+
+                            window.postMessage({
+                                action: 'save_crux_url_request',
+                                source: 'incident-injector-panel',
+                                cruxUrl: url
+                            }, '*');
+
+                            setTimeout(() => {
+                                window.removeEventListener('message', messageHandler);
+                                reject(new Error('Crux URL save request timed out'));
+                            }, 5000);
+                        });
+
+                        if (response.success) {
+                            console.log('[Panel] ✅ Crux URL saved via message relay');
+                            // Update the input field to trimmed value
+                            e.target.value = url;
+                        } else {
+                            throw new Error(response.error || 'Failed to save Crux URL via message relay');
+                        }
                     }
                 } catch (error) {
                     // Silently handle extension context invalidation
