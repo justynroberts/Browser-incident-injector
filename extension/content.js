@@ -118,6 +118,8 @@
             showAlert,
             allowFormContinuation,
             redirectTo500,
+            triggerCrux,
+            cruxUrl: cruxUrl ? `${cruxUrl.length} chars` : 'empty',
             hasActiveScenario,
             shouldRunScenario,
             runScenarioOnSubmit,
@@ -219,7 +221,15 @@
             if (changes.redirect_to_500) {
                 redirectTo500 = changes.redirect_to_500.newValue;
             }
-            
+            if (changes.trigger_crux) {
+                triggerCrux = changes.trigger_crux.newValue;
+                console.log('[PagerDuty Simulator] Crux trigger updated:', triggerCrux);
+            }
+            if (changes.crux_url) {
+                cruxUrl = changes.crux_url.newValue;
+                console.log('[PagerDuty Simulator] Crux URL updated:', cruxUrl ? `${cruxUrl.length} chars` : 'empty');
+            }
+
             // Handle changes to run_scenario_on_submit or active_scenario_id
             let updateRunScenario = false;
             let runScenarioValue = runScenarioOnSubmit;
