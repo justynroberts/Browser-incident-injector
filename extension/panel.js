@@ -2002,7 +2002,12 @@
             extension_enabled: settings.extension_enabled,
             trigger_on_click_enabled: settings.trigger_on_click_enabled,
             integration_key: settings.integration_key ? `${settings.integration_key.length} chars` : 'empty',
-            crux_url: settings.crux_url ? `${settings.crux_url.length} chars` : 'empty'
+            crux_url: settings.crux_url ? `${settings.crux_url.length} chars` : 'empty',
+            show_alert: settings.show_alert,
+            run_scenario_on_submit: settings.run_scenario_on_submit,
+            redirect_to_500: settings.redirect_to_500,
+            trigger_crux: settings.trigger_crux,
+            allow_form_continuation: settings.allow_form_continuation
         });
 
         // Also save the event definition JSON to local storage (it can be large)
@@ -2018,14 +2023,10 @@
             }
         });
 
-        // Try direct Chrome API save first
-        try {
-            if (typeof chrome !== 'undefined' &&
-                chrome &&
-                chrome.storage &&
-                chrome.storage.sync &&
-                typeof chrome.storage.sync.set === 'function') {
-
+        // Check if we're in extension context first
+        if (isExtensionContext()) {
+            // Direct Chrome API save
+            try {
                 console.log('[Panel] Auto-saving via Chrome API...');
 
                 // Save sync settings
@@ -2060,7 +2061,7 @@
                     });
                 }
 
-                console.log('[Panel] Auto-save successful');
+                console.log('[Panel] ✅ Auto-save successful via Chrome API');
 
                 // Update click configuration in content script
                 window.postMessage({
@@ -2070,17 +2071,17 @@
                     targetElements: settings.target_element_texts
                 }, '*');
 
+            } catch (error) {
+                // Silently handle extension context invalidation
+                if (error.message && error.message.includes('Extension context invalidated')) {
+                    console.log('[Panel] Extension was reloaded during close, settings not saved');
+                    return; // Exit gracefully without showing error to user
+                }
+                console.log('[Panel] Chrome API save failed:', error.message);
             }
-        } catch (error) {
-            // Silently handle extension context invalidation
-            if (error.message && error.message.includes('Extension context invalidated')) {
-                console.log('[Panel] Extension was reloaded during close, settings not saved');
-                return; // Exit gracefully without showing error to user
-            }
-
-            console.log('[Panel] Auto-save failed, will use message relay as fallback:', error.message);
-
-            // Fallback to message relay (fire and forget)
+        } else {
+            // Use message relay (page context)
+            console.log('[Panel] Using message relay for auto-save (page context)');
             try {
                 window.postMessage({
                     action: 'save_all_settings_request',
@@ -2088,8 +2089,17 @@
                     settings: settings,
                     localSettings: localSettings
                 }, '*');
+                console.log('[Panel] ✅ Settings sent via message relay');
+
+                // Update click configuration in content script
+                window.postMessage({
+                    action: 'update_click_config',
+                    source: 'incident-injector-panel',
+                    enabled: settings.trigger_on_click_enabled,
+                    targetElements: settings.target_element_texts
+                }, '*');
             } catch (msgError) {
-                console.log('[Panel] Message relay also failed, settings not saved');
+                console.log('[Panel] Message relay failed:', msgError.message);
             }
         }
     }
