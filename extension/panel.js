@@ -399,7 +399,39 @@
                         // Update status after a delay to ensure storage write completes
                         setTimeout(updateStatus, 250);
                     } else {
-                        console.log('[Panel] ⚠️ Extension context not available, key will save on panel close');
+                        // Use message relay to save via content script
+                        console.log('[Panel] Using message relay to save integration key');
+                        const response = await new Promise((resolve, reject) => {
+                            const messageHandler = (event) => {
+                                if (event.data.action === 'key_save_response' && event.data.source === 'incident-injector-content') {
+                                    window.removeEventListener('message', messageHandler);
+                                    resolve(event.data.response);
+                                }
+                            };
+
+                            window.addEventListener('message', messageHandler);
+
+                            window.postMessage({
+                                action: 'save_key_request',
+                                source: 'incident-injector-panel',
+                                key: key
+                            }, '*');
+
+                            setTimeout(() => {
+                                window.removeEventListener('message', messageHandler);
+                                reject(new Error('Key save request timed out'));
+                            }, 5000);
+                        });
+
+                        if (response.success) {
+                            console.log('[Panel] ✅ Integration key saved via message relay');
+                            // Update the input field to trimmed value
+                            e.target.value = key;
+                            // Update status
+                            setTimeout(updateStatus, 250);
+                        } else {
+                            throw new Error(response.error || 'Failed to save key via message relay');
+                        }
                     }
                 } catch (error) {
                     // Silently handle extension context invalidation
@@ -434,6 +466,40 @@
 
                         // Update status after a delay to ensure storage write completes
                         setTimeout(updateStatus, 250);
+                    } else {
+                        // Use message relay to save via content script
+                        console.log('[Panel] Using message relay to save integration key (change event)');
+                        const response = await new Promise((resolve, reject) => {
+                            const messageHandler = (event) => {
+                                if (event.data.action === 'key_save_response' && event.data.source === 'incident-injector-content') {
+                                    window.removeEventListener('message', messageHandler);
+                                    resolve(event.data.response);
+                                }
+                            };
+
+                            window.addEventListener('message', messageHandler);
+
+                            window.postMessage({
+                                action: 'save_key_request',
+                                source: 'incident-injector-panel',
+                                key: key
+                            }, '*');
+
+                            setTimeout(() => {
+                                window.removeEventListener('message', messageHandler);
+                                reject(new Error('Key save request timed out'));
+                            }, 5000);
+                        });
+
+                        if (response.success) {
+                            console.log('[Panel] ✅ Integration key saved via message relay (change event)');
+                            // Update the input field to trimmed value
+                            e.target.value = key;
+                            // Update status
+                            setTimeout(updateStatus, 250);
+                        } else {
+                            throw new Error(response.error || 'Failed to save key via message relay');
+                        }
                     }
                 } catch (error) {
                     console.log('[Panel] Change event save failed:', error.message);
