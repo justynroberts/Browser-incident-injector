@@ -269,10 +269,19 @@ async function handleRunScenario(scenarioId, options, sendResponse) {
         
         // Check if integration key is configured - REQUIRED for scenarios
         const result = await chrome.storage.sync.get(['integration_key']);
-        const hasIntegrationKey = result.integration_key && result.integration_key.length === 32;
-        
+        console.log('[Background] Integration key from storage:', result.integration_key ? `"${result.integration_key}" (${result.integration_key.length} chars)` : 'not set');
+
+        // Trim the key and validate
+        const integrationKey = result.integration_key ? result.integration_key.trim() : '';
+        const hasIntegrationKey = integrationKey.length === 32 && /^[a-zA-Z0-9]+$/.test(integrationKey);
+
         if (!hasIntegrationKey) {
             console.log('[Background] No valid integration key configured - scenario cannot run');
+            console.log('[Background] Key validation failed:', {
+                hasKey: !!result.integration_key,
+                trimmedLength: integrationKey.length,
+                isAlphanumeric: /^[a-zA-Z0-9]+$/.test(integrationKey)
+            });
             await clearScenarioRunningStatus();
             sendResponse({
                 success: false,
