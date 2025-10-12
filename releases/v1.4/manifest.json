@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "Incident Injector",
+  "version": "1.4",
+  "description": "Inject incidents by triggering PagerDuty alerts on form submissions and user interactions",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "notifications",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [{
+    "resources": [
+      "sample-event-definition.json",
+      "panel.html",
+      "panel.css",
+      "panel.js",
+      "debug-panel.js",
+      "fonts/SpaceGrotesk-Regular.woff2",
+      "fonts/SpaceGrotesk-Medium.woff2",
+      "fonts/SpaceGrotesk-Bold.woff2",
+      "fonts/SpaceGrotesk-Variable.woff2"
+    ],
+    "matches": ["<all_urls>"]
+  }],
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content.js"],
+    "run_at": "document_end"
+  }],
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png", 
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com;"
+  }
+}

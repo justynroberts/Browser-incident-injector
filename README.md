@@ -24,7 +24,7 @@ The extension simulates realistic failure scenarios by intercepting user interac
 
 1. **Download the latest release**
    - Navigate to the [Releases](releases) page
-   - Download `incident-injector-v1.3.zip`
+   - Download `incident-injector-v1.4.zip`
    - Extract the ZIP file to a local directory
 
 2. **Install in Chrome**
@@ -232,4 +232,4 @@ For technical support, bug reports, or feature requests:
 
 ---
 
-**Incident Injector v1.3** | [Download Latest Release](releases) | [Report Issues](../../issues)
+**Incident Injector v1.4** | [Download Latest Release](releases) | [Report Issues](../../issues)
