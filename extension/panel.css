@@ -1,6 +1,31 @@
 /* Incident Injector Panel - Slide-out Style */
 /* IMPORTANT: All styles scoped to prevent bleeding into host page */
 
+/* Font Definitions */
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('./fonts/SpaceGrotesk-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('./fonts/SpaceGrotesk-Medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Space Grotesk';
+    src: url('./fonts/SpaceGrotesk-Bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* CSS Variables scoped to panel only */
 .incident-injector-panel {
     --bg-primary: #0f0f0f;
@@ -45,7 +70,7 @@
     border-left: 2px solid var(--border-medium);
     box-shadow: -5px 0 20px rgba(0, 0, 0, 0.6);
     z-index: 999999;
-    font-family: 'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     font-size: 13px;
     line-height: 1.4;
     color: var(--text-primary);
@@ -592,7 +617,7 @@
     background: var(--bg-tertiary);
     color: var(--text-primary);
     transition: var(--transition);
-    font-family: 'Grandstander', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
 }
 
 .incident-injector-panel .form-group input::placeholder,
@@ -656,7 +681,7 @@
     transition: var(--transition);
     text-decoration: none;
     width: 100%;
-    font-family: 'Grandstander', sans-serif;
+    font-family: 'Space Grotesk', sans-serif;
     position: relative;
     overflow: hidden;
 }
