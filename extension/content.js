@@ -1327,7 +1327,7 @@
                     // Ensure panel has all correct styles applied
                     panel.style.width = '320px';
                     panel.style.right = '-340px';
-                    panel.style.fontFamily = "'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+                    panel.style.fontFamily = "'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
                     panel.style.fontSize = '13px';
                     
                     initializePanelEventListeners();
@@ -1371,7 +1371,7 @@
                     background: #0f0f0f;
                     color: white;
                     z-index: 999999;
-                    font-family: 'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+                    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
                     font-size: 13px;
                     transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
                     display: flex;
@@ -1434,7 +1434,7 @@
                 tempFontCSS.setAttribute('data-font-applied', 'true');
                 tempFontCSS.textContent = `
                     #incident-injector-panel {
-                        font-family: 'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+                        font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
                     }
                     #incident-injector-panel * {
                         font-family: inherit !important;
@@ -1545,30 +1545,80 @@
     // Load panel CSS and fonts
     function loadPanelCSS() {
         console.log('[Incident Injector] Loading panel CSS and fonts...');
-        
-        // Use system fonts only - no external fonts to avoid CSP issues
+
+        // Check if extension context is still valid
+        try {
+            if (!chrome.runtime?.id) {
+                console.error('[Incident Injector] Extension context invalidated - please reload the page');
+                return;
+            }
+        } catch (e) {
+            console.error('[Incident Injector] Extension context invalidated - please reload the page');
+            return;
+        }
+
+        // Load Space Grotesk font files from extension
         const panelFontCSS = document.createElement('style');
         panelFontCSS.id = 'incident-injector-panel-fonts';
-        panelFontCSS.textContent = `
-            /* Apply system fonts only to panel elements */
-            #incident-injector-panel,
-            #incident-injector-panel *,
-            .incident-injector-panel,
-            .incident-injector-panel * {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Helvetica Neue', Arial, sans-serif !important;
-                font-weight: 500 !important;
-            }
-            
-            #incident-injector-panel .panel-title,
-            #incident-injector-panel h1,
-            #incident-injector-panel h2,
-            #incident-injector-panel h3 {
-                font-weight: 600 !important;
-            }
-        `;
-        
-        document.head.appendChild(panelFontCSS);
-        console.log('[Incident Injector] ✅ System fonts applied to panel');
+
+        try {
+            const regularFontUrl = chrome.runtime.getURL('fonts/SpaceGrotesk-Regular.woff2');
+            const mediumFontUrl = chrome.runtime.getURL('fonts/SpaceGrotesk-Medium.woff2');
+            const boldFontUrl = chrome.runtime.getURL('fonts/SpaceGrotesk-Bold.woff2');
+
+            panelFontCSS.textContent = `
+                /* Space Grotesk Font Definitions */
+                @font-face {
+                    font-family: 'Space Grotesk';
+                    src: url('${regularFontUrl}') format('woff2');
+                    font-weight: 400;
+                    font-style: normal;
+                    font-display: swap;
+                }
+
+                @font-face {
+                    font-family: 'Space Grotesk';
+                    src: url('${mediumFontUrl}') format('woff2');
+                    font-weight: 500;
+                    font-style: normal;
+                    font-display: swap;
+                }
+
+                @font-face {
+                    font-family: 'Space Grotesk';
+                    src: url('${boldFontUrl}') format('woff2');
+                    font-weight: 700;
+                    font-style: normal;
+                    font-display: swap;
+                }
+
+                /* Apply Space Grotesk to panel elements */
+                #incident-injector-panel,
+                #incident-injector-panel *,
+                .incident-injector-panel,
+                .incident-injector-panel * {
+                    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+                }
+            `;
+
+            document.head.appendChild(panelFontCSS);
+            console.log('[Incident Injector] ✅ Space Grotesk font loaded and applied to panel');
+            console.log('[Incident Injector] Font URLs:', { regularFontUrl, mediumFontUrl, boldFontUrl });
+        } catch (error) {
+            console.error('[Incident Injector] Error loading fonts:', error);
+            console.log('[Incident Injector] Falling back to system fonts');
+
+            // Fallback to system fonts
+            panelFontCSS.textContent = `
+                #incident-injector-panel,
+                #incident-injector-panel *,
+                .incident-injector-panel,
+                .incident-injector-panel * {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+                }
+            `;
+            document.head.appendChild(panelFontCSS);
+        }
         
         // Skip Font Awesome to avoid CSP violations - use Unicode icons only
         console.log('[Incident Injector] Using Unicode icons to avoid CSP violations');
@@ -1579,18 +1629,22 @@
         // Load panel CSS
         const existingCSS = document.querySelector('link[href*="panel.css"]');
         if (!existingCSS) {
-            const link = document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = chrome.runtime.getURL('panel.css');
-            link.onload = () => {
-                console.log('[Incident Injector] Panel CSS loaded successfully');
-                setTimeout(() => {
-                    console.log('[Incident Injector] All CSS should be applied now');
-                }, 100);
-            };
-            link.onerror = (error) => console.error('[Incident Injector] Error loading panel CSS:', error);
-            document.head.appendChild(link);
-            console.log('[Incident Injector] Panel CSS link added to head');
+            try {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = chrome.runtime.getURL('panel.css');
+                link.onload = () => {
+                    console.log('[Incident Injector] Panel CSS loaded successfully');
+                    setTimeout(() => {
+                        console.log('[Incident Injector] All CSS should be applied now');
+                    }, 100);
+                };
+                link.onerror = (error) => console.error('[Incident Injector] Error loading panel CSS:', error);
+                document.head.appendChild(link);
+                console.log('[Incident Injector] Panel CSS link added to head');
+            } catch (error) {
+                console.error('[Incident Injector] Failed to load panel CSS:', error);
+            }
         } else {
             console.log('[Incident Injector] Panel CSS already loaded');
         }
@@ -1599,44 +1653,44 @@
     // Verify font loading and apply if needed
     function verifyFontLoading() {
         console.log('[Incident Injector] Verifying font loading...');
-        
-        // Check if Grandstander font is available
+
+        // Check if Space Grotesk font is available
         const testElement = document.createElement('div');
-        testElement.style.fontFamily = 'Grandstander, sans-serif';
+        testElement.style.fontFamily = "'Space Grotesk', sans-serif";
         testElement.style.position = 'absolute';
         testElement.style.left = '-9999px';
         testElement.textContent = 'Font test';
         document.body.appendChild(testElement);
-        
+
         const computedFont = window.getComputedStyle(testElement).fontFamily;
         document.body.removeChild(testElement);
-        
-        if (computedFont.includes('Grandstander')) {
-            console.log('[Incident Injector] ✅ Grandstander font is active');
-            
+
+        if (computedFont.includes('Space Grotesk')) {
+            console.log('[Incident Injector] ✅ Space Grotesk font is active');
+
             // Apply the font to the panel specifically
             const panel = document.getElementById('incident-injector-panel');
             if (panel) {
-                panel.style.fontFamily = "'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+                panel.style.fontFamily = "'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
             }
         } else {
-            console.log('[Incident Injector] ⚠️ Grandstander font not detected, computed font:', computedFont);
-            console.log('[Incident Injector] Force applying Grandstander font...');
-            
+            console.log('[Incident Injector] ⚠️ Space Grotesk font not detected, computed font:', computedFont);
+            console.log('[Incident Injector] Force applying Space Grotesk font...');
+
             // Simple fallback - just apply system fonts to avoid double font loading
             console.log('[Incident Injector] Using system fonts as fallback');
         }
-        
+
         // Also check the panel element specifically
         const panel = document.getElementById('incident-injector-panel');
         if (panel) {
             const panelFont = window.getComputedStyle(panel).fontFamily;
             console.log('[Incident Injector] Panel computed font:', panelFont);
-            
+
             // Apply font directly to panel
-            panel.style.fontFamily = "'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+            panel.style.fontFamily = "'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
         }
-        
+
         // Also ensure compact styles are applied
         setTimeout(() => {
             applyCompactStyles();
@@ -1713,7 +1767,7 @@
                 width: 320px !important;
                 right: -340px !important;
                 font-size: 13px !important;
-                font-family: 'Grandstander', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+                font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
             }
             
             #incident-injector-panel.visible {
@@ -1750,13 +1804,13 @@
             #incident-injector-panel .form-group select {
                 padding: 8px 10px !important;
                 font-size: 12px !important;
-                font-family: 'Grandstander', sans-serif !important;
+                font-family: 'Space Grotesk', sans-serif !important;
             }
             
             #incident-injector-panel .btn {
                 padding: 8px 12px !important;
                 font-size: 11px !important;
-                font-family: 'Grandstander', sans-serif !important;
+                font-family: 'Space Grotesk', sans-serif !important;
             }
             
             #incident-injector-panel .panel-close {

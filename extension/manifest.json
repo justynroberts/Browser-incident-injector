@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Incident Injector",
-  "version": "1.3",
+  "version": "1.4",
   "description": "Inject incidents by triggering PagerDuty alerts on form submissions and user interactions",
   "permissions": [
     "storage",
@@ -17,7 +17,17 @@
     "service_worker": "background.js"
   },
   "web_accessible_resources": [{
-    "resources": ["sample-event-definition.json", "panel.html", "panel.css", "panel.js", "debug-panel.js"],
+    "resources": [
+      "sample-event-definition.json",
+      "panel.html",
+      "panel.css",
+      "panel.js",
+      "debug-panel.js",
+      "fonts/SpaceGrotesk-Regular.woff2",
+      "fonts/SpaceGrotesk-Medium.woff2",
+      "fonts/SpaceGrotesk-Bold.woff2",
+      "fonts/SpaceGrotesk-Variable.woff2"
+    ],
     "matches": ["<all_urls>"]
   }],
   "content_scripts": [{
