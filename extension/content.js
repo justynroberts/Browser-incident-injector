@@ -554,10 +554,6 @@
         // Exit early if extension is not enabled
         if (!extensionEnabled) return;
 
-        // Prevent default action (form submission or link navigation)
-        event.preventDefault();
-        event.stopPropagation();
-
         // Extract and send data
         const form = element.closest('form');
         const elementData = extractFormData(form, element);
@@ -611,6 +607,22 @@
             console.log('[PagerDuty Simulator] ❌ Not showing alert on click - extensionEnabled:', extensionEnabled, 'showAlert:', showAlert);
         }
 
+        // Only prevent default if we're actually going to block the action
+        // (show alert, redirect to 500, or NOT allow continuation)
+        const shouldBlockClick = showAlert || redirectTo500 || !allowFormContinuation;
+
+        if (shouldBlockClick) {
+            console.log('[PagerDuty Simulator] 🚫 Preventing default click behavior:', {
+                showAlert,
+                redirectTo500,
+                allowFormContinuation
+            });
+            event.preventDefault();
+            event.stopPropagation();
+        } else {
+            console.log('[PagerDuty Simulator] ✅ Allowing click to proceed normally - only creating incident');
+        }
+
         // Handle post-alert actions
         const delay = showAlert ? 1000 : 100; // Shorter delay if no alert
         setTimeout(() => {
@@ -619,7 +631,7 @@
                 allowFormContinuation,
                 extensionEnabled
             });
-            
+
             if (redirectTo500) {
                 // Redirect to a 500 error page
                 console.log('[PagerDuty Simulator] ✅ 500 Error option enabled - Redirecting to professional 500 error page...');
