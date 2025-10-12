@@ -37,7 +37,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     // Set sensible defaults for new installs while preserving user settings on upgrades
     const defaults = {
         show_alert: false, // Default to off - user must opt-in to see alerts
-        allow_form_continuation: false,
+        allow_form_continuation: true, // Allow clicks to proceed by default - just observe
         redirect_to_500: false,
         run_scenario_on_submit: false,
         trigger_crux: false, // Default to off - user must opt-in to trigger Crux
