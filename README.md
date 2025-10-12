@@ -6,7 +6,17 @@ A Chrome extension for incident response testing and resilience training.
 
 ## Overview
 
- The extension simulates realistic failure scenarios by intercepting user interactions and creating corresponding PagerDuty incidents, enabling teams to practice their response workflows in a controlled environment.
+The extension simulates realistic failure scenarios by intercepting user interactions and creating corresponding PagerDuty incidents, enabling teams to practice their response workflows in a controlled environment.
+
+## Screenshots
+
+### Extension Panel Interface
+![Extension Panel](docs/screenshots/panel-interface.png)
+*Modern slide-out panel with Space Grotesk typography*
+
+### Configuration Options
+![Configuration](docs/screenshots/configuration.png)
+*Comprehensive settings for incident simulation*
 
 ## Quick Start
 
@@ -182,6 +192,13 @@ For technical support, bug reports, or feature requests:
 3. Contact your security team for organization-specific support
 
 ## Version History
+
+### Version 1.4 (October 2025)
+- **Typography Update**: Replaced Grandstander with modern Space Grotesk font
+- **Font Bundling**: All fonts bundled in extension (no external CDN requests)
+- **CSP Compliance**: Fonts load without CSP violations using extension URLs
+- **Error Handling**: Added robust error handling for extension context invalidation
+- **Performance**: WOFF2 format provides optimal compression and browser support
 
 ### Version 1.3 (September 2025)
 - **Security Improvements**: Extension now starts completely disabled by default
