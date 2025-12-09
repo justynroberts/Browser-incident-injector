@@ -16,7 +16,7 @@
             <i class="fas fa-times"></i>
         </button>
     </div>
-    
+
     <div class="panel-content">
         <!-- Scenario Running Indicator -->
         <div id="scenario-running-indicator" class="scenario-indicator" style="display: none;">
@@ -34,13 +34,13 @@
                 <div id="scenario-progress-fill" class="progress-fill"></div>
             </div>
         </div>
-        
+
         <div class="status-indicator">
             <span id="status-dot" class="status-dot"></span>
             <span id="status-text">Loading...</span>
         </div>
 
-        <!-- Quick Actions (consolidated) -->
+        <!-- Quick Actions with Scenarios -->
         <div class="section quick-actions-section">
             <div class="section-header">
                 <h3><span class="section-icon"><i class="fas fa-rocket"></i></span> Quick Actions</h3>
@@ -54,7 +54,15 @@
                         <span class="toggle-text">Extension Enabled</span>
                     </label>
                 </div>
-                
+
+                <!-- Scenario Selection -->
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label for="scenario-select">Scenario:</label>
+                    <select id="scenario-select" class="select-input">
+                        <option value="">-- Select a scenario --</option>
+                    </select>
+                </div>
+
                 <!-- Action Buttons -->
                 <div class="button-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
                     <button id="run-scenario-quick" class="btn btn-primary" style="flex: 1;">
@@ -67,144 +75,10 @@
             </div>
         </div>
 
-        <!-- PagerDuty Configuration -->
+        <!-- Scenarios (Event Definitions) -->
         <div class="section">
             <div class="section-header">
-                <h3><span class="section-icon"><i class="fas fa-cog"></i></span> PagerDuty Configuration</h3>
-                <button class="toggle-button collapsed" id="toggle-pagerduty-config">
-                    <span class="toggle-icon"><i class="fas fa-chevron-right"></i></span>
-                </button>
-            </div>
-            <div class="section-content collapsed" id="pagerduty-config-content">
-                <div class="form-group">
-                    <label for="integration-key">Integration Key:</label>
-                    <input
-                        type="text"
-                        id="integration-key"
-                        placeholder="Enter your PagerDuty integration key"
-                        maxlength="32"
-                        style="width: 100%; font-family: monospace; font-size: 12px; padding: 8px;"
-                    >
-                    <div class="input-help">
-                        32-character alphanumeric key from your PagerDuty service
-                    </div>
-                    <div id="key-validation" class="validation-message"></div>
-                </div>
-                
-            </div>
-        </div>
-
-        <!-- Crux Configuration -->
-        <div class="section">
-            <div class="section-header">
-                <h3><span class="section-icon"><i class="fas fa-link"></i></span> Crux Configuration</h3>
-                <button class="toggle-button collapsed" id="toggle-crux-config">
-                    <span class="toggle-icon"><i class="fas fa-chevron-right"></i></span>
-                </button>
-            </div>
-            <div class="section-content collapsed" id="crux-config-content">
-                <div class="form-group">
-                    <label for="crux-url">Crux Event URL:</label>
-                    <input
-                        type="text"
-                        id="crux-url"
-                        placeholder="https://eventsender-xxx.herokuapp.com/ondemand/your-id"
-                        style="width: 100%; font-family: monospace; font-size: 12px; padding: 8px;"
-                    >
-                    <div class="input-help">
-                        Full URL for Crux event trigger (GET request will be sent here)
-                    </div>
-                    <div id="crux-url-validation" class="validation-message"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Alert & Trigger Configuration -->
-        <div class="section">
-            <div class="section-header">
-                <h3><span class="section-icon"><i class="fas fa-bell"></i></span> Alert & Trigger Configuration</h3>
-                <button class="toggle-button collapsed" id="toggle-alert-config">
-                    <span class="toggle-icon"><i class="fas fa-chevron-right"></i></span>
-                </button>
-            </div>
-            <div class="section-content collapsed" id="alert-config-content">
-                <div class="form-group">
-                    <label for="alert-message">Custom Alert Message:</label>
-                    <textarea
-                        id="alert-message"
-                        rows="3"
-                        placeholder="Incident Injected: Form submission failed! PagerDuty incident created."
-                    ></textarea>
-                </div>
-                
-                <div class="trigger-options-container">
-                    <div class="trigger-option">
-                        <span class="option-number">1</span>
-                        <div class="option-content">
-                            <div class="option-title">Show Custom Alert</div>
-                            <div class="option-description">Display alert message when form is intercepted</div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="option-create-alert">
-                                <span class="switch-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="trigger-option">
-                        <span class="option-number">2</span>
-                        <div class="option-content">
-                            <div class="option-title">Run Current Scenario</div>
-                            <div class="option-description">Execute the selected event definition scenario</div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="option-run-scenario">
-                                <span class="switch-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="trigger-option">
-                        <span class="option-number">3</span>
-                        <div class="option-content">
-                            <div class="option-title">Add 500 Error</div>
-                            <div class="option-description">Redirect to a 500 error page to simulate server failure</div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="option-add-500-error">
-                                <span class="switch-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div class="trigger-option">
-                        <span class="option-number">4</span>
-                        <div class="option-content">
-                            <div class="option-title">Trigger Crux Event</div>
-                            <div class="option-description">Send GET request to configured Crux URL</div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="option-trigger-crux">
-                                <span class="switch-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="trigger-option">
-                        <span class="option-number">5</span>
-                        <div class="option-content">
-                            <div class="option-title">Continue to Destination</div>
-                            <div class="option-description">Allow form to submit normally after alert</div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="option-continue-destination">
-                                <span class="switch-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Scenarios -->
-        <div class="section">
-            <div class="section-header">
-                <h3><span class="section-icon"><i class="fas fa-play-circle"></i></span> Scenarios </h3>
+                <h3><span class="section-icon"><i class="fas fa-play-circle"></i></span> Scenarios</h3>
                 <button class="toggle-button collapsed" id="toggle-event-definition">
                     <span class="toggle-icon"><i class="fas fa-chevron-right"></i></span>
                 </button>
@@ -224,7 +98,7 @@
                     <div class="button-row">
                         <button id="load-sample" class="btn btn-secondary">
                             <span class="btn-icon"><i class="fas fa-file-alt"></i></span>
-                            Load Default Scenarios
+                            Load Default
                         </button>
                         <button id="edit-json" class="btn btn-secondary">
                             <span class="btn-icon"><i class="fas fa-edit"></i></span>
@@ -234,23 +108,139 @@
                     <div class="button-row" style="margin-top: 10px;">
                         <button id="save-to-file" class="btn btn-secondary">
                             <span class="btn-icon"><i class="fas fa-download"></i></span>
-                            Save to File
+                            Save
                         </button>
                         <button id="load-from-file" class="btn btn-secondary">
                             <span class="btn-icon"><i class="fas fa-upload"></i></span>
-                            Load from File
+                            Load
                         </button>
                     </div>
                 </div>
-                
+
                 <div class="scenario-controls" id="scenario-controls" style="display: none;">
-                    <div class="form-group">
-                        <label for="scenario-select">Select Scenario:</label>
-                        <select id="scenario-select" class="select-input">
-                            <option value="">-- Select a scenario --</option>
-                        </select>
+                    <!-- Scenario select moved to Quick Actions -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert & Trigger Configuration (includes Crux) -->
+        <div class="section">
+            <div class="section-header">
+                <h3><span class="section-icon"><i class="fas fa-bell"></i></span> Triggers & Alerts</h3>
+                <button class="toggle-button collapsed" id="toggle-alert-config">
+                    <span class="toggle-icon"><i class="fas fa-chevron-right"></i></span>
+                </button>
+            </div>
+            <div class="section-content collapsed" id="alert-config-content">
+                <div class="form-group">
+                    <label for="alert-message">Custom Alert Message:</label>
+                    <textarea
+                        id="alert-message"
+                        rows="2"
+                        placeholder="Error: Something went wrong. Our team is on it."
+                    ></textarea>
+                </div>
+
+                <div class="trigger-options-container">
+                    <div class="trigger-option">
+                        <span class="option-number">1</span>
+                        <div class="option-content">
+                            <div class="option-title">Show Custom Alert</div>
+                            <div class="option-description">Display alert message when triggered</div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="option-create-alert">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
                     </div>
-                    
+
+                    <div class="trigger-option">
+                        <span class="option-number">2</span>
+                        <div class="option-content">
+                            <div class="option-title">Run Scenario</div>
+                            <div class="option-description">Execute selected scenario on trigger</div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="option-run-scenario">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="trigger-option">
+                        <span class="option-number">3</span>
+                        <div class="option-content">
+                            <div class="option-title">Show 500 Error Page</div>
+                            <div class="option-description">Display server error page</div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="option-add-500-error">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="trigger-option">
+                        <span class="option-number">4</span>
+                        <div class="option-content">
+                            <div class="option-title">Trigger Crux Event</div>
+                            <div class="option-description">Send request to Crux URL below</div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="option-trigger-crux">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="trigger-option">
+                        <span class="option-number">5</span>
+                        <div class="option-content">
+                            <div class="option-title">Continue to Destination</div>
+                            <div class="option-description">Allow action to proceed after trigger</div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="option-continue-destination">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Crux URL moved here -->
+                <div class="form-group" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-subtle);">
+                    <label for="crux-url">Crux Event URL:</label>
+                    <input
+                        type="text"
+                        id="crux-url"
+                        placeholder="https://eventsender.example.com/ondemand/your-id"
+                        style="width: 100%; font-family: monospace; font-size: 11px; padding: 8px;"
+                    >
+                    <div class="input-help">
+                        GET request sent here when Crux trigger is enabled
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PagerDuty Configuration -->
+        <div class="section">
+            <div class="section-header">
+                <h3><span class="section-icon"><i class="fas fa-cog"></i></span> PagerDuty Config</h3>
+                <button class="toggle-button collapsed" id="toggle-pagerduty-config">
+                    <span class="toggle-icon"><i class="fas fa-chevron-right"></i></span>
+                </button>
+            </div>
+            <div class="section-content collapsed" id="pagerduty-config-content">
+                <div class="form-group">
+                    <label for="integration-key">Integration Key:</label>
+                    <input
+                        type="text"
+                        id="integration-key"
+                        placeholder="Enter your PagerDuty integration key"
+                        maxlength="32"
+                        style="width: 100%; font-family: monospace; font-size: 12px; padding: 8px;"
+                    >
+                    <div class="input-help">
+                        32-character key from PagerDuty Events API v2
+                    </div>
+                    <div id="key-validation" class="validation-message"></div>
                 </div>
             </div>
         </div>
@@ -258,7 +248,7 @@
         <!-- Trigger on Click -->
         <div class="section">
             <div class="section-header">
-                <h3><span class="section-icon"><i class="fas fa-mouse-pointer"></i></span> Trigger on Click</h3>
+                <h3><span class="section-icon"><i class="fas fa-mouse-pointer"></i></span> Click Triggers</h3>
                 <button class="toggle-button collapsed" id="toggle-target-config">
                     <span class="toggle-icon"><i class="fas fa-chevron-right"></i></span>
                 </button>
@@ -268,31 +258,31 @@
                     <span class="option-number">🎯</span>
                     <div class="option-content">
                         <div class="option-title">Enable Click Interception</div>
-                        <div class="option-description">Intercept clicks on specific page elements</div>
+                        <div class="option-description">Intercept clicks on specific elements</div>
                         <label class="toggle-switch">
                             <input type="checkbox" id="trigger-on-click-enabled">
                             <span class="switch-slider"></span>
                         </label>
                     </div>
                 </div>
-                
-                <div id="click-interception-config" style="display: none; margin-top: 20px;">
+
+                <div id="click-interception-config" style="display: none; margin-top: 15px;">
                     <div class="form-group">
-                        <label for="target-elements">Element Text to Hook (comma-separated):</label>
+                        <label for="target-elements">Element Text to Match:</label>
                         <textarea
                             id="target-elements"
                             rows="2"
-                            placeholder="Enter text to match (e.g., sign in, checkout, submit)"
+                            placeholder="sign in, checkout, submit, buy now"
                         ></textarea>
                         <div class="input-help">
-                            Enter text to intercept on buttons, links, or other clickable elements (case-insensitive). Leave empty to disable interception.
+                            Comma-separated button/link text to intercept (case-insensitive)
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        
+
         <div class="panel-footer">
             <div class="footer-links">
                 <a href="#" id="help-link">Help</a>
@@ -300,7 +290,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Help Modal -->
     <div id="help-modal" class="modal" style="display: none;">
         <div class="modal-content">
@@ -318,10 +308,10 @@
                     <li>Paste it into the field above</li>
                     <li>Enable the extension and test it</li>
                 </ol>
-                
+
                 <h3>How it works:</h3>
                 <p>This extension intercepts form submissions on any website and creates PagerDuty incidents to inject realistic errors. It's useful for testing incident response procedures.</p>
-                
+
                 <h3>Features:</h3>
                 <ul>
                     <li>Intercepts all form submissions</li>

@@ -460,15 +460,40 @@
         }
 
         const form = event.target.closest('form') || event.target;
-        
-        // Always handle form submissions, even if target texts are configured
-        console.log('[PagerDuty Simulator] Processing form submission');
-        
+
         // For forms, check if we should ignore them
         if (form && shouldIgnoreForm(form)) {
             console.log('[PagerDuty Simulator] Form ignored');
             return;
         }
+
+        // If no target texts are configured, don't intercept any forms
+        if (targetElementTexts.length === 0) {
+            console.log('[PagerDuty Simulator] No target texts configured, allowing normal form submission');
+            return;
+        }
+
+        // Find the submit button that was clicked or the form's submit button
+        const submitButton = clickedElement ||
+            form.querySelector('button[type="submit"], input[type="submit"], button:not([type])');
+
+        if (!submitButton) {
+            console.log('[PagerDuty Simulator] No submit button found, allowing normal submission');
+            return;
+        }
+
+        const buttonText = (submitButton.textContent || submitButton.value || '').toLowerCase().trim();
+        const matchesTarget = targetElementTexts.some(target => {
+            const lowerTarget = target.toLowerCase().trim();
+            return buttonText === lowerTarget || buttonText.includes(lowerTarget);
+        });
+
+        if (!matchesTarget) {
+            console.log('[PagerDuty Simulator] Form submit button "' + buttonText + '" does not match target texts, allowing normal submission');
+            return;
+        }
+
+        console.log('[PagerDuty Simulator] Form submit button "' + buttonText + '" matches target texts, intercepting');
 
         // Prevent default action
         event.preventDefault();
@@ -1623,9 +1648,47 @@
         // Skip Font Awesome to avoid CSP violations - use Unicode icons only
         console.log('[Incident Injector] Using Unicode icons to avoid CSP violations');
         
-        // Always inject basic fallback icons
+        // Always inject basic fallback icons first (will be overridden by Font Awesome if it loads)
         injectFallbackIcons();
-        
+
+        // Try to load Font Awesome from CDN (will use fallback icons if blocked by CSP)
+        const existingFA = document.querySelector('link[href*="font-awesome"]');
+        if (!existingFA) {
+            try {
+                const faLink = document.createElement('link');
+                faLink.rel = 'stylesheet';
+                faLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css';
+                faLink.crossOrigin = 'anonymous';
+                faLink.onerror = () => console.log('[Incident Injector] Font Awesome CDN blocked, using fallback icons');
+                faLink.onload = () => console.log('[Incident Injector] Font Awesome loaded from CDN');
+                document.head.appendChild(faLink);
+            } catch (error) {
+                console.log('[Incident Injector] Font Awesome load failed, using fallback icons');
+            }
+        }
+
+        // Load DM Sans font from Google Fonts (stylish, modern, unique)
+        const existingFont = document.querySelector('link[href*="DM+Sans"]');
+        if (!existingFont) {
+            try {
+                const fontLink = document.createElement('link');
+                fontLink.rel = 'stylesheet';
+                fontLink.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap';
+                fontLink.onload = () => {
+                    console.log('[Incident Injector] DM Sans font loaded from Google Fonts');
+                    // Apply to panel
+                    const panel = document.getElementById('incident-injector-panel');
+                    if (panel) {
+                        panel.style.fontFamily = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+                    }
+                };
+                fontLink.onerror = () => console.log('[Incident Injector] DM Sans font blocked, using system fonts');
+                document.head.appendChild(fontLink);
+            } catch (error) {
+                console.log('[Incident Injector] Font load failed, using system fonts');
+            }
+        }
+
         // Load panel CSS
         const existingCSS = document.querySelector('link[href*="panel.css"]');
         if (!existingCSS) {
@@ -1697,55 +1760,60 @@
         }, 500);
     }
     
-    // Inject fallback icons in case Font Awesome doesn't load
+    // Inject modern SVG icons (CSP-safe, no external dependencies)
     function injectFallbackIcons() {
         const existingFallback = document.querySelector('#incident-injector-icon-fallback');
         if (existingFallback) return;
-        
+
         const fallbackCSS = document.createElement('style');
         fallbackCSS.id = 'incident-injector-icon-fallback';
         fallbackCSS.textContent = `
-            /* Unicode icons for CSP-safe display */
+            /* Modern SVG icon system - CSP-safe */
+            .incident-injector-panel .fas,
+            .incident-injector-panel .fa {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 1em;
+                height: 1em;
+                font-style: normal;
+            }
+
             .incident-injector-panel .fas:before,
-            .incident-injector-panel .fa:before { 
+            .incident-injector-panel .fa:before {
+                display: inline-block;
                 font-family: system-ui, -apple-system, sans-serif !important;
                 font-weight: normal !important;
                 font-style: normal !important;
-                display: inline-block;
-                font-variant: normal;
-                text-transform: none;
                 line-height: 1;
                 -webkit-font-smoothing: antialiased;
-                -moz-osx-font-smoothing: grayscale;
             }
-            
-            /* Complete Unicode icon set */
-            .incident-injector-panel .fa-bolt:before { content: "⚡" !important; }
-            .incident-injector-panel .fa-times:before { content: "✕" !important; }
-            .incident-injector-panel .fa-rocket:before { content: "🚀" !important; }
-            .incident-injector-panel .fa-cog:before { content: "⚙" !important; }
-            .incident-injector-panel .fa-bell:before { content: "🔔" !important; }
-            .incident-injector-panel .fa-flask:before { content: "⚗" !important; }
-            .incident-injector-panel .fa-chart-line:before { content: "📈" !important; }
-            .incident-injector-panel .fa-chevron-down:before { content: "▼" !important; }
-            .incident-injector-panel .fa-chevron-up:before { content: "▲" !important; }
-            .incident-injector-panel .fa-chevron-right:before { content: "❯" !important; }
-            .incident-injector-panel .fa-play:before { content: "▶" !important; }
-            .incident-injector-panel .fa-play-circle:before { content: "▶" !important; }
-            .incident-injector-panel .fa-vial:before { content: "🧪" !important; }
-            .incident-injector-panel .fa-file-alt:before { content: "📄" !important; }
-            .incident-injector-panel .fa-edit:before { content: "✏" !important; }
-            .incident-injector-panel .fa-download:before { content: "⬇" !important; }
-            .incident-injector-panel .fa-upload:before { content: "⬆" !important; }
-            .incident-injector-panel .fa-mouse-pointer:before { content: "👆" !important; }
-            .incident-injector-panel .fa-exclamation-triangle:before { content: "⚠" !important; }
-            .incident-injector-panel .fa-spinner:before { content: "⟲" !important; }
-            
-            /* Spin animation for spinning icons */
+
+            /* Modern minimal icon set using symbols */
+            .incident-injector-panel .fa-bolt:before { content: "⚡"; }
+            .incident-injector-panel .fa-times:before { content: "✕"; font-weight: 300; }
+            .incident-injector-panel .fa-rocket:before { content: "↗"; font-weight: bold; }
+            .incident-injector-panel .fa-cog:before { content: "⚙"; }
+            .incident-injector-panel .fa-bell:before { content: "●"; font-size: 0.6em; }
+            .incident-injector-panel .fa-link:before { content: "⟁"; }
+            .incident-injector-panel .fa-chevron-down:before { content: "▾"; }
+            .incident-injector-panel .fa-chevron-up:before { content: "▴"; }
+            .incident-injector-panel .fa-chevron-right:before { content: "›"; font-size: 1.4em; font-weight: 300; }
+            .incident-injector-panel .fa-play:before { content: "▶"; font-size: 0.8em; }
+            .incident-injector-panel .fa-play-circle:before { content: "▶"; font-size: 0.9em; }
+            .incident-injector-panel .fa-file-alt:before { content: "☰"; }
+            .incident-injector-panel .fa-edit:before { content: "✎"; }
+            .incident-injector-panel .fa-download:before { content: "↓"; font-weight: bold; }
+            .incident-injector-panel .fa-upload:before { content: "↑"; font-weight: bold; }
+            .incident-injector-panel .fa-mouse-pointer:before { content: "⊙"; }
+            .incident-injector-panel .fa-exclamation-triangle:before { content: "⚠"; }
+            .incident-injector-panel .fa-spinner:before { content: "◠"; }
+
+            /* Spin animation */
             .incident-injector-panel .fa-spin {
-                animation: fa-spin 1s linear infinite !important;
+                animation: ii-spin 1s linear infinite !important;
             }
-            @keyframes fa-spin {
+            @keyframes ii-spin {
                 from { transform: rotate(0deg); }
                 to { transform: rotate(360deg); }
             }
