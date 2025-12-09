@@ -1428,18 +1428,30 @@
     async function runCurrentScenario() {
         const panel = document.getElementById('incident-injector-panel');
         if (!panel) return;
-        
+
         const resultDiv = panel.querySelector('#quick-action-result');
         if (!resultDiv) return;
-        
+
         try {
+            // Check if extension is enabled
+            const extensionEnabledToggle = panel.querySelector('#extension-enabled');
+            if (extensionEnabledToggle && !extensionEnabledToggle.checked) {
+                resultDiv.textContent = 'Extension is disabled. Enable it first.';
+                resultDiv.className = 'test-result error';
+                return;
+            }
+
+            // Auto-save all settings before running scenario
+            console.log('[Panel] Auto-saving settings before running scenario...');
+            await autoSaveAllSettings();
+
             // Note: We don't need to check isExtensionContext() here because
             // we have a fallback message relay system in place
-            
+
             // Get the current selected scenario
             const scenarioSelect = panel.querySelector('#scenario-select');
             const eventDefinitionTextarea = panel.querySelector('#event-definition');
-            
+
             if (!eventDefinitionTextarea || !eventDefinitionTextarea.value.trim()) {
                 resultDiv.textContent = 'No event definition loaded';
                 resultDiv.className = 'test-result error';

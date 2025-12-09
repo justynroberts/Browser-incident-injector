@@ -70,9 +70,10 @@
     border-left: 2px solid var(--border-medium);
     box-shadow: -5px 0 20px rgba(0, 0, 0, 0.6);
     z-index: 999999;
-    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: 'DM Sans', 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     font-size: 13px;
-    line-height: 1.4;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
     color: var(--text-primary);
     transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     overflow: hidden;
@@ -617,7 +618,7 @@
     background: var(--bg-tertiary);
     color: var(--text-primary);
     transition: var(--transition);
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'DM Sans', 'Space Grotesk', sans-serif;
 }
 
 .incident-injector-panel .form-group input::placeholder,
@@ -681,7 +682,7 @@
     transition: var(--transition);
     text-decoration: none;
     width: 100%;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: 'DM Sans', 'Space Grotesk', sans-serif;
     position: relative;
     overflow: hidden;
 }
@@ -1212,4 +1213,287 @@
 
 .incident-injector-panel.animate-in {
     animation: slideIn 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* ===== ENHANCED ANIMATIONS & TRANSITIONS ===== */
+
+/* Smooth section expand/collapse with stagger effect */
+.incident-injector-panel .section {
+    animation: fadeSlideUp 0.4s ease-out backwards;
+}
+
+.incident-injector-panel .section:nth-child(1) { animation-delay: 0.05s; }
+.incident-injector-panel .section:nth-child(2) { animation-delay: 0.1s; }
+.incident-injector-panel .section:nth-child(3) { animation-delay: 0.15s; }
+.incident-injector-panel .section:nth-child(4) { animation-delay: 0.2s; }
+.incident-injector-panel .section:nth-child(5) { animation-delay: 0.25s; }
+
+@keyframes fadeSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Button hover animations */
+.incident-injector-panel .btn {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: center;
+}
+
+.incident-injector-panel .btn:hover:not(:disabled) {
+    transform: translateY(-2px) scale(1.02);
+}
+
+.incident-injector-panel .btn:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+}
+
+.incident-injector-panel .btn-primary {
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 50%, var(--accent-primary) 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 3s ease infinite;
+}
+
+@keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+/* Toggle switch enhanced animation */
+.incident-injector-panel .toggle-slider {
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.incident-injector-panel .toggle-slider::before {
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.incident-injector-panel .toggle-input:checked + .toggle-slider::before {
+    transform: translateX(18px);
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+}
+
+.incident-injector-panel .switch-slider {
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.incident-injector-panel .switch-slider:before {
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.incident-injector-panel input:checked + .switch-slider:before {
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+}
+
+/* Section header hover effect */
+.incident-injector-panel .section-header {
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.incident-injector-panel .section-header::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+    transition: width 0.3s ease;
+}
+
+.incident-injector-panel .section-header:hover::after {
+    width: 100%;
+}
+
+/* Chevron rotation animation */
+.incident-injector-panel .toggle-button .toggle-icon {
+    transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.incident-injector-panel .toggle-button:not(.collapsed) .toggle-icon {
+    transform: rotate(90deg);
+}
+
+/* Input focus animations */
+.incident-injector-panel .form-group input:focus,
+.incident-injector-panel .form-group textarea:focus,
+.incident-injector-panel .form-group select:focus {
+    animation: focusPulse 0.3s ease;
+}
+
+@keyframes focusPulse {
+    0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.1); }
+    100% { box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1); }
+}
+
+/* Trigger option hover effect */
+.incident-injector-panel .trigger-option {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+}
+
+.incident-injector-panel .trigger-option:hover {
+    transform: translateX(4px);
+    background: rgba(34, 197, 94, 0.05);
+    border-color: var(--accent-primary);
+}
+
+.incident-injector-panel .trigger-option .option-number {
+    transition: all 0.3s ease;
+}
+
+.incident-injector-panel .trigger-option:hover .option-number {
+    transform: scale(1.1);
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+}
+
+/* Status dot pulse animation */
+.incident-injector-panel .status-dot.active {
+    animation: statusPulse 2s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+        transform: scale(1.1);
+    }
+}
+
+/* Panel close button animation */
+.incident-injector-panel .panel-close {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.incident-injector-panel .panel-close:hover {
+    transform: rotate(90deg) scale(1.1);
+}
+
+/* Section content smooth expand */
+.incident-injector-panel .section-content {
+    transition: max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.3s ease,
+                padding 0.3s ease;
+}
+
+/* Select dropdown animation */
+.incident-injector-panel .select-input {
+    transition: all 0.3s ease;
+}
+
+.incident-injector-panel .select-input:hover {
+    border-color: var(--accent-primary);
+}
+
+/* Test result fade in */
+.incident-injector-panel .test-result:not(:empty) {
+    animation: resultFadeIn 0.3s ease;
+}
+
+@keyframes resultFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Validation message animation */
+.incident-injector-panel .validation-message:not(:empty) {
+    animation: validationSlide 0.3s ease;
+}
+
+@keyframes validationSlide {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Footer links hover */
+.incident-injector-panel .footer-links a {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.incident-injector-panel .footer-links a::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 1px;
+    background: var(--accent-primary);
+    transition: width 0.3s ease;
+}
+
+.incident-injector-panel .footer-links a:hover::after {
+    width: 100%;
+}
+
+/* Loading shimmer effect for buttons */
+.incident-injector-panel .btn.loading {
+    position: relative;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.incident-injector-panel .btn.loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shimmerLoad 1.5s infinite;
+}
+
+@keyframes shimmerLoad {
+    0% { left: -100%; }
+    100% { left: 100%; }
+}
+
+/* Panel header gradient animation */
+.incident-injector-panel .panel-header {
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 50%, var(--bg-secondary) 100%);
+    background-size: 200% 200%;
+    animation: headerGradient 8s ease infinite;
+}
+
+@keyframes headerGradient {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+}
+
+/* Icon animations */
+.incident-injector-panel .section-icon i {
+    transition: all 0.3s ease;
+}
+
+.incident-injector-panel .section:hover .section-icon i {
+    transform: scale(1.2);
+}
+
+/* Smooth scroll behavior */
+.incident-injector-panel .panel-content {
+    scroll-behavior: smooth;
 }

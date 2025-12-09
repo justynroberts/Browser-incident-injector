@@ -12,7 +12,7 @@ The extension simulates realistic failure scenarios by intercepting user interac
 
 ### Extension Panel Interface
 ![Extension Panel](docs/screenshots/panel-interface.png)
-*Modern slide-out panel with Space Grotesk typography*
+*Modern slide-out panel with DM Sans typography and animated UI*
 
 ### Configuration Options
 ![Configuration](docs/screenshots/configuration.png)
@@ -24,7 +24,7 @@ The extension simulates realistic failure scenarios by intercepting user interac
 
 1. **Download the latest release**
    - Navigate to the [Releases](releases) page
-   - Download `incident-injector-v1.4.zip`
+   - Download `incident-injector-v1.6.zip`
    - Extract the ZIP file to a local directory
 
 2. **Install in Chrome**
@@ -193,6 +193,19 @@ For technical support, bug reports, or feature requests:
 
 ## Version History
 
+### Version 1.6 (December 2025)
+- **UI Reorganization**: Streamlined panel layout with scenarios in Quick Actions
+- **New Typography**: DM Sans font for a modern, stylish appearance
+- **Enhanced Animations**: Smooth transitions, hover effects, and visual feedback throughout
+- **Consolidated Settings**: Crux configuration moved under Triggers & Alerts
+- **Form Submission Fix**: Only intercepts forms matching configured target element texts
+- **Auto-save Improvements**: Settings save when closing panel and before running scenarios
+- **Font Awesome Icons**: CDN loading with Unicode fallback for CSP-restricted sites
+
+### Version 1.5 (November 2025)
+- **Bug Fixes**: Fixed scenario execution when extension disabled
+- **Icon Updates**: Cleaner Unicode fallback icons
+
 ### Version 1.4 (October 2025)
 - **Typography Update**: Replaced Grandstander with modern Space Grotesk font
 - **Font Bundling**: All fonts bundled in extension (no external CDN requests)
@@ -232,4 +245,4 @@ For technical support, bug reports, or feature requests:
 
 ---
 
-**Incident Injector v1.4** | [Download Latest Release](releases) | [Report Issues](../../issues)
+**Incident Injector v1.6** | [Download Latest Release](releases) | [Report Issues](../../issues)
