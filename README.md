@@ -11,12 +11,12 @@ The extension simulates realistic failure scenarios by intercepting user interac
 ## Screenshots
 
 ### Extension Panel Interface
-![Extension Panel](docs/screenshots/panel-interface.png)
-*Modern slide-out panel with DM Sans typography and animated UI*
+![Extension Panel](docs/screenshots/panel-interface.png?v=1.6)
+*Quick Actions panel with scenario selection and one-click execution*
 
 ### Configuration Options
-![Configuration](docs/screenshots/configuration.png)
-*Comprehensive settings for incident simulation*
+![Configuration](docs/screenshots/configuration.png?v=1.6)
+*Triggers & Alerts configuration with customizable options*
 
 ## Quick Start
 
