@@ -32,6 +32,31 @@
         return trustedHTMLPolicy ? trustedHTMLPolicy.createHTML(html) : html;
     }
 
+    // Attach button handlers + auto-refresh to the injected 500 page.
+    // The page uses data-ii-action attributes instead of inline onclick= /
+    // <script> so that sites with strict CSP (e.g. `script-src 'self'`) don't
+    // block the button actions.
+    function wireUp500Page() {
+        try {
+            document.querySelectorAll('[data-ii-action="reload"]').forEach((btn) => {
+                btn.addEventListener('click', () => window.location.reload());
+            });
+            document.querySelectorAll('[data-ii-action="back"]').forEach((btn) => {
+                btn.addEventListener('click', () => history.back());
+            });
+            setTimeout(() => {
+                const refreshBtn = document.querySelector('[data-ii-action="reload"]');
+                if (refreshBtn) {
+                    refreshBtn.textContent = '🔄 Auto-refreshing...';
+                    refreshBtn.disabled = true;
+                }
+                setTimeout(() => window.location.reload(), 2000);
+            }, 30000);
+        } catch (e) {
+            console.warn('[Incident Injector] Could not wire up 500 page actions:', e.message);
+        }
+    }
+
     // Debug function for users to check click interception status
     window.debugClickInterception = function() {
         console.log('🔧 Click Interception Debug Info:');
@@ -979,10 +1004,10 @@
                                     </div>
                                     
                                     <div class="actions">
-                                        <button class="btn btn-primary" onclick="window.location.reload()">
+                                        <button class="btn btn-primary" data-ii-action="reload">
                                             🔄 Try Again
                                         </button>
-                                        <button class="btn btn-secondary" onclick="history.back()">
+                                        <button class="btn btn-secondary" data-ii-action="back">
                                             ← Go Back
                                         </button>
                                     </div>
@@ -1000,23 +1025,11 @@
                                     </p>
                                 </footer>
                                 
-                                <script>
-                                    // Auto-refresh every 30 seconds
-                                    setTimeout(() => {
-                                        const refreshBtn = document.querySelector('.btn-primary');
-                                        if (refreshBtn) {
-                                            refreshBtn.textContent = '🔄 Auto-refreshing...';
-                                            refreshBtn.disabled = true;
-                                        }
-                                        setTimeout(() => {
-                                            window.location.reload();
-                                        }, 2000);
-                                    }, 30000);
-                                </script>
                             </body>
                         </html>
                     `));
                     document.close();
+                    wireUp500Page();
                 } catch (e) {
                     console.error('[PagerDuty Simulator] Error creating 500 page:', e);
                     // Fallback - professional inline styles
@@ -1075,8 +1088,8 @@
                                 </div>
                                 
                                 <div style="display: flex; gap: 16px; justify-content: center; margin-top: 40px;">
-                                    <button onclick="window.location.reload()" style="padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; border: none; background: #3b82f6; color: white; transition: all 0.2s;">🔄 Try Again</button>
-                                    <button onclick="history.back()" style="padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;">← Go Back</button>
+                                    <button data-ii-action="reload" style="padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; border: none; background: #3b82f6; color: white; transition: all 0.2s;">🔄 Try Again</button>
+                                    <button data-ii-action="back" style="padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;">← Go Back</button>
                                 </div>
                             </main>
                             
@@ -1086,6 +1099,7 @@
                             </footer>
                         </div>
                     `);
+                    wireUp500Page();
                 }
             } else if (allowFormContinuation) {
                 // Continue with original action if allowed
