@@ -2,7 +2,29 @@
 // This script provides the functionality for the slide-out panel
 (function() {
     'use strict';
-    
+
+    // Trusted Types policy — panel.js runs in the page's main world, so pages
+    // that enforce `require-trusted-types-for 'script'` will reject raw string
+    // assignments to innerHTML. Pass-through policy; all HTML we assign is
+    // extension-owned.
+    const trustedHTMLPolicy = (() => {
+        try {
+            if (window.trustedTypes && typeof window.trustedTypes.createPolicy === 'function') {
+                return window.trustedTypes.createPolicy('incident-injector-panel', {
+                    createHTML: (s) => s,
+                    createScriptURL: (s) => s,
+                    createScript: (s) => s
+                });
+            }
+        } catch (e) {
+            console.warn('[Panel] Could not create TrustedTypes policy, falling back:', e.message);
+        }
+        return null;
+    })();
+    function toTrustedHTML(html) {
+        return trustedHTMLPolicy ? trustedHTMLPolicy.createHTML(html) : html;
+    }
+
     // Helper function to check if Chrome extension API is available
     function isExtensionContext() {
         try {
@@ -1552,7 +1574,7 @@
                 resultDiv.textContent = 'Scenario may still be running in background. Check browser console for updates.';
                 resultDiv.className = 'test-result warning';
             } else if (error.message.includes('Extension context invalidated') || error.message.includes('CONTEXT_INVALIDATED')) {
-                resultDiv.innerHTML = 'Extension reloaded - please refresh page to continue<br><button onclick="window.location.reload()" class="btn btn-secondary" style="margin-top:8px;width:100%">Refresh Page</button>';
+                resultDiv.innerHTML = toTrustedHTML('Extension reloaded - please refresh page to continue<br><button onclick="window.location.reload()" class="btn btn-secondary" style="margin-top:8px;width:100%">Refresh Page</button>');
                 resultDiv.className = 'test-result error';
             } else {
                 resultDiv.textContent = 'Error: ' + error.message;
@@ -1717,7 +1739,7 @@
                 scenarioControls.style.display = 'block';
                 
                 if (scenarioSelect) {
-                    scenarioSelect.innerHTML = '<option value="">-- Select a scenario --</option>';
+                    scenarioSelect.innerHTML = toTrustedHTML('<option value="">-- Select a scenario --</option>');
                     scenarios.forEach((scenario, index) => {
                         const option = document.createElement('option');
                         option.value = scenario.id || index.toString();

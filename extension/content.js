@@ -8,7 +8,30 @@
         return;
     }
     window.incidentInjectorLoaded = true;
-    
+
+    // Trusted Types policy — some sites (incl. ServiceNow, Google) enforce
+    // `require-trusted-types-for 'script'`, which rejects raw string
+    // assignments to innerHTML/outerHTML and string args to document.write.
+    // We create a pass-through policy; all HTML we assign is extension-owned,
+    // so there's no injection risk from user-controlled input here.
+    const trustedHTMLPolicy = (() => {
+        try {
+            if (window.trustedTypes && typeof window.trustedTypes.createPolicy === 'function') {
+                return window.trustedTypes.createPolicy('incident-injector', {
+                    createHTML: (s) => s,
+                    createScriptURL: (s) => s,
+                    createScript: (s) => s
+                });
+            }
+        } catch (e) {
+            console.warn('[Incident Injector] Could not create TrustedTypes policy, falling back:', e.message);
+        }
+        return null;
+    })();
+    function toTrustedHTML(html) {
+        return trustedHTMLPolicy ? trustedHTMLPolicy.createHTML(html) : html;
+    }
+
     // Debug function for users to check click interception status
     window.debugClickInterception = function() {
         console.log('🔧 Click Interception Debug Info:');
@@ -663,7 +686,7 @@
                 try {
                     // Professional approach - redirect to a realistic corporate error page
                     document.open();
-                    document.write(`
+                    document.write(toTrustedHTML(`
                         <!DOCTYPE html>
                         <html lang="en">
                             <head>
@@ -982,7 +1005,7 @@
                                     setTimeout(() => {
                                         const refreshBtn = document.querySelector('.btn-primary');
                                         if (refreshBtn) {
-                                            refreshBtn.innerHTML = '🔄 Auto-refreshing...';
+                                            refreshBtn.textContent = '🔄 Auto-refreshing...';
                                             refreshBtn.disabled = true;
                                         }
                                         setTimeout(() => {
@@ -992,12 +1015,12 @@
                                 </script>
                             </body>
                         </html>
-                    `);
+                    `));
                     document.close();
                 } catch (e) {
                     console.error('[PagerDuty Simulator] Error creating 500 page:', e);
                     // Fallback - professional inline styles
-                    document.body.innerHTML = `
+                    document.body.innerHTML = toTrustedHTML(`
                         <div style="
                             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                             background-color: #f5f7fa;
@@ -1062,7 +1085,7 @@
                                 <p style="margin-top: 8px; font-size: 12px;">If this issue persists, please contact our support team with the incident ID above.</p>
                             </footer>
                         </div>
-                    `;
+                    `);
                 }
             } else if (allowFormContinuation) {
                 // Continue with original action if allowed
@@ -1333,13 +1356,13 @@
             .then(html => {
                 // Extract just the content inside the panel div
                 const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = html;
+                tempDiv.innerHTML = toTrustedHTML(html);
                 const panelContent = tempDiv.querySelector('.incident-injector-panel');
                 if (panelContent) {
-                    panel.innerHTML = panelContent.innerHTML;
+                    panel.innerHTML = toTrustedHTML(panelContent.innerHTML);
                 } else {
                     console.warn('[Incident Injector] Panel content not found in HTML, using full content');
-                    panel.innerHTML = html;
+                    panel.innerHTML = toTrustedHTML(html);
                 }
                 
                 // Add panel to page
@@ -1368,7 +1391,7 @@
                 console.error('[Incident Injector] Error loading panel HTML:', error);
                 
                 // Fallback: create a minimal panel structure
-                panel.innerHTML = `
+                panel.innerHTML = toTrustedHTML(`
                     <div class="panel-header">
                         <div class="panel-title">
                             <i class="fas fa-bolt"></i>
@@ -1384,7 +1407,7 @@
                             <span>Error loading panel - Please reload page</span>
                         </div>
                     </div>
-                `;
+                `);
                 
                 // Add minimal styles with compact dimensions
                 panel.style.cssText = `
