@@ -556,33 +556,35 @@
             triggerCruxEvent();
         }
 
-        // Always check for active scenario if extension is enabled
-        // Double-check that there's an active scenario before attempting to run it
-        chrome.storage.sync.get(['active_scenario_id'], (result) => {
-            const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
-            
-            if (hasActiveScenario) {
-                console.log('[PagerDuty Simulator] Running active scenario on form submission:', result.active_scenario_id);
-                console.log('[PagerDuty Simulator] Sending message to background script with data:', elementData);
-                safeRuntimeSendMessage({
-                    action: "run_active_scenario",
-                    data: elementData
-                }, (response) => {
-                    if (chrome.runtime && chrome.runtime.lastError) {
-                        console.error('[PagerDuty Simulator] Error running scenario:', chrome.runtime.lastError);
-                        return;
-                    }
-                    
-                    if (response && response.success) {
-                        console.log('[PagerDuty Simulator] Scenario executed successfully');
-                    } else {
-                        console.error('[PagerDuty Simulator] Failed to run scenario:', response?.error);
-                    }
-                });
-            } else {
-                console.log('[PagerDuty Simulator] No active scenario defined, skipping scenario execution');
-            }
-        });
+        // Run scenario only if the Run Scenario trigger is enabled AND an
+        // active scenario is selected. Previously this fired whenever an
+        // active scenario existed, ignoring the toggle.
+        if (runScenarioOnSubmit) {
+            chrome.storage.sync.get(['active_scenario_id'], (result) => {
+                const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
+                if (hasActiveScenario) {
+                    console.log('[PagerDuty Simulator] Running active scenario on form submission:', result.active_scenario_id);
+                    safeRuntimeSendMessage({
+                        action: "run_active_scenario",
+                        data: elementData
+                    }, (response) => {
+                        if (chrome.runtime && chrome.runtime.lastError) {
+                            console.error('[PagerDuty Simulator] Error running scenario:', chrome.runtime.lastError);
+                            return;
+                        }
+                        if (response && response.success) {
+                            console.log('[PagerDuty Simulator] Scenario executed successfully');
+                        } else {
+                            console.error('[PagerDuty Simulator] Failed to run scenario:', response?.error);
+                        }
+                    });
+                } else {
+                    console.log('[PagerDuty Simulator] Run Scenario enabled but no active scenario set');
+                }
+            });
+        } else {
+            console.log('[PagerDuty Simulator] Run Scenario trigger disabled, skipping');
+        }
 
         // Show alert only if both extension is enabled AND user has enabled alerts
         if (extensionEnabled && showAlert) {
@@ -637,34 +639,34 @@
             triggerCruxEvent();
         }
         
-        // Always check for active scenario if extension is enabled
-        console.log('[PagerDuty Simulator] Checking for active scenario on element click');
-        // Double-check that there's an active scenario before attempting to run it
-        chrome.storage.sync.get(['active_scenario_id'], (result) => {
-            const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
-            
-            if (hasActiveScenario) {
-                console.log('[PagerDuty Simulator] Running active scenario on element click:', result.active_scenario_id);
-                console.log('[PagerDuty Simulator] Sending message to background script with data:', elementData);
-                safeRuntimeSendMessage({
-                    action: "run_active_scenario",
-                    data: elementData
-                }, (response) => {
-                    if (chrome.runtime && chrome.runtime.lastError) {
-                        console.error('[PagerDuty Simulator] Error running scenario:', chrome.runtime.lastError);
-                        return;
-                    }
-                    
-                    if (response && response.success) {
-                        console.log('[PagerDuty Simulator] Scenario executed successfully');
-                    } else {
-                        console.error('[PagerDuty Simulator] Failed to run scenario:', response?.error);
-                    }
-                });
-            } else {
-                console.log('[PagerDuty Simulator] No active scenario defined, skipping scenario execution');
-            }
-        });
+        // Run scenario only if the Run Scenario trigger is enabled AND an
+        // active scenario is selected.
+        if (runScenarioOnSubmit) {
+            chrome.storage.sync.get(['active_scenario_id'], (result) => {
+                const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
+                if (hasActiveScenario) {
+                    console.log('[PagerDuty Simulator] Running active scenario on element click:', result.active_scenario_id);
+                    safeRuntimeSendMessage({
+                        action: "run_active_scenario",
+                        data: elementData
+                    }, (response) => {
+                        if (chrome.runtime && chrome.runtime.lastError) {
+                            console.error('[PagerDuty Simulator] Error running scenario:', chrome.runtime.lastError);
+                            return;
+                        }
+                        if (response && response.success) {
+                            console.log('[PagerDuty Simulator] Scenario executed successfully');
+                        } else {
+                            console.error('[PagerDuty Simulator] Failed to run scenario:', response?.error);
+                        }
+                    });
+                } else {
+                    console.log('[PagerDuty Simulator] Run Scenario enabled but no active scenario set');
+                }
+            });
+        } else {
+            console.log('[PagerDuty Simulator] Run Scenario trigger disabled on click, skipping');
+        }
 
         // Show alert only if both extension is enabled AND user has enabled alerts
         console.log('[PagerDuty Simulator] 🔍 Debug - Click Alert check:', {

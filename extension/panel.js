@@ -322,9 +322,14 @@
             if (redirectTo500Checkbox) redirectTo500Checkbox.checked = result.redirect_to_500 === true;
             if (triggerCruxCheckbox) triggerCruxCheckbox.checked = result.trigger_crux === true;
             if (targetElementsTextarea) {
-                // Use sensible defaults if no value is stored
+                // Apply defaults only on first install (undefined). A previously
+                // saved empty string should stay empty, otherwise clearing the
+                // field and reopening the panel would silently repopulate it
+                // with defaults.
                 const defaultTargets = "Submit, Login, Sign In, Register, Sign Up, Buy Now, Checkout, Purchase, Add to Cart";
-                targetElementsTextarea.value = result.target_element_texts || defaultTargets;
+                targetElementsTextarea.value = result.target_element_texts !== undefined
+                    ? result.target_element_texts
+                    : defaultTargets;
             }
             // Check localStorage first, then chrome.storage, then default to true
             const savedTriggerOnClick = localStorage.getItem('incident_injector_trigger_on_click');
@@ -2052,42 +2057,53 @@
         const panel = document.getElementById('incident-injector-panel');
         if (!panel) return;
 
-        // Gather all settings (use ?? false for booleans to preserve explicit false values)
-        const extensionEnabledCheckbox = panel.querySelector('#extension-enabled');
-        const triggerOnClickCheckbox = panel.querySelector('#trigger-on-click-enabled');
-
-        const settings = {
-            extension_enabled: extensionEnabledCheckbox ? extensionEnabledCheckbox.checked : false,
-            integration_key: (panel.querySelector('#integration-key')?.value || '').trim(),
-            crux_url: (panel.querySelector('#crux-url')?.value || '').trim(),
-            custom_alert_message: panel.querySelector('#alert-message')?.value || '',
-            show_alert: panel.querySelector('#option-create-alert')?.checked || false,
-            run_scenario_on_submit: panel.querySelector('#option-run-scenario')?.checked || false,
-            redirect_to_500: panel.querySelector('#option-add-500-error')?.checked || false,
-            trigger_crux: panel.querySelector('#option-trigger-crux')?.checked || false,
-            allow_form_continuation: panel.querySelector('#option-continue-destination')?.checked || false,
-            trigger_on_click_enabled: triggerOnClickCheckbox ? triggerOnClickCheckbox.checked : false,
-            target_element_texts: panel.querySelector('#target-elements')?.value || '',
-            active_scenario_id: panel.querySelector('#scenario-select')?.value || ''
+        // Only include a key in the payload if its input element is actually
+        // present in the panel DOM. Writing `?.value || ''` / `?.checked || false`
+        // for missing elements would silently clobber good stored values
+        // with empty strings / false, wiping user config.
+        const settings = {};
+        const addBool = (key, selector) => {
+            const el = panel.querySelector(selector);
+            if (el) settings[key] = !!el.checked;
         };
+        const addTrimmedString = (key, selector) => {
+            const el = panel.querySelector(selector);
+            if (el) settings[key] = (el.value || '').trim();
+        };
+        const addRawString = (key, selector) => {
+            const el = panel.querySelector(selector);
+            if (el) settings[key] = el.value || '';
+        };
+
+        addBool('extension_enabled', '#extension-enabled');
+        addTrimmedString('integration_key', '#integration-key');
+        addTrimmedString('crux_url', '#crux-url');
+        addRawString('custom_alert_message', '#alert-message');
+        addBool('show_alert', '#option-create-alert');
+        addBool('run_scenario_on_submit', '#option-run-scenario');
+        addBool('redirect_to_500', '#option-add-500-error');
+        addBool('trigger_crux', '#option-trigger-crux');
+        addBool('allow_form_continuation', '#option-continue-destination');
+        addBool('trigger_on_click_enabled', '#trigger-on-click-enabled');
+        addRawString('target_element_texts', '#target-elements');
+        addRawString('active_scenario_id', '#scenario-select');
 
         console.log('[Panel] Auto-save gathering settings:', {
+            keys: Object.keys(settings),
             extension_enabled: settings.extension_enabled,
             trigger_on_click_enabled: settings.trigger_on_click_enabled,
-            integration_key: settings.integration_key ? `${settings.integration_key.length} chars` : 'empty',
-            crux_url: settings.crux_url ? `${settings.crux_url.length} chars` : 'empty',
-            show_alert: settings.show_alert,
-            run_scenario_on_submit: settings.run_scenario_on_submit,
-            redirect_to_500: settings.redirect_to_500,
-            trigger_crux: settings.trigger_crux,
-            allow_form_continuation: settings.allow_form_continuation
+            integration_key: settings.integration_key ? `${settings.integration_key.length} chars` : 'empty/omitted',
+            target_element_texts: settings.target_element_texts,
+            active_scenario_id: settings.active_scenario_id
         });
 
-        // Also save the event definition JSON to local storage (it can be large)
-        const eventDefinition = panel.querySelector('#event-definition')?.value || '';
-        const localSettings = {
-            event_definition: eventDefinition
-        };
+        // Also save the event definition JSON to local storage (it can be large).
+        // Only persist if the textarea was actually present.
+        const eventDefinitionEl = panel.querySelector('#event-definition');
+        const localSettings = {};
+        if (eventDefinitionEl) {
+            localSettings.event_definition = eventDefinitionEl.value || '';
+        }
 
         // Save to localStorage for persistence
         Object.keys(settings).forEach(key => {
@@ -2136,13 +2152,17 @@
 
                 console.log('[Panel] ✅ Auto-save successful via Chrome API');
 
-                // Update click configuration in content script
-                window.postMessage({
-                    action: 'update_click_config',
-                    source: 'incident-injector-panel',
-                    enabled: settings.trigger_on_click_enabled,
-                    targetElements: settings.target_element_texts
-                }, '*');
+                // Update click configuration in content script — but only if
+                // we actually gathered these fields (missing DOM → skip to
+                // avoid resetting live globals to undefined).
+                if ('trigger_on_click_enabled' in settings || 'target_element_texts' in settings) {
+                    window.postMessage({
+                        action: 'update_click_config',
+                        source: 'incident-injector-panel',
+                        enabled: settings.trigger_on_click_enabled,
+                        targetElements: settings.target_element_texts
+                    }, '*');
+                }
 
             } catch (error) {
                 // Silently handle extension context invalidation
@@ -2164,13 +2184,17 @@
                 }, '*');
                 console.log('[Panel] ✅ Settings sent via message relay');
 
-                // Update click configuration in content script
-                window.postMessage({
-                    action: 'update_click_config',
-                    source: 'incident-injector-panel',
-                    enabled: settings.trigger_on_click_enabled,
-                    targetElements: settings.target_element_texts
-                }, '*');
+                // Update click configuration in content script — but only if
+                // we actually gathered these fields (missing DOM → skip to
+                // avoid resetting live globals to undefined).
+                if ('trigger_on_click_enabled' in settings || 'target_element_texts' in settings) {
+                    window.postMessage({
+                        action: 'update_click_config',
+                        source: 'incident-injector-panel',
+                        enabled: settings.trigger_on_click_enabled,
+                        targetElements: settings.target_element_texts
+                    }, '*');
+                }
             } catch (msgError) {
                 console.log('[Panel] Message relay failed:', msgError.message);
             }
