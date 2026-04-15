@@ -2207,7 +2207,10 @@
             enabled: data.enabled,
             targetElements: data.targetElements
         });
-        
+
+        const prevEnabled = triggerOnClickEnabled;
+        const prevTargets = targetElementTexts.join(',');
+
         // Update the global variables
         triggerOnClickEnabled = data.enabled;
         if (data.targetElements && data.targetElements.trim()) {
@@ -2215,11 +2218,16 @@
         } else {
             targetElementTexts = [];
         }
-        
+
         console.log('[Content] Click configuration updated:', {
             triggerOnClickEnabled: triggerOnClickEnabled,
             targetElementTexts: targetElementTexts
         });
+
+        // Reattach listeners so DOM state matches the new config.
+        if (prevEnabled !== triggerOnClickEnabled || prevTargets !== targetElementTexts.join(',')) {
+            reinitializeListeners();
+        }
     }
     
     // Handle save target elements request from panel
@@ -2407,22 +2415,47 @@
                 console.log('[Content] Event definition saved to local storage');
             }
             
-            // Update all local variables
-            extensionEnabled = requestData.settings.extension_enabled;
-            customAlertMessage = requestData.settings.custom_alert_message;
-            showAlert = requestData.settings.show_alert;
-            runScenarioOnSubmit = requestData.settings.run_scenario_on_submit;
-            redirectTo500 = requestData.settings.redirect_to_500;
-            triggerCrux = requestData.settings.trigger_crux || false;
-            cruxUrl = requestData.settings.crux_url || '';
-            allowFormContinuation = requestData.settings.allow_form_continuation;
-            triggerOnClickEnabled = requestData.settings.trigger_on_click_enabled;
+            // Update local variables only for keys actually present in the payload.
+            // This lets callers send partial updates (e.g. just extension_enabled)
+            // without clobbering unrelated globals with undefined.
+            const s = requestData.settings || {};
+            const has = (k) => Object.prototype.hasOwnProperty.call(s, k);
+            let listenerStateChanged = false;
+
+            if (has('extension_enabled')) {
+                if (extensionEnabled !== s.extension_enabled) listenerStateChanged = true;
+                extensionEnabled = s.extension_enabled;
+                localStorage.setItem('incident_injector_extension_enabled', extensionEnabled.toString());
+            }
+            if (has('custom_alert_message')) customAlertMessage = s.custom_alert_message;
+            if (has('show_alert')) showAlert = s.show_alert;
+            if (has('run_scenario_on_submit')) runScenarioOnSubmit = s.run_scenario_on_submit;
+            if (has('redirect_to_500')) redirectTo500 = s.redirect_to_500;
+            if (has('trigger_crux')) triggerCrux = s.trigger_crux || false;
+            if (has('crux_url')) cruxUrl = s.crux_url || '';
+            if (has('allow_form_continuation')) allowFormContinuation = s.allow_form_continuation;
+            if (has('trigger_on_click_enabled')) {
+                if (triggerOnClickEnabled !== s.trigger_on_click_enabled) listenerStateChanged = true;
+                triggerOnClickEnabled = s.trigger_on_click_enabled;
+                localStorage.setItem('incident_injector_trigger_on_click', triggerOnClickEnabled.toString());
+            }
 
             // Update target elements
-            if (requestData.settings.target_element_texts && requestData.settings.target_element_texts.trim()) {
-                targetElementTexts = requestData.settings.target_element_texts.split(',').map(text => text.trim()).filter(text => text);
-            } else {
-                targetElementTexts = [];
+            if (has('target_element_texts')) {
+                const prev = targetElementTexts.join(',');
+                if (s.target_element_texts && s.target_element_texts.trim()) {
+                    targetElementTexts = s.target_element_texts.split(',').map(text => text.trim()).filter(text => text);
+                } else {
+                    targetElementTexts = [];
+                }
+                if (prev !== targetElementTexts.join(',')) listenerStateChanged = true;
+            }
+
+            // If anything that affects listener attachment changed, reattach now
+            // rather than waiting for the indirect chrome.storage.onChanged path.
+            if (listenerStateChanged) {
+                console.log('[Content] Listener-relevant settings changed, reinitializing listeners');
+                reinitializeListeners();
             }
 
             console.log('[Content] All settings saved successfully');
