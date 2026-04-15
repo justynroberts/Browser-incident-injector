@@ -349,6 +349,17 @@
                     if (isExtensionContext()) {
                         await chrome.storage.sync.set({ extension_enabled: value });
                         console.log('[Panel] Extension enabled saved to both chrome.storage and localStorage');
+                    } else {
+                        // Page-context fallback: relay through content script so it
+                        // persists to chrome.storage AND reinitializes listeners.
+                        console.log('[Panel] Relaying extension_enabled via content script');
+                        window.postMessage({
+                            action: 'save_all_settings_request',
+                            source: 'incident-injector-panel',
+                            settings: { extension_enabled: value },
+                            localSettings: {},
+                            partial: true
+                        }, '*');
                     }
                 } catch (error) {
                     // Silently handle extension context invalidation
