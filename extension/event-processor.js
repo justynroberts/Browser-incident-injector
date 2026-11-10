@@ -657,7 +657,14 @@ class PagerDutyEventProcessor {
         // Create payload based on event type
         let payload;
         
+        let endpoint = 'https://events.pagerduty.com/v2/enqueue';
+
         switch (event.type.toLowerCase()) {
+            case 'change':
+                // Real PagerDuty change event (shows on the service's change timeline)
+                payload = this.createChangeEventPayload(event);
+                endpoint = 'https://events.pagerduty.com/v2/change/enqueue';
+                break;
             case 'trigger':
                 // If this is a change event (indicated by class="change"), use createChangePayload
                 if (event.class === 'change') {
@@ -673,7 +680,7 @@ class PagerDutyEventProcessor {
                 payload = this.createAcknowledgePayload(event);
                 break;
             default:
-                throw new Error(`Unsupported event type: ${event.type} (must be one of: trigger, acknowledge, resolve)`);
+                throw new Error(`Unsupported event type: ${event.type} (must be one of: trigger, acknowledge, resolve, change)`);
         }
         
         // Process templates in payload
@@ -691,14 +698,42 @@ class PagerDutyEventProcessor {
         // Send to PagerDuty
         console.log('[Event Processor] About to send event to PagerDuty, integration key present:', !!this.integrationKey);
         console.log('[Event Processor] Integration key length:', this.integrationKey ? this.integrationKey.length : 'N/A');
-        const result = await this.sendToPagerDuty(payload);
+        const result = await this.sendToPagerDuty(payload, endpoint);
         console.log('[Event Processor] PagerDuty send result:', result);
         return result;
     }
 
     // Create payload for trigger event
+    // ISO timestamp for an event, shifted by offset_minutes (e.g. -190 = 190 minutes ago)
+    eventTimestamp(event) {
+        const offset = Number(event.offset_minutes);
+        if (!Number.isFinite(offset) || offset === 0) return undefined;
+        return new Date(Date.now() + offset * 60000).toISOString();
+    }
+
+    // Copy optional links/images/timestamp onto a payload
+    withExtras(body, event) {
+        const timestamp = this.eventTimestamp(event);
+        if (timestamp) body.payload.timestamp = timestamp;
+        if (Array.isArray(event.links) && event.links.length) body.links = event.links;
+        if (Array.isArray(event.images) && event.images.length) body.images = event.images;
+        return body;
+    }
+
+    // Payload for /v2/change/enqueue. No severity, dedup_key or event_action.
+    createChangeEventPayload(event) {
+        return this.withExtras({
+            routing_key: event.routing_key || this.integrationKey,
+            payload: {
+                summary: event.summary || "Change event from Event Definition",
+                source: event.source || "chrome-extension",
+                custom_details: event.custom_details || {}
+            }
+        }, event);
+    }
+
     createTriggerPayload(event) {
-        return {
+        return this.withExtras({
             routing_key: event.routing_key || this.integrationKey,
             event_action: "trigger",
             dedup_key: event.dedup_key || `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
@@ -713,7 +748,7 @@ class PagerDutyEventProcessor {
                     simulation_source: "chrome-extension-event-definition"
                 }
             }
-        };
+        }, event);
     }
 
     // Create payload for resolve event
@@ -788,13 +823,13 @@ class PagerDutyEventProcessor {
     }
 
     // Send payload to PagerDuty
-    async sendToPagerDuty(payload) {
+    async sendToPagerDuty(payload, endpoint = 'https://events.pagerduty.com/v2/enqueue') {
         console.log("[Event Processor] 🚀 SENDING PAYLOAD TO PAGERDUTY!");
         console.log("[Event Processor] Payload details:", JSON.stringify(payload, null, 2));
         
         try {
-            console.log("[Event Processor] 🌐 Making API request to https://events.pagerduty.com/v2/enqueue");
-            const response = await fetch('https://events.pagerduty.com/v2/enqueue', {
+            console.log(`[Event Processor] Making API request to ${endpoint}`);
+            const response = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

@@ -59,7 +59,7 @@ const pd = https.createServer({ key: fs.readFileSync(path.join(certDir, 'key.pem
   req.on('end', () => {
     let json = {};
     try { json = JSON.parse(body); } catch (e) { /* keep raw */ }
-    events.push({ t: Date.now(), json });
+    events.push({ t: Date.now(), path: req.url, json });
     res.writeHead(202, { 'Content-Type': 'application/json', ...cors });
     res.end(JSON.stringify({ status: 'success', message: 'Event processed', dedup_key: json.dedup_key || 'mock' }));
   });
@@ -391,6 +391,33 @@ await test('stagger: second scenario starts ~5s after the first', async () => {
   const api = events.find(e => e.json?.payload?.summary === 'API p95 high')?.t;
   if (!db || !api) throw new Error('scenario events missing');
   if (api - db < 4500) throw new Error(`not staggered (${api - db}ms)`);
+});
+
+await test('shipped scenarios: DDoS + payments storm, real change events', async () => {
+  await sw(async () => {
+    const text = await (await fetch(chrome.runtime.getURL('sample-event-definition.json'))).text();
+    await chrome.storage.local.set({ event_definition: text });
+  });
+  await settings({ run_scenario_on_submit: true, active_scenario_ids: ['ddos_attack', 'payments_alert_storm'], active_scenario_id: 'ddos_attack' });
+  const p = await open(`${A}/button`);
+  await clickIn(p, '#b');
+  const scenarioAlerts = () => triggers().filter(e => !String(e.json.payload.source).startsWith('http'));
+  for (let i = 0; i < 80 && scenarioAlerts().length < 14; i++) await sleep(500);
+  const changes = events.filter(e => e.path === '/v2/change/enqueue');
+  eq(changes.length, 2, 'change events on /v2/change/enqueue');
+  const deploy = changes.find(e => e.json.payload.summary.startsWith('Deployed payment-processor'));
+  if (!deploy) throw new Error('deploy change missing');
+  if ('event_action' in deploy.json || 'severity' in deploy.json.payload) throw new Error('change payload has trigger-only fields');
+  const ago = (Date.now() - Date.parse(deploy.json.payload.timestamp)) / 60000;
+  if (ago < 185 || ago > 195) throw new Error(`deploy timestamp ${ago.toFixed(1)} min ago, want ~190`);
+  eq(deploy.json.links.length, 2, 'deploy links');
+  const t = scenarioAlerts();
+  eq(t.length, 14, 'alerts (1 DDoS + 13 storm)');
+  if (t.some(e => e.path !== '/v2/enqueue')) throw new Error('alert sent to wrong endpoint');
+  const ddos = t.find(e => e.json.payload.class === 'ddos-attack');
+  eq([ddos.json.payload.source, ddos.json.payload.custom_details.service, ddos.json.payload.custom_details.requests_per_second],
+     ['cloudflare-security', 'Security', 45000], 'DDoS payload');
+  eq(new Set(t.map(e => e.json.dedup_key)).size, 14, 'unique dedup keys');
 });
 
 await test('panel: opens, new font renders, multi-select run', async () => {
