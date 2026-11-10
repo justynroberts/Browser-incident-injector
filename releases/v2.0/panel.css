@@ -1,0 +1,353 @@
+/* MIT License - Copyright (c) fintonlabs.com */
+/*
+ * Incident Injector panel — "on-call console".
+ * Injected straight into the host page DOM, so every selector is anchored on
+ * #incident-injector-panel and the block below resets what host CSS may leak in.
+ * Direction, tokens and rationale: ../DESIGN.md
+ */
+
+@font-face { font-family: 'II Plex Sans'; src: url('./fonts/IBMPlexSans-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: 'II Plex Sans'; src: url('./fonts/IBMPlexSans-Medium.woff2') format('woff2'); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: 'II Plex Sans'; src: url('./fonts/IBMPlexSans-SemiBold.woff2') format('woff2'); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: 'II Plex Mono'; src: url('./fonts/IBMPlexMono-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
+
+#incident-injector-panel {
+    --ii-bg: #0c0e0d;
+    --ii-bg-2: #121513;
+    --ii-bg-3: #191d1b;
+    --ii-line: #232826;
+    --ii-line-2: #343a37;
+    --ii-text: #e8ecea;
+    --ii-text-2: #a8b0ac;
+    --ii-text-3: #7d8581;
+    --ii-accent: #06ac38;          /* PagerDuty green — the only accent */
+    --ii-accent-ink: #0c0e0d;
+    --ii-danger: #f0646b;          /* state only: errors, triggered */
+    --ii-warn: #e3b450;            /* state only: warnings */
+    --ii-radius: 3px;
+    --ii-ease: 140ms ease-out;
+    --ii-font: 'II Plex Sans', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --ii-mono: 'II Plex Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --ii-w: 360px;
+}
+
+/* ---------- reset (host-page CSS leaks into injected DOM) ---------- */
+#incident-injector-panel,
+#incident-injector-panel * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font: inherit;
+    font-family: var(--ii-font);
+    color: inherit;
+    letter-spacing: 0;
+    text-transform: none;
+    text-shadow: none;
+    box-shadow: none;
+    background: none;
+    float: none;
+    min-width: 0;
+    max-width: none;
+    line-height: inherit;
+    text-align: left;
+}
+#incident-injector-panel svg {
+    width: 16px; height: 16px; flex: none;
+    fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: square;
+}
+#incident-injector-panel ol,
+#incident-injector-panel ul { list-style: none; }
+#incident-injector-panel b { font-weight: 600; }
+#incident-injector-panel code,
+#incident-injector-panel .ii-mono { font-family: var(--ii-mono); font-size: 12px; }
+#incident-injector-panel a { color: var(--ii-text-2); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+#incident-injector-panel a:hover { color: var(--ii-text); }
+#incident-injector-panel button { cursor: pointer; }
+#incident-injector-panel :focus-visible { outline: 2px solid var(--ii-accent); outline-offset: 1px; }
+
+/* ---------- shell ---------- */
+#incident-injector-panel {
+    position: fixed;
+    top: 0;
+    right: calc(-1 * var(--ii-w) - 24px);
+    width: var(--ii-w);
+    height: 100vh;
+    z-index: 2147483000;
+    display: flex;
+    flex-direction: column;
+    background: var(--ii-bg);
+    border-left: 1px solid var(--ii-line-2);
+    color: var(--ii-text);
+    font-family: var(--ii-font);
+    font-size: 13px;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+    transition: right 160ms ease-out;
+    overflow: hidden;
+}
+#incident-injector-panel.visible { right: 0; }
+
+/* ---------- header ---------- */
+#incident-injector-panel .ii-head {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 48px; padding: 0 8px 0 16px;
+    border-bottom: 1px solid var(--ii-line);
+}
+#incident-injector-panel .ii-brand { display: flex; align-items: center; gap: 8px; }
+#incident-injector-panel .ii-mark {
+    width: 8px; height: 16px; background: var(--ii-text-3);
+    transition: background var(--ii-ease);
+}
+#incident-injector-panel.ii-armed .ii-mark { background: var(--ii-accent); }
+#incident-injector-panel .ii-name { font-weight: 600; font-size: 15px; }
+#incident-injector-panel .ii-head-tools { display: flex; gap: 0; }
+#incident-injector-panel .ii-icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: var(--ii-radius);
+    color: var(--ii-text-3);
+    transition: color var(--ii-ease), background var(--ii-ease);
+}
+#incident-injector-panel .ii-icon-btn:hover { color: var(--ii-text); background: var(--ii-bg-3); }
+
+/* ---------- armed bar: the recognisable bit ---------- */
+#incident-injector-panel .ii-armbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    height: 48px; padding: 0 16px;
+    background: var(--ii-bg-2);
+    border-bottom: 2px solid var(--ii-line);
+    transition: border-color var(--ii-ease);
+}
+#incident-injector-panel.ii-armed .ii-armbar { border-bottom-color: var(--ii-accent); }
+#incident-injector-panel .ii-armbar-label { font-weight: 600; }
+#incident-injector-panel .ii-status {
+    display: flex; align-items: center; gap: 8px;
+    color: var(--ii-text-2); font-size: 11px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: .06em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#incident-injector-panel .ii-status #status-text { overflow: hidden; text-overflow: ellipsis; }
+#incident-injector-panel .status-dot { width: 8px; height: 8px; flex: none; background: var(--ii-text-3); }
+#incident-injector-panel .status-dot.active { background: var(--ii-accent); }
+#incident-injector-panel .status-dot.warning { background: var(--ii-warn); }
+#incident-injector-panel .status-dot.inactive { background: var(--ii-text-3); }
+
+/* ---------- body ---------- */
+#incident-injector-panel .ii-body {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    display: flex; flex-direction: column;
+    scrollbar-width: thin; scrollbar-color: var(--ii-line-2) transparent;
+}
+
+/* ---------- sections ---------- */
+#incident-injector-panel .ii-sec { border-bottom: 1px solid var(--ii-line); }
+#incident-injector-panel .ii-sec-head {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; min-height: 40px; padding: 0 16px;
+    color: var(--ii-text);
+}
+#incident-injector-panel .ii-toggle { transition: background var(--ii-ease); }
+#incident-injector-panel .ii-toggle:hover { background: var(--ii-bg-2); }
+#incident-injector-panel .ii-h {
+    font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ii-text-2);
+}
+#incident-injector-panel .ii-meta {
+    font-size: 11px; color: var(--ii-text-3); font-weight: 400;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#incident-injector-panel .ii-sec-head .ii-meta { flex: 1; text-align: right; }
+#incident-injector-panel .ii-sec-tools { display: flex; gap: 8px; }
+#incident-injector-panel .ii-chev { color: var(--ii-text-3); }
+#incident-injector-panel .ii-chev-d,
+#incident-injector-panel .ii-toggle:not(.collapsed) .ii-chev-r { display: none; }
+#incident-injector-panel .ii-toggle:not(.collapsed) .ii-chev-d { display: inline; }
+#incident-injector-panel .section-content { padding: 0 16px 16px; }
+#incident-injector-panel .section-content.collapsed { display: none; }
+
+#incident-injector-panel .ii-link {
+    font-size: 11px; color: var(--ii-text-2); padding: 4px 0;
+    text-decoration: underline; text-underline-offset: 2px;
+}
+#incident-injector-panel .ii-link:hover { color: var(--ii-text); }
+
+/* ---------- scenario list (incident-list rows) ---------- */
+#incident-injector-panel .ii-list {
+    max-height: 288px; overflow-y: auto;
+    border-top: 1px solid var(--ii-line);
+    scrollbar-width: thin; scrollbar-color: var(--ii-line-2) transparent;
+}
+#incident-injector-panel .ii-empty { padding: 16px; color: var(--ii-text-3); }
+#incident-injector-panel .ii-scn {
+    position: relative;
+    display: grid; grid-template-columns: 16px 1fr auto; gap: 4px 12px; align-items: start;
+    padding: 8px 16px 8px 16px;
+    border-bottom: 1px solid var(--ii-line);
+    cursor: pointer;
+    transition: background var(--ii-ease);
+}
+#incident-injector-panel .ii-scn::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: transparent; transition: background var(--ii-ease);
+}
+#incident-injector-panel .ii-scn:hover { background: var(--ii-bg-2); }
+#incident-injector-panel .ii-scn.is-on { background: var(--ii-bg-2); }
+#incident-injector-panel .ii-scn.is-on::before { background: var(--ii-accent); }
+#incident-injector-panel .ii-scn.is-running::before { background: var(--ii-danger); }
+#incident-injector-panel .ii-scn-name { font-weight: 500; color: var(--ii-text); line-height: 16px; }
+#incident-injector-panel .ii-scn-desc {
+    grid-column: 2 / 4; color: var(--ii-text-3); font-size: 11px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+#incident-injector-panel .ii-scn-count { color: var(--ii-text-3); font-size: 11px; line-height: 16px; }
+
+/* checkbox (custom box, real input) */
+#incident-injector-panel .ii-check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--ii-text-2); font-size: 11px; }
+#incident-injector-panel .ii-check input,
+#incident-injector-panel .ii-scn input,
+#incident-injector-panel .ii-switch input {
+    position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none;
+}
+#incident-injector-panel .ii-box {
+    position: relative; width: 16px; height: 16px; flex: none;
+    border: 1px solid var(--ii-line-2); border-radius: 2px; background: var(--ii-bg);
+    transition: background var(--ii-ease), border-color var(--ii-ease);
+}
+#incident-injector-panel input:checked + .ii-box { background: var(--ii-accent); border-color: var(--ii-accent); }
+#incident-injector-panel input:checked + .ii-box::after {
+    content: ''; position: absolute; left: 4px; top: 1px; width: 5px; height: 9px;
+    border: solid var(--ii-accent-ink); border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+#incident-injector-panel input:focus-visible + .ii-box,
+#incident-injector-panel input:focus-visible + .ii-switch-track { outline: 2px solid var(--ii-accent); outline-offset: 2px; }
+
+/* ---------- run row ---------- */
+#incident-injector-panel .ii-runrow { display: flex; align-items: center; gap: 16px; padding: 16px 16px 8px; }
+#incident-injector-panel .ii-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 32px; padding: 0 12px; border-radius: var(--ii-radius);
+    border: 1px solid var(--ii-line-2); color: var(--ii-text);
+    font-weight: 500; white-space: nowrap;
+    transition: background var(--ii-ease), border-color var(--ii-ease), color var(--ii-ease);
+}
+#incident-injector-panel .ii-btn:hover { background: var(--ii-bg-3); }
+#incident-injector-panel .ii-btn-primary { flex: 1; height: 40px; background: var(--ii-accent); border-color: var(--ii-accent); color: var(--ii-accent-ink); font-weight: 600; }
+#incident-injector-panel .ii-btn-primary svg { fill: currentColor; stroke: none; }
+#incident-injector-panel .ii-btn-primary:hover { background: #079b33; }
+#incident-injector-panel .ii-btn:disabled { background: var(--ii-bg-3); border-color: var(--ii-line-2); color: var(--ii-text-3); cursor: not-allowed; }
+#incident-injector-panel .ii-btnrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+#incident-injector-panel .ii-btnrow .ii-btn { padding: 0 4px; font-size: 12px; }
+
+/* result + validation lines */
+#incident-injector-panel .test-result { padding: 0 16px 16px; min-height: 0; font-size: 12px; color: var(--ii-text-2); }
+#incident-injector-panel .test-result:empty { padding-bottom: 8px; }
+#incident-injector-panel .test-result.success { color: var(--ii-accent); }
+#incident-injector-panel .test-result.error { color: var(--ii-danger); }
+#incident-injector-panel .test-result.warning { color: var(--ii-warn); }
+#incident-injector-panel .validation-message { margin-top: 4px; font-size: 11px; color: var(--ii-text-3); }
+#incident-injector-panel .validation-message:empty { display: none; }
+#incident-injector-panel .validation-message.valid { color: var(--ii-accent); }
+#incident-injector-panel .validation-message.invalid,
+#incident-injector-panel .validation-message.error { color: var(--ii-danger); }
+
+/* ---------- running block ---------- */
+#incident-injector-panel .ii-running { padding: 12px 16px; background: var(--ii-bg-2); border-bottom: 1px solid var(--ii-line); }
+#incident-injector-panel .ii-running-row { display: flex; align-items: baseline; gap: 8px; }
+#incident-injector-panel .ii-running-tag {
+    font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ii-danger);
+}
+#incident-injector-panel .ii-running-name { color: var(--ii-text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#incident-injector-panel .ii-meter { height: 2px; margin-top: 8px; background: var(--ii-line-2); }
+#incident-injector-panel .ii-meter-fill { height: 2px; width: 0; background: var(--ii-danger); transition: width 180ms ease-out; }
+#incident-injector-panel .ii-running-list { margin-top: 8px; }
+#incident-injector-panel .ii-running-list:empty { display: none; }
+#incident-injector-panel .ii-running-list li {
+    display: flex; justify-content: space-between; gap: 8px;
+    font-size: 11px; color: var(--ii-text-2); line-height: 20px;
+}
+#incident-injector-panel .ii-running-list li span:last-child { color: var(--ii-text-3); }
+#incident-injector-panel .ii-running-list li.done span:last-child { color: var(--ii-accent); }
+#incident-injector-panel .ii-running-list li.failed span:last-child { color: var(--ii-danger); }
+
+/* ---------- setting rows + switches ---------- */
+#incident-injector-panel .ii-rows { border-top: 1px solid var(--ii-line); margin-bottom: 8px; }
+#incident-injector-panel .ii-row {
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 8px 0; border-bottom: 1px solid var(--ii-line);
+}
+#incident-injector-panel .ii-row-title { font-weight: 500; }
+#incident-injector-panel .ii-row-sub { font-size: 11px; color: var(--ii-text-3); }
+#incident-injector-panel .ii-switch { position: relative; display: inline-flex; align-items: center; gap: 12px; cursor: pointer; }
+#incident-injector-panel .ii-switch-track {
+    position: relative; width: 32px; height: 16px; flex: none;
+    border-radius: 2px; background: var(--ii-line-2);
+    transition: background var(--ii-ease);
+}
+#incident-injector-panel .ii-switch-track::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px;
+    border-radius: 1px; background: var(--ii-text-2);
+    transition: transform var(--ii-ease), background var(--ii-ease);
+}
+#incident-injector-panel .ii-switch input:checked + .ii-switch-track { background: var(--ii-accent); }
+#incident-injector-panel .ii-switch input:checked + .ii-switch-track::after { transform: translateX(16px); background: var(--ii-accent-ink); }
+
+/* ---------- fields ---------- */
+#incident-injector-panel .ii-field { margin-top: 12px; }
+#incident-injector-panel .ii-field label { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 500; color: var(--ii-text-2); }
+#incident-injector-panel .ii-hint { color: var(--ii-text-3); font-weight: 400; margin-left: 4px; }
+#incident-injector-panel input[type="text"],
+#incident-injector-panel textarea {
+    display: block; width: 100%;
+    padding: 8px; border-radius: var(--ii-radius);
+    background: var(--ii-bg); border: 1px solid var(--ii-line-2);
+    color: var(--ii-text); font-size: 13px; line-height: 1.4;
+    resize: vertical; outline: none;
+    transition: border-color var(--ii-ease);
+}
+#incident-injector-panel input.ii-mono,
+#incident-injector-panel textarea.ii-mono { font-family: var(--ii-mono); font-size: 12px; }
+#incident-injector-panel input[type="text"]:focus,
+#incident-injector-panel textarea:focus { border-color: var(--ii-accent); }
+#incident-injector-panel ::placeholder { color: var(--ii-text-3); opacity: 1; }
+
+/* ---------- footer ---------- */
+#incident-injector-panel .ii-foot {
+    display: flex; gap: 16px; align-items: center;
+    margin-top: auto; padding: 12px 16px; font-size: 11px;
+}
+#incident-injector-panel .ii-foot-ver { margin-left: auto; color: var(--ii-text-3); }
+
+/* ---------- sheets (help / about) ---------- */
+#incident-injector-panel .ii-sheet {
+    position: absolute; inset: 0; z-index: 2;
+    background: rgba(12, 14, 13, .86);
+}
+#incident-injector-panel .ii-sheet-body {
+    position: absolute; left: 0; right: 0; top: 48px;
+    padding: 16px; background: var(--ii-bg-2);
+    border-top: 1px solid var(--ii-line-2); border-bottom: 1px solid var(--ii-line-2);
+}
+#incident-injector-panel .ii-sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+#incident-injector-panel .ii-sheet h2 { font-size: 15px; font-weight: 600; }
+#incident-injector-panel .ii-sheet p { color: var(--ii-text-2); margin-top: 8px; }
+#incident-injector-panel .ii-steps { counter-reset: s; }
+#incident-injector-panel .ii-steps li { counter-increment: s; position: relative; padding: 4px 0 4px 24px; color: var(--ii-text-2); }
+#incident-injector-panel .ii-steps li::before { content: counter(s); position: absolute; left: 0; color: var(--ii-text-3); }
+#incident-injector-panel .ii-steps b { color: var(--ii-text); }
+
+@media (prefers-reduced-motion: reduce) {
+    #incident-injector-panel,
+    #incident-injector-panel *,
+    #incident-injector-panel *::before,
+    #incident-injector-panel *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+}
+
+@media (max-width: 420px) {
+    #incident-injector-panel { --ii-w: 100vw; }
+}

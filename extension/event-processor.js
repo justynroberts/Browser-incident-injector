@@ -283,23 +283,19 @@ class PagerDutyEventProcessor {
             // New schema format - scenarioNameOrIndex should be an index or name
             let eventDefinition;
             
-            // If it's a number, use it as an index
-            if (!isNaN(parseInt(scenarioNameOrIndex))) {
-                const index = parseInt(scenarioNameOrIndex);
-                eventDefinition = this.currentDefinition.event_definitions[index];
-                if (!eventDefinition) {
-                    console.error(`[Event Processor] Event definition at index ${index} not found`);
-                    return false;
-                }
-            } else {
-                // Otherwise, look it up by name or id
-                eventDefinition = this.currentDefinition.event_definitions.find(
-                    def => def.name === scenarioNameOrIndex || def.id === scenarioNameOrIndex
-                );
-                if (!eventDefinition) {
-                    console.error(`[Event Processor] Event definition '${scenarioNameOrIndex}' not found`);
-                    return false;
-                }
+            // Match by id or name first; fall back to a numeric index only for
+            // pure digits. (parseInt('1-db-outage') === 1 used to pick the
+            // wrong definition for ids that start with a digit.)
+            const key = String(scenarioNameOrIndex);
+            eventDefinition = this.currentDefinition.event_definitions.find(
+                def => def.id === key || def.name === key
+            );
+            if (!eventDefinition && /^\d+$/.test(key)) {
+                eventDefinition = this.currentDefinition.event_definitions[parseInt(key, 10)];
+            }
+            if (!eventDefinition) {
+                console.error(`[Event Processor] Event definition '${key}' not found`);
+                return false;
             }
             
             console.log(`[Event Processor] Running event definition: ${eventDefinition.name || 'unnamed'}`);

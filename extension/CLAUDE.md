@@ -2,87 +2,40 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+The repo-root `../CLAUDE.md` has the architecture, interception rules, test suite and release steps. Read it first. This file only covers what lives in this folder.
 
-Incident Injector is a Chrome extension (Manifest V3) for incident response training. It intercepts form submissions and button clicks on websites to trigger PagerDuty alerts, display custom error pages, and simulate realistic incident scenarios.
+## Files
 
-## Architecture
+- `background.js`: the service worker. It handles incidents (`create_incident`) and scenario runs (`run_scenario` from the panel, `run_active_scenario` from an intercept). Both of those go through `runScenarioSet()`.
+- `content.js`: runs at `document_start` in every frame. From top to bottom it contains:
+  - the Trusted Types helper
+  - settings load and `onChanged` sync
+  - the interception core (`findTarget`, `trigger`, `replayAction`, the 500 page)
+  - panel injection and the postMessage relay handlers (`handle*Request`)
+- `panel.html` / `panel.css` / `panel.js`: the slide-out panel. `content.js` fetches `panel.html` and injects the inner `.incident-injector-panel` markup into the page. `panel.js` is loaded as a main-world `<script>`.
+- `event-processor.js`: the `PagerDutyEventProcessor` class plus a shared singleton. Scenario runs create their own instances.
+- `fonts/`: IBM Plex Sans (400/500/600) and Plex Mono (400). The licence is in `OFL.txt`.
 
-### Core Components
+## Panel conventions
 
-- **background.js** - Service worker handling extension lifecycle, PagerDuty API calls, and scenario execution orchestration
-- **content.js** - Injected into web pages; handles click/form interception, panel injection, and communicates with background via `chrome.runtime.sendMessage`
-- **panel.js** - Slide-out panel UI logic; manages settings, scenario selection, and triggers. Runs in an iframe context with message relay for Chrome API access
-- **event-processor.js** - PagerDuty event scenario engine; processes event definitions, handles variable templating (`{{variable}}`), and sends events to PagerDuty Events API v2
-- **panel.html/panel.css** - Panel UI structure and styling
+- **Scenario list:** scenarios render as `#scenario-list .ii-scn` rows, each with an `input[data-scenario-id]` checkbox. `getSelectedScenarioIds()` reads the selection, and `persistScenarioSelection()` saves `active_scenario_ids` along with `active_scenario_id`.
+- **Collapsible sections:** a section head is a `button.toggle-button#toggle-X` that controls `#X-content`. The `collapsed` class toggles both, and `aria-expanded` follows it.
+- **`initConsoleUi()`** handles:
+  - the armed state (the `ii-armed` class on the panel)
+  - section summaries
+  - All/None, Format JSON, and the About sheet (the "Made by FintonLabs" info button)
+  - the running-state relay (`scenario_running_update`)
+- **Result lines:** `.test-result` gets its className replaced wholesale (`test-result success|error|warning`). Don't put extra classes on it.
+- **Look:** `../DESIGN.md` defines it: near-black, PagerDuty green `#06AC38` as the only accent, IBM Plex, no shadows, radius ≤ 3px.
 
-### Key Communication Patterns
+## Key settings (`chrome.storage.sync`)
 
-1. **Panel ↔ Content Script**: Uses `window.postMessage` with `source: 'incident-injector-panel'` or `source: 'incident-injector-content'` for settings relay when Chrome APIs unavailable in iframe context
-2. **Content ↔ Background**: Uses `chrome.runtime.sendMessage` with action-based routing (`create_incident`, `run_scenario`, `run_active_scenario`, etc.)
-3. **Settings Storage**: `chrome.storage.sync` for user preferences, `chrome.storage.local` for event definitions. localStorage used as fallback for persistence across extension reloads
-
-### Event Definition Schema
-
-Supports two formats:
-- **New schema** (v1.0): `event_definitions` array with `id`, `name`, `description`, `variables`, and `events`
-- **Legacy schema**: `scenarios` object keyed by scenario ID
-
-Events support types: `trigger`, `acknowledge`, `resolve` with template variables and configurable delays.
-
-## Development
-
-### Loading the Extension
-
-1. Navigate to `chrome://extensions/`
-2. Enable "Developer mode"
-3. Click "Load unpacked" and select this `extension` folder
-
-### Testing Changes
-
-- Reload extension via chrome://extensions after modifying background.js or content.js
-- For panel changes, close and reopen the panel
-- Use browser console for debugging (filter logs by `[Incident Injector]` or `[PagerDuty Simulator]`)
-- Debug click interception: `window.debugClickInterception()` in page console
-
-### Key Settings
-
-Settings stored in `chrome.storage.sync`:
-- `integration_key` - 32-char PagerDuty Events API v2 key
-- `extension_enabled` - Master on/off toggle
-- `trigger_on_click_enabled` - Click interception toggle
-- `target_element_texts` - Comma-separated button texts to intercept
-- `show_alert`, `redirect_to_500`, `trigger_crux`, `allow_form_continuation` - Trigger behaviors
-- `active_scenario_id` - Currently selected scenario
-
-## Important Patterns
-
-### Extension Context Detection
-
-Panel.js uses `isExtensionContext()` to detect if Chrome APIs are available. When running in page context (iframe), it falls back to message relay through content.js.
-
-### Click & Form Interception
-
-Content.js matches clicked elements and form submit buttons against `targetElementTexts` (case-insensitive). When matched:
-1. Prevents default action (unless `allow_form_continuation` enabled)
-2. Optionally shows alert, runs scenario, redirects to 500 page, or triggers Crux event
-3. Creates PagerDuty incident via background script
-
-**Important**: If `targetElementTexts` is configured, ONLY elements/buttons matching those texts will trigger incidents. If empty, no interception occurs.
-
-### Scenario Execution
-
-Event processor sends events in batches (`maxConcurrentEvents: 3`) with retries (`maxRetries: 3`). Progress updates sent via `updateScenarioProgress` action.
-
-### Auto-save Behavior
-
-Settings are automatically saved:
-- When closing the panel (X button)
-- Before running a scenario
-- Uses `autoSaveAllSettings()` in panel.js
-
-### Font & Icon Loading
-
-- **DM Sans** font loaded from Google Fonts CDN
-- **Font Awesome 6** loaded from cdnjs CDN
-- Fallback to bundled Space Grotesk and Unicode icons if CDN blocked by CSP
+| Key | Purpose |
+|---|---|
+| `integration_key` | 32-char Events API v2 routing key |
+| `extension_enabled` | Master switch, shown as "Injection" in the panel |
+| `trigger_on_click_enabled` | Click interception |
+| `target_element_texts` | Comma-separated labels to match |
+| `show_alert`, `redirect_to_500`, `trigger_crux`, `allow_form_continuation`, `run_scenario_on_submit` | What happens on a match |
+| `active_scenario_ids` / `active_scenario_id` | Ticked scenarios / first of them, kept for older readers |
+| `run_stagger` | Start ticked scenarios 5s apart instead of together |

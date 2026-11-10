@@ -1,6 +1,13 @@
 // Incident Injector - Content Script
 (function() {
     'use strict';
+
+    // Page localStorage throws in sandboxed frames and on opaque origins;
+    // never let that abort the script. chrome.storage.sync stays the source of truth.
+    const safeStorage = {
+        get(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } },
+        set(key, value) { try { window.localStorage.setItem(key, value); } catch (e) { /* ignore */ } }
+    };
     
     // Prevent multiple executions of the content script
     if (window.incidentInjectorLoaded) {
@@ -105,8 +112,8 @@
     console.log('[Incident Injector] Loading content script...');
 
     // Check localStorage for persisted state before applying defaults
-    const savedExtensionEnabled = localStorage.getItem('incident_injector_extension_enabled');
-    const savedTriggerOnClick = localStorage.getItem('incident_injector_trigger_on_click');
+    const savedExtensionEnabled = safeStorage.get('incident_injector_extension_enabled');
+    const savedTriggerOnClick = safeStorage.get('incident_injector_trigger_on_click');
 
     // Use saved state if available, otherwise default to true (enabled for immediate use)
     let extensionEnabled = savedExtensionEnabled !== null ? savedExtensionEnabled === 'true' : true;
@@ -118,10 +125,6 @@
     let cruxUrl = ''; // Crux event URL
     let customAlertMessage = "Error: UX Failure - Our team are working on it now.";
     let targetElementTexts = []; // Will be loaded from storage with sensible defaults
-    let lastSubmissionTime = 0;
-    const SUBMISSION_COOLDOWN = 0; // No cooldown - allow immediate resubmission
-    let lastProcessedElement = null;
-    let lastProcessedTime = 0;
     let triggerOnClickEnabled = savedTriggerOnClick !== null ? savedTriggerOnClick === 'true' : true; // Use saved state or default to true
 
     // Load extension settings
@@ -142,11 +145,11 @@
         if (result.extension_enabled !== undefined) {
             extensionEnabled = result.extension_enabled;
             // Save to localStorage for persistence
-            localStorage.setItem('incident_injector_extension_enabled', extensionEnabled.toString());
+            safeStorage.set('incident_injector_extension_enabled', extensionEnabled.toString());
         } else if (savedExtensionEnabled === null) {
             // No stored value anywhere, use true as default (enabled)
             extensionEnabled = true;
-            localStorage.setItem('incident_injector_extension_enabled', 'true');
+            safeStorage.set('incident_injector_extension_enabled', 'true');
         }
         // Otherwise keep the localStorage value we loaded initially
         showAlert = result.show_alert === true; // Default to false - must be explicitly enabled
@@ -196,11 +199,11 @@
         if (result.trigger_on_click_enabled !== undefined) {
             triggerOnClickEnabled = result.trigger_on_click_enabled;
             // Save to localStorage for persistence
-            localStorage.setItem('incident_injector_trigger_on_click', triggerOnClickEnabled.toString());
+            safeStorage.set('incident_injector_trigger_on_click', triggerOnClickEnabled.toString());
         } else if (savedTriggerOnClick === null) {
             // No stored value anywhere, use true as default (enabled with sensible defaults)
             triggerOnClickEnabled = true;
-            localStorage.setItem('incident_injector_trigger_on_click', 'true');
+            safeStorage.set('incident_injector_trigger_on_click', 'true');
         }
         // Otherwise keep the localStorage value we loaded initially
         
@@ -220,28 +223,18 @@
     // Listen for messages from background script (for panel toggle)
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.action === 'toggle_panel') {
+            // all_frames: only the top frame owns the panel
+            if (window.top !== window) return false;
             console.log('[Incident Injector] Received panel toggle message');
             
-            try {
-                const existingPanel = document.getElementById('incident-injector-panel');
-                if (!existingPanel) {
-                    console.log('[Incident Injector] Creating new panel...');
-                    createPanel();
-                    // Wait a bit longer for panel to be created and styled
-                    setTimeout(() => {
-                        showPanel();
-                        sendResponse({ success: true });
-                    }, 200);
-                } else {
-                    console.log('[Incident Injector] Toggling existing panel...');
-                    togglePanel();
-                    sendResponse({ success: true });
-                }
-                return true; // Keep message channel open for async response
-            } catch (error) {
-                console.error('[Incident Injector] Error handling panel toggle:', error);
-                sendResponse({ success: false, error: error.message });
-            }
+            Promise.resolve()
+                .then(() => togglePanel())
+                .then(() => sendResponse({ success: true }))
+                .catch(error => {
+                    console.error('[Incident Injector] Error handling panel toggle:', error);
+                    sendResponse({ success: false, error: error.message });
+                });
+            return true; // Keep message channel open for async response
         }
     });
 
@@ -252,7 +245,7 @@
                 const wasEnabled = extensionEnabled;
                 extensionEnabled = changes.extension_enabled.newValue;
                 // Save to localStorage for persistence
-                localStorage.setItem('incident_injector_extension_enabled', extensionEnabled.toString());
+                safeStorage.set('incident_injector_extension_enabled', extensionEnabled.toString());
                 
                 // Reinitialize listeners when extension state changes
                 if (wasEnabled !== extensionEnabled) {
@@ -340,7 +333,7 @@
             if (changes.trigger_on_click_enabled) {
                 triggerOnClickEnabled = changes.trigger_on_click_enabled.newValue;
                 // Save to localStorage for persistence
-                localStorage.setItem('incident_injector_trigger_on_click', triggerOnClickEnabled.toString());
+                safeStorage.set('incident_injector_trigger_on_click', triggerOnClickEnabled.toString());
                 console.log('[Incident Injector] Click interception toggled:', triggerOnClickEnabled);
                 // Reinitialize listeners to respect the new setting
                 reinitializeListeners();
@@ -349,12 +342,11 @@
     });
 
     // Reinitialize listeners (remove old ones and add new ones)
+    // Kept for the many call sites that run after a settings change. The
+    // listeners themselves are attached once at document_start and read the
+    // live settings on every event, so nothing is removed and re-added
+    // (re-adding would queue us behind the page's own window listeners).
     function reinitializeListeners() {
-        // Remove existing listeners
-        document.removeEventListener('submit', handleFormSubmission, true);
-        document.removeEventListener('click', handleElementClick, true);
-        
-        // Add listeners based on current configuration
         initializeListeners();
     }
 
@@ -371,242 +363,176 @@
         };
     }
 
-    // Check if form should be ignored
-    function shouldIgnoreForm(form) {
-        if (!form) return true;
-        
-        // Ignore search forms
-        if (form.method && form.method.toLowerCase() === 'get') {
-            const action = form.action || '';
-            if (action.includes('search') || action.includes('query') || action.includes('find')) {
-                return true;
-            }
-        }
+    // =====================================================================
+    // Interception core
+    //
+    // One path for every trigger. Clicks are caught on `window` in the capture
+    // phase (before site handlers on document/body), targets are resolved
+    // through event.composedPath() so open shadow DOM works, and synthetic
+    // clicks (`isTrusted === false`) are ignored so our own replays can never
+    // loop. A submit that follows a click we already handled is not counted
+    // twice.
+    // =====================================================================
 
-        // Ignore newsletter signup forms (basic detection)
-        const formHTML = form.innerHTML.toLowerCase();
-        if (formHTML.includes('newsletter') || formHTML.includes('subscribe')) {
-            return true;
-        }
+    const CLICKABLE_SELECTOR = [
+        'button', 'a[href]', 'input[type="submit"]', 'input[type="button"]', 'input[type="image"]',
+        '[role="button"]', '[role="link"]', '[role="menuitem"]', '[role="tab"]', 'summary'
+    ].join(',');
+    const LOOSE_TAGS = new Set(['DIV', 'SPAN', 'LI', 'TD', 'P', 'LABEL', 'IMG', 'SVG']);
+    const MATCH_SLACK = 12;           // "Checkout (3)", "Place order →", "Sign in now"
+    let lastTrigger = { el: null, time: 0 };
+    const replaySubmits = new WeakSet();
 
-        return false;
+    function contextAlive() {
+        try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; }
     }
 
-    // Extract element/form data
+    // A content script left behind by an extension reload still has its
+    // listeners but can no longer talk to the extension. Detach it so it
+    // stops swallowing clicks on that tab.
+    function teardownIfOrphaned() {
+        if (contextAlive()) return false;
+        window.removeEventListener('click', handleElementClick, true);
+        window.removeEventListener('submit', handleFormSubmission, true);
+        console.warn('[Incident Injector] Extension was reloaded — refresh this tab to re-arm it.');
+        return true;
+    }
+
+    function normaliseText(text) {
+        return (text || '').replace(/[\s ​]+/g, ' ').trim().toLowerCase();
+    }
+
+    function escapeRegExp(text) {
+        return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // Visible label of a control: value for inputs, rendered text otherwise,
+    // falling back to aria-label/title for icon-only buttons.
+    function labelOf(el) {
+        if (!el || el.nodeType !== 1) return '';
+        if (el.tagName === 'INPUT') {
+            return normaliseText(el.value || el.getAttribute('aria-label') || el.getAttribute('alt') || el.title);
+        }
+        const visible = normaliseText(typeof el.innerText === 'string' ? el.innerText : el.textContent);
+        return visible || normaliseText(el.getAttribute('aria-label') || el.title || el.getAttribute('alt'));
+    }
+
+    // Exact match, or the target as a whole phrase inside a short label.
+    function labelMatches(label) {
+        if (!label) return null;
+        for (const raw of targetElementTexts) {
+            const target = normaliseText(raw);
+            if (!target) continue;
+            if (label === target) return raw;
+            if (label.length <= target.length + MATCH_SLACK &&
+                new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegExp(target)}($|[^\\p{L}\\p{N}])`, 'u').test(label)) {
+                return raw;
+            }
+        }
+        return null;
+    }
+
+    function isInsideOwnUi(path) {
+        return path.some(n => n && n.id && (n.id === 'incident-injector-panel' || n.id === 'pagerduty-simulator-alert'));
+    }
+
+    // Resolve the control the user actually clicked. Prefer real controls
+    // (button, link, role=button, submit input) anywhere in the composed path;
+    // fall back to short-text div/span "buttons" near the click target, which
+    // many SPAs use without a role.
+    function findTarget(event) {
+        const path = (event.composedPath ? event.composedPath() : [event.target]).filter(n => n && n.nodeType === 1);
+        if (!path.length || isInsideOwnUi(path)) return null;
+
+        for (const el of path) {
+            if (el === document.body || el === document.documentElement) break;
+            if (el.matches && el.matches(CLICKABLE_SELECTOR)) {
+                if (el.tagName === 'INPUT' && !/^(submit|button|image)$/i.test(el.type)) continue;
+                const matched = labelMatches(labelOf(el));
+                if (matched) return { el, matched };
+                return null; // the user clicked a different control
+            }
+        }
+        for (const el of path.slice(0, 4)) {
+            if (!LOOSE_TAGS.has(el.tagName.toUpperCase())) continue;
+            const matched = labelMatches(labelOf(el));
+            if (matched) return { el, matched };
+        }
+        return null;
+    }
+
+    function shouldIgnoreForm(form, submitter) {
+        if (!form) return false;
+        if (form.getAttribute('role') === 'search') return true;
+        const name = labelOf(submitter);
+        return /^(search|subscribe)$/.test(name);
+    }
+
     function extractFormData(form, clickedElement) {
         const element = clickedElement || form;
-        const elementType = element ? element.tagName.toLowerCase() : 'unknown';
-        const elementText = element ? (element.textContent || element.value || element.alt || 'Unknown Element') : 'Unknown';
-        
-        const elementData = {
+        return {
             url: window.location.href,
             title: document.title,
             formAction: form ? (form.action || window.location.href) : (element && element.href) || window.location.href,
             formMethod: form ? (form.method || 'GET') : 'click',
-            buttonText: elementText,
-            elementType: elementType,
+            buttonText: labelOf(element) || 'Unknown Element',
+            elementType: element ? element.tagName.toLowerCase() : 'unknown',
+            frame: window.top === window ? 'top' : 'iframe',
             timestamp: new Date().toISOString(),
             userAgent: navigator.userAgent,
             referrer: document.referrer || 'Direct'
         };
-
-        console.log('[Incident Injector] Element data extracted:', elementData);
-        return elementData;
     }
 
-    // Create incident via background script
     function createIncident(formData) {
-        const now = Date.now();
-        if (now - lastSubmissionTime < SUBMISSION_COOLDOWN) {
-            console.log('[PagerDuty Simulator] Submission ignored due to cooldown');
-            return;
-        }
-        lastSubmissionTime = now;
-
-        safeRuntimeSendMessage({
-            action: "create_incident",
-            data: formData
-        }, (response) => {
+        safeRuntimeSendMessage({ action: 'create_incident', data: formData }, (response) => {
             if (chrome.runtime && chrome.runtime.lastError) {
-                console.error('[PagerDuty Simulator] Error sending message:', chrome.runtime.lastError);
+                console.error('[Incident Injector] Error sending incident:', chrome.runtime.lastError.message);
                 return;
             }
-            
             if (response && response.success) {
-                console.log('[PagerDuty Simulator] Incident created successfully:', response.incidentId);
+                console.log('[Incident Injector] Incident created:', response.incidentId || response.dedupKey || '');
             } else {
-                console.error('[PagerDuty Simulator] Failed to create incident:', response?.error);
+                console.error('[Incident Injector] Failed to create incident:', response?.error);
             }
         });
     }
 
-    // Show alert with fallback for CSP restrictions
+    function runActiveScenarios(elementData) {
+        safeRuntimeSendMessage({ action: 'run_active_scenario', data: elementData }, (response) => {
+            if (chrome.runtime && chrome.runtime.lastError) {
+                console.error('[Incident Injector] Error running scenarios:', chrome.runtime.lastError.message);
+                return;
+            }
+            console.log('[Incident Injector] Scenario run:', response?.message || response?.error);
+        });
+    }
+
+    // Native alert() is blocked in sandboxed frames and suppressed on some
+    // sites; a DOM toast always works.
     function showAlertMessage(message) {
         try {
             alert(message);
         } catch (e) {
-            // Fallback for sites with strict CSP
-            console.warn('[PagerDuty Simulator] Alert blocked by CSP, using console message');
-            console.log(`%c${message}`, 'color: red; font-size: 16px; font-weight: bold;');
-            
-            // Try to create a custom modal as fallback
             createCustomAlert(message);
         }
     }
 
-    // Custom alert modal for CSP-restricted sites
     function createCustomAlert(message) {
-        const existingAlert = document.getElementById('pagerduty-simulator-alert');
-        if (existingAlert) {
-            existingAlert.remove();
-        }
-
+        document.getElementById('pagerduty-simulator-alert')?.remove();
         const alertDiv = document.createElement('div');
         alertDiv.id = 'pagerduty-simulator-alert';
-        
-        // Set styles individually to avoid CSP issues
-        alertDiv.style.position = 'fixed';
-        alertDiv.style.top = '20px';
-        alertDiv.style.right = '20px';
-        alertDiv.style.background = '#ff4444';
-        alertDiv.style.color = 'white';
-        alertDiv.style.padding = '15px';
-        alertDiv.style.borderRadius = '5px';
-        alertDiv.style.zIndex = '999999';
-        alertDiv.style.fontFamily = 'Arial, sans-serif';
-        alertDiv.style.fontSize = '14px';
-        alertDiv.style.maxWidth = '300px';
-        alertDiv.style.boxShadow = '0 4px 8px rgba(0,0,0,0.3)';
-        alertDiv.style.border = '1px solid #cc0000';
-        alertDiv.style.fontWeight = 'bold';
-        
-        alertDiv.textContent = message;
-
-        try {
-            document.body.appendChild(alertDiv);
-        } catch (e) {
-            // If even this fails, just log to console
-            console.error('[PagerDuty Simulator] Could not create alert due to CSP:', e);
-            console.log(`%c${message}`, 'color: red; font-size: 16px; font-weight: bold;');
-            return;
-        }
-
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.parentNode.removeChild(alertDiv);
-            }
-        }, 5000);
-    }
-
-    // Handle form submission
-    function handleFormSubmission(event, clickedElement) {
-        // Exit early if extension is not enabled - don't process anything
-        if (!extensionEnabled) {
-            console.log('[PagerDuty Simulator] Extension disabled, allowing normal form submission');
-            return;
-        }
-
-        const form = event.target.closest('form') || event.target;
-
-        // For forms, check if we should ignore them
-        if (form && shouldIgnoreForm(form)) {
-            console.log('[PagerDuty Simulator] Form ignored');
-            return;
-        }
-
-        // If no target texts are configured, don't intercept any forms
-        if (targetElementTexts.length === 0) {
-            console.log('[PagerDuty Simulator] No target texts configured, allowing normal form submission');
-            return;
-        }
-
-        // Find the submit button that was clicked or the form's submit button
-        const submitButton = clickedElement ||
-            form.querySelector('button[type="submit"], input[type="submit"], button:not([type])');
-
-        if (!submitButton) {
-            console.log('[PagerDuty Simulator] No submit button found, allowing normal submission');
-            return;
-        }
-
-        const buttonText = (submitButton.textContent || submitButton.value || '').toLowerCase().trim();
-        const matchesTarget = targetElementTexts.some(target => {
-            const lowerTarget = target.toLowerCase().trim();
-            return buttonText === lowerTarget || buttonText.includes(lowerTarget);
+        Object.assign(alertDiv.style, {
+            position: 'fixed', top: '16px', right: '16px', zIndex: '2147483646',
+            background: '#0c0e0d', color: '#e8ecea', borderLeft: '3px solid #f0646b',
+            padding: '12px 16px', maxWidth: '320px',
+            font: '500 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
         });
-
-        if (!matchesTarget) {
-            console.log('[PagerDuty Simulator] Form submit button "' + buttonText + '" does not match target texts, allowing normal submission');
-            return;
-        }
-
-        console.log('[PagerDuty Simulator] Form submit button "' + buttonText + '" matches target texts, intercepting');
-
-        // Prevent default action
-        event.preventDefault();
-        event.stopPropagation();
-
-        // Extract and send data
-        const elementData = extractFormData(form, clickedElement);
-        createIncident(elementData);
-
-        // Trigger Crux event if enabled
-        if (triggerCrux && cruxUrl) {
-            triggerCruxEvent();
-        }
-
-        // Run scenario only if the Run Scenario trigger is enabled AND an
-        // active scenario is selected. Previously this fired whenever an
-        // active scenario existed, ignoring the toggle.
-        if (runScenarioOnSubmit) {
-            chrome.storage.sync.get(['active_scenario_id'], (result) => {
-                const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
-                if (hasActiveScenario) {
-                    console.log('[PagerDuty Simulator] Running active scenario on form submission:', result.active_scenario_id);
-                    safeRuntimeSendMessage({
-                        action: "run_active_scenario",
-                        data: elementData
-                    }, (response) => {
-                        if (chrome.runtime && chrome.runtime.lastError) {
-                            console.error('[PagerDuty Simulator] Error running scenario:', chrome.runtime.lastError);
-                            return;
-                        }
-                        if (response && response.success) {
-                            console.log('[PagerDuty Simulator] Scenario executed successfully');
-                        } else {
-                            console.error('[PagerDuty Simulator] Failed to run scenario:', response?.error);
-                        }
-                    });
-                } else {
-                    console.log('[PagerDuty Simulator] Run Scenario enabled but no active scenario set');
-                }
-            });
-        } else {
-            console.log('[PagerDuty Simulator] Run Scenario trigger disabled, skipping');
-        }
-
-        // Show alert only if both extension is enabled AND user has enabled alerts
-        if (extensionEnabled && showAlert) {
-            showAlertMessage(customAlertMessage);
-        }
-
-        // Continue with original action if allowed
-        if (allowFormContinuation) {
-            setTimeout(() => {
-                if (form && form.submit) {
-                    form.removeEventListener('submit', handleFormSubmission);
-                    form.submit();
-                    setTimeout(() => {
-                        form.addEventListener('submit', handleFormSubmission);
-                    }, 100);
-                }
-            }, 1000);
-        }
+        alertDiv.textContent = message;
+        (document.body || document.documentElement).appendChild(alertDiv);
+        setTimeout(() => alertDiv.remove(), 5000);
     }
 
-    // Handle element click incidents
-    // Function to trigger Crux event
     function triggerCruxEvent() {
         if (!triggerCrux || !cruxUrl) {
             console.log('[Incident Injector] Crux not configured or not enabled');
@@ -625,95 +551,104 @@
         });
     }
 
-    function handleElementIncident(event, element) {
-        // Exit early if extension is not enabled
-        if (!extensionEnabled) return;
-
-        // Extract and send data
-        const form = element.closest('form');
-        const elementData = extractFormData(form, element);
-        createIncident(elementData);
-
-        // Trigger Crux event if enabled
-        if (triggerCrux && cruxUrl) {
-            triggerCruxEvent();
-        }
-        
-        // Run scenario only if the Run Scenario trigger is enabled AND an
-        // active scenario is selected.
-        if (runScenarioOnSubmit) {
-            chrome.storage.sync.get(['active_scenario_id'], (result) => {
-                const hasActiveScenario = result.active_scenario_id && result.active_scenario_id.trim() !== '';
-                if (hasActiveScenario) {
-                    console.log('[PagerDuty Simulator] Running active scenario on element click:', result.active_scenario_id);
-                    safeRuntimeSendMessage({
-                        action: "run_active_scenario",
-                        data: elementData
-                    }, (response) => {
-                        if (chrome.runtime && chrome.runtime.lastError) {
-                            console.error('[PagerDuty Simulator] Error running scenario:', chrome.runtime.lastError);
-                            return;
-                        }
-                        if (response && response.success) {
-                            console.log('[PagerDuty Simulator] Scenario executed successfully');
-                        } else {
-                            console.error('[PagerDuty Simulator] Failed to run scenario:', response?.error);
-                        }
-                    });
+    // Re-run the action we blocked (only used when an alert paused it and the
+    // user wants the action to continue afterwards).
+    function replayAction(el, form) {
+        try {
+            const isSubmitter = form && el && (el.type === 'submit' || el.type === 'image' ||
+                (el.tagName === 'BUTTON' && !el.getAttribute('type')));
+            if (form && (isSubmitter || !el)) {
+                replaySubmits.add(form);
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit(isSubmitter ? el : undefined); // runs the site's own onsubmit
                 } else {
-                    console.log('[PagerDuty Simulator] Run Scenario enabled but no active scenario set');
+                    form.submit();
                 }
-            });
-        } else {
-            console.log('[PagerDuty Simulator] Run Scenario trigger disabled on click, skipping');
+                return;
+            }
+            if (el && typeof el.click === 'function') {
+                el.click(); // synthetic: isTrusted === false, so we ignore it
+            }
+        } catch (e) {
+            console.warn('[Incident Injector] Could not continue original action:', e.message);
         }
+    }
 
-        // Show alert only if both extension is enabled AND user has enabled alerts
-        console.log('[PagerDuty Simulator] 🔍 Debug - Click Alert check:', {
-            extensionEnabled,
-            showAlert,
-            customAlertMessage: customAlertMessage?.substring(0, 30) + '...'
-        });
-        
-        if (extensionEnabled && showAlert) {
-            console.log('[PagerDuty Simulator] ✅ Showing custom alert message on click');
-            showAlertMessage(customAlertMessage);
-        } else {
-            console.log('[PagerDuty Simulator] ❌ Not showing alert on click - extensionEnabled:', extensionEnabled, 'showAlert:', showAlert);
-        }
+    function trigger(event, el, form, source, matched) {
+        if (teardownIfOrphaned()) return;
+        lastTrigger = { el, time: Date.now() };
 
-        // Only prevent default if we're actually going to block the action
-        // (show alert, redirect to 500, or NOT allow continuation)
-        const shouldBlockClick = showAlert || redirectTo500 || !allowFormContinuation;
-
-        if (shouldBlockClick) {
-            console.log('[PagerDuty Simulator] 🚫 Preventing default click behavior:', {
-                showAlert,
-                redirectTo500,
-                allowFormContinuation
-            });
+        const block = showAlert || redirectTo500 || !allowFormContinuation;
+        if (block) {
             event.preventDefault();
-            event.stopPropagation();
-        } else {
-            console.log('[PagerDuty Simulator] ✅ Allowing click to proceed normally - only creating incident');
+            event.stopImmediatePropagation();
         }
 
-        // Handle post-alert actions
-        const delay = showAlert ? 1000 : 100; // Shorter delay if no alert
-        setTimeout(() => {
-            console.log('[PagerDuty Simulator] 🔍 Debug - Post-click actions:', {
-                redirectTo500,
-                allowFormContinuation,
-                extensionEnabled
-            });
+        const elementData = extractFormData(form, el);
+        elementData.matchedText = matched;
+        elementData.trigger = source;
+        console.log(`[Incident Injector] ${source} matched "${matched}" (${block ? 'blocked' : 'passing through'})`, elementData);
 
-            if (redirectTo500) {
-                // Redirect to a 500 error page
-                console.log('[PagerDuty Simulator] ✅ 500 Error option enabled - Redirecting to professional 500 error page...');
-                try {
-                    // Professional approach - redirect to a realistic corporate error page
-                    document.open();
-                    document.write(toTrustedHTML(`
+        createIncident(elementData);
+        if (triggerCrux && cruxUrl) triggerCruxEvent();
+        if (runScenarioOnSubmit) runActiveScenarios(elementData);
+        if (showAlert) showAlertMessage(customAlertMessage);
+
+        if (redirectTo500) {
+            setTimeout(show500Page, showAlert ? 300 : 100);
+        } else if (block && allowFormContinuation) {
+            setTimeout(() => replayAction(el, form), showAlert ? 300 : 50);
+        }
+    }
+
+    function handleElementClick(event) {
+        if (!extensionEnabled || !triggerOnClickEnabled || targetElementTexts.length === 0) return;
+        if (!event.isTrusted) return;
+        if (event.button !== undefined && event.button !== 0) return;
+        if (teardownIfOrphaned()) return;
+
+        const hit = findTarget(event);
+        if (!hit) return;
+        const form = hit.el.form || hit.el.closest?.('form') || null;
+        trigger(event, hit.el, form, 'click', hit.matched);
+    }
+
+    function handleFormSubmission(event) {
+        if (!extensionEnabled || targetElementTexts.length === 0) return;
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (replaySubmits.has(form)) {        // our own continuation
+            replaySubmits.delete(form);
+            return;
+        }
+        if (teardownIfOrphaned()) return;
+
+        // Enter-key submits have no submitter; use the form's default button.
+        const submitter = event.submitter ||
+            form.querySelector('button[type="submit"], input[type="submit"], input[type="image"], button:not([type])');
+        if (!submitter) return;
+        // Already handled as a click a moment ago (and let through)
+        if (lastTrigger.el === submitter && Date.now() - lastTrigger.time < 1500) return;
+        if (shouldIgnoreForm(form, submitter)) return;
+
+        const matched = labelMatches(labelOf(submitter));
+        if (!matched) return;
+        trigger(event, submitter, form, 'submit', matched);
+    }
+
+    // Frames hand the 500 page to the top window so it covers the whole tab.
+    function show500Page() {
+        if (window.top !== window) {
+            try {
+                window.top.postMessage({ source: 'incident-injector-frame', action: 'show_500' }, '*');
+                return;
+            } catch (e) { /* fall through: render in the frame */ }
+        }
+        render500Page();
+    }
+
+    function build500Html() {
+        return `
                         <!DOCTYPE html>
                         <html lang="en">
                             <head>
@@ -1029,326 +964,118 @@
                                 
                             </body>
                         </html>
-                    `));
-                    document.close();
-                    wireUp500Page();
-                } catch (e) {
-                    console.error('[PagerDuty Simulator] Error creating 500 page:', e);
-                    // Fallback - professional inline styles
-                    document.body.innerHTML = toTrustedHTML(`
-                        <div style="
-                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                            background-color: #f5f7fa;
-                            color: #2c3e50;
-                            margin: 0;
-                            padding: 0;
-                            min-height: 100vh;
-                        ">
-                            <header style="
-                                background: #ffffff;
-                                border-bottom: 1px solid #e1e8ed;
-                                padding: 20px;
-                                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-                            ">
-                                <div style="display: flex; align-items: center; justify-content: space-between; max-width: 1200px; margin: 0 auto;">
-                                    <div style="display: flex; align-items: center; font-size: 24px; font-weight: 600; color: #1e40af;">
-                                        <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #3b82f6, #1e40af); border-radius: 6px; margin-right: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px;">🌐</div>
-                                        CloudTech Services
-                                    </div>
-                                    <a href="#" style="color: #6b7280; text-decoration: none; font-size: 14px;">Need help? Contact Support</a>
-                                </div>
-                            </header>
-                            
-                            <main style="max-width: 800px; margin: 80px auto; padding: 0 20px; text-align: center;">
-                                <div style="font-size: 72px; font-weight: 700; color: #ef4444; margin-bottom: 24px; letter-spacing: -2px;">500</div>
-                                <h1 style="font-size: 36px; font-weight: 600; color: #111827; margin-bottom: 16px;">Service Temporarily Unavailable</h1>
-                                <p style="font-size: 20px; color: #6b7280; margin-bottom: 40px; font-weight: 400;">We're experiencing some technical difficulties. Our engineering team has been notified and is working to resolve this issue.</p>
-                                
-                                <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 32px; margin: 40px 0; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); text-align: left;">
-                                    <div style="display: flex; align-items: center; margin-bottom: 20px;">
-                                        <div style="width: 20px; height: 20px; background: #fbbf24; border-radius: 50%; margin-right: 12px;"></div>
-                                        <div style="font-size: 18px; font-weight: 600; color: #111827;">Incident Status: Under Investigation</div>
-                                    </div>
-                                    <p style="color: #6b7280; font-size: 16px; margin-bottom: 24px;">Our monitoring systems have detected an issue affecting service availability. We're actively investigating the root cause and working on a resolution.</p>
-                                    
-                                    <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px;">
-                                        <h4 style="color: #374151; font-size: 14px; font-weight: 600; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Incident Details</h4>
-                                        <div style="margin-bottom: 8px;"><span style="color: #6b7280;">Incident ID:</span> <span style="color: #111827; font-family: Monaco, Consolas, monospace; font-size: 13px;">INC-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 3).toUpperCase()}</span></div>
-                                        <div style="margin-bottom: 8px;"><span style="color: #6b7280;">Started:</span> <span style="color: #111827; font-family: Monaco, Consolas, monospace; font-size: 13px;">${new Date().toLocaleString('en-US', { 
-                                            year: 'numeric', 
-                                            month: 'short', 
-                                            day: '2-digit', 
-                                            hour: '2-digit', 
-                                            minute: '2-digit',
-                                            timeZoneName: 'short'
-                                        })}</span></div>
-                                        <div style="margin-bottom: 8px;"><span style="color: #6b7280;">Status:</span> <span style="color: #111827; font-family: Monaco, Consolas, monospace; font-size: 13px;">🔍 Investigating</span></div>
-                                        <div style="margin-bottom: 8px;"><span style="color: #6b7280;">Affected Service:</span> <span style="color: #111827; font-family: Monaco, Consolas, monospace; font-size: 13px;">${window.location.hostname} (Production)</span></div>
-                                        <div style="margin-bottom: 8px;"><span style="color: #6b7280;">Error Code:</span> <span style="color: #111827; font-family: Monaco, Consolas, monospace; font-size: 13px;">HTTP 500 • Database Connection Timeout</span></div>
-                                        <div><span style="color: #6b7280;">Response Time:</span> <span style="color: #111827; font-family: Monaco, Consolas, monospace; font-size: 13px;">${(Math.random() * 30 + 15).toFixed(1)}s (normal: 0.2s)</span></div>
-                                    </div>
-                                </div>
-                                
-                                <div style="display: flex; gap: 16px; justify-content: center; margin-top: 40px;">
-                                    <button data-ii-action="reload" style="padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; border: none; background: #3b82f6; color: white; transition: all 0.2s;">🔄 Try Again</button>
-                                    <button data-ii-action="back" style="padding: 12px 24px; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;">← Go Back</button>
-                                </div>
-                            </main>
-                            
-                            <footer style="text-align: center; padding: 40px 20px; color: #9ca3af; font-size: 14px; border-top: 1px solid #e5e7eb; margin-top: 80px; background: #ffffff;">
-                                <p>© 2024 CloudTech Services • Status Page • Support • Documentation</p>
-                                <p style="margin-top: 8px; font-size: 12px;">If this issue persists, please contact our support team with the incident ID above.</p>
-                            </footer>
-                        </div>
-                    `);
-                    wireUp500Page();
-                }
-            } else if (allowFormContinuation) {
-                // Continue with original action if allowed
-                if (form && element.type === 'submit') {
-                    // Handle form submission
-                    form.removeEventListener('submit', handleFormSubmission);
-                    if (form.submit) {
-                        form.submit();
-                    }
-                    setTimeout(() => {
-                        form.addEventListener('submit', handleFormSubmission);
-                    }, 100);
-                } else if (element.tagName.toLowerCase() === 'a' && element.href) {
-                    // Handle link navigation
-                    window.location.href = element.href;
-                } else if (element.click) {
-                    // Handle other clickable elements
-                    element.click();
-                }
-            }
-        }, delay);
+                    `;
     }
 
-    // Handle element clicks (buttons and links)
-    function handleElementClick(event) {
-        // Exit early if extension is not enabled - don't process anything
-        if (!extensionEnabled) {
-            return;
-        }
-        
-        console.log('[PagerDuty Simulator] Click event detected on element:', event.target.tagName,
-            event.target.textContent ? event.target.textContent.substring(0, 20) + '...' : '(no text)');
-        
-        // If no target texts are configured, just log and return
-        if (targetElementTexts.length === 0) {
-            console.log('[PagerDuty Simulator] Click detected but no target texts configured');
-            return;
-        }
-        
-        console.log('[PagerDuty Simulator] Checking click against target texts:', targetElementTexts);
-
-        // No cooldown check - allow rapid-fire triggering
-        const now = Date.now();
-
-        let element = event.target;
-        let matchingElement = null;
-        let matchedText = '';
-        
-        // Check the clicked element and its parents up to 3 levels (reduced from 5)
-        for (let i = 0; i < 3 && element && element !== document; i++) {
-            // Skip non-interactive elements
-            const tagName = element.tagName.toLowerCase();
-            if (i === 0 && !['a', 'button', 'input', 'span', 'div'].includes(tagName)) {
-                element = element.parentElement;
-                continue;
+    function render500Page() {
+        // With Trusted Types enforced and our policy refused (sites that only
+        // allow named policies), document.write would throw after
+        // document.open() had already wiped the page. Build with DOM APIs then.
+        const ttBlocked = !!window.trustedTypes && !trustedHTMLPolicy && (() => {
+            try { document.createElement('div').innerHTML = '<b></b>'; return false; } catch (e) { return true; }
+        })();
+        if (!ttBlocked) {
+            try {
+                const html = toTrustedHTML(build500Html());
+                document.open();
+                document.write(html);
+                document.close();
+                wireUp500Page();
+                return;
+            } catch (e) {
+                console.warn('[Incident Injector] document.write blocked, building 500 page with DOM APIs:', e.message);
             }
-            
-            // Get element text for matching (case-insensitive)
-            const elementText = (element.textContent || element.value || '').toLowerCase().trim();
-            
-            // Skip elements with too much text (likely containers)
-            if (elementText.length > 100) {
-                element = element.parentElement;
-                continue;
-            }
-            
-            // Check if element text matches any of the target texts (exact match or contains)
-            const matchesTargetText = targetElementTexts.some(targetText => {
-                const lowerTargetText = targetText.toLowerCase().trim();
-                
-                // More strict matching - either exact match or element text is short and contains target
-                const exactMatch = elementText === lowerTargetText;
-                const containsMatch = elementText.length <= 50 && elementText.includes(lowerTargetText);
-                const attributeMatch = element.getAttribute('aria-label')?.toLowerCase().includes(lowerTargetText) ||
-                                     element.title?.toLowerCase().includes(lowerTargetText) ||
-                                     element.getAttribute('alt')?.toLowerCase().includes(lowerTargetText);
-                
-                // Log matching attempts for debugging
-                if (exactMatch || containsMatch || attributeMatch) {
-                    console.log(`[PagerDuty Simulator] Element text "${elementText}" matched target "${lowerTargetText}"`,
-                        { exactMatch, containsMatch, attributeMatch });
-                }
-                
-                return exactMatch || containsMatch || attributeMatch;
-            });
-
-            if (matchesTargetText) {
-                matchingElement = element;
-                matchedText = elementText;
-                break;
-            }
-            
-            element = element.parentElement;
         }
+        render500PageDom();
+    }
 
-        // Handle any element that matches target text
-        if (matchingElement) {
-            // Allow processing the same element immediately
-            // No duplicate prevention
-            
-            lastProcessedElement = matchingElement;
-            lastProcessedTime = now;
-            
-            const elementType = matchingElement.tagName.toLowerCase();
-            console.log(`[PagerDuty Simulator] Element intercepted: "${matchedText}" (${elementType})`);
-            
-            // Create incident for any matching element (links, buttons, etc.)
-            handleElementIncident(event, matchingElement);
+    function render500PageDom() {
+        const el = (tag, styles, text) => {
+            const node = document.createElement(tag);
+            if (styles) Object.assign(node.style, styles);
+            if (text) node.textContent = text;
+            return node;
+        };
+        const root = el('div', {
+            position: 'fixed', inset: '0', zIndex: '2147483646', background: '#f5f7fa', color: '#1f2933',
+            font: '16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px',
+            padding: '24px', textAlign: 'center'
+        });
+        root.append(
+            el('div', { fontSize: '72px', fontWeight: '700', color: '#d64545' }, '500'),
+            el('h1', { fontSize: '28px', margin: '0' }, 'Service Temporarily Unavailable'),
+            el('p', { maxWidth: '560px', color: '#52606d', margin: '0' },
+                "We're experiencing technical difficulties. Our engineering team has been notified."),
+            el('p', { font: '13px Menlo, monospace', color: '#52606d', margin: '0' },
+                `Incident INC-${Date.now().toString().slice(-6)} · ${window.location.hostname} · HTTP 500`)
+        );
+        const actions = el('div', { display: 'flex', gap: '12px' });
+        const again = el('button', { padding: '10px 20px', background: '#1f6feb', color: '#fff', border: '0', cursor: 'pointer' }, 'Try again');
+        again.dataset.iiAction = 'reload';
+        const back = el('button', { padding: '10px 20px', background: '#fff', border: '1px solid #cbd2d9', cursor: 'pointer' }, 'Go back');
+        back.dataset.iiAction = 'back';
+        actions.append(again, back);
+        root.append(actions);
+        try { window.stop(); } catch (e) { /* ignore */ }
+        if (document.body) {
+            document.body.replaceChildren(root);
+        } else {
+            document.documentElement.appendChild(root);
         }
+        document.title = '500 Internal Server Error';
+        wireUp500Page();
+    }
+
+    if (window.top === window) {
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.source === 'incident-injector-frame' && event.data.action === 'show_500' && redirectTo500) {
+                render500Page();
+            }
+        });
     }
 
     // Initialize event listeners
     function initializeListeners() {
-        console.log('[PagerDuty Simulator] 🎯 Initializing event listeners...');
-        console.log('[PagerDuty Simulator] 🔍 Listener config:', {
-            extensionEnabled,
-            triggerOnClickEnabled,
-            targetElementTexts,
-            targetElementTextsLength: targetElementTexts.length
+        if (!contextAlive()) return;
+        window.addEventListener('submit', handleFormSubmission, true);  // idempotent
+        window.addEventListener('click', handleElementClick, true);
+        console.log('[Incident Injector] Listening', {
+            extensionEnabled, triggerOnClickEnabled, targets: targetElementTexts
         });
-        
-        // Remove any existing listeners first to prevent duplicates
-        document.removeEventListener('submit', handleFormSubmission, true);
-        document.removeEventListener('click', handleElementClick, true);
-        
-        // Only add listeners if extension is enabled
-        if (extensionEnabled) {
-            // Always add form submission listener when extension is enabled
-            document.addEventListener('submit', handleFormSubmission, true);
-            console.log('[PagerDuty Simulator] Form submit listener added');
-            
-            // Add click listener only if click interception is enabled AND target texts are configured
-            if (triggerOnClickEnabled && targetElementTexts.length > 0) {
-                document.addEventListener('click', handleElementClick, true);
-                console.log('[PagerDuty Simulator] ✅ Click listener added for target texts:', targetElementTexts);
-            } else if (triggerOnClickEnabled && targetElementTexts.length === 0) {
-                console.log('[PagerDuty Simulator] ⚠️ Click interception enabled but no target texts configured');
-            } else {
-                console.log('[PagerDuty Simulator] ❌ Click interception disabled - triggerOnClickEnabled:', triggerOnClickEnabled);
-            }
-        } else {
-            console.log('[PagerDuty Simulator] Extension disabled, no listeners added');
-        }
-
-        console.log('[PagerDuty Simulator] Event listeners initialized, extension enabled:', extensionEnabled);
     }
 
-    // Handle dynamic content with MutationObserver
-    function observeFormChanges() {
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        // Check if new forms were added
-                        const newForms = node.querySelectorAll ? node.querySelectorAll('form') : [];
-                        if (newForms.length > 0) {
-                            console.log('[PagerDuty Simulator] New forms detected:', newForms.length);
-                        }
-                    }
-                });
-            });
-        });
 
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-
-        return observer;
-    }
-
-    // Intercept AJAX submissions
-    function interceptAjaxSubmissions() {
-        // Intercept fetch
-        const originalFetch = window.fetch;
-        window.fetch = function(...args) {
-            const [url, options] = args;
-            if (options && options.method && options.method.toLowerCase() === 'post') {
-                console.log('[PagerDuty Simulator] AJAX POST detected via fetch:', url);
-                
-                if (extensionEnabled) {
-                    const formData = {
-                        url: window.location.href,
-                        title: document.title,
-                        formAction: url,
-                        formMethod: 'POST',
-                        buttonText: 'AJAX Submit',
-                        timestamp: new Date().toISOString(),
-                        userAgent: navigator.userAgent,
-                        referrer: document.referrer || 'Direct'
-                    };
-                    
-                    createIncident(formData);
-                    if (showAlert) {
-                        showAlertMessage(customAlertMessage);
-                    }
-                }
-            }
-            
-            return originalFetch.apply(this, args);
-        };
-
-        // Intercept XMLHttpRequest
-        const originalXHROpen = XMLHttpRequest.prototype.open;
-        const originalXHRSend = XMLHttpRequest.prototype.send;
-        
-        XMLHttpRequest.prototype.open = function(method, url, ...args) {
-            this._method = method;
-            this._url = url;
-            return originalXHROpen.apply(this, [method, url, ...args]);
-        };
-        
-        XMLHttpRequest.prototype.send = function(data) {
-            if (this._method && this._method.toLowerCase() === 'post' && extensionEnabled) {
-                console.log('[PagerDuty Simulator] AJAX POST detected via XMLHttpRequest:', this._url);
-                
-                const formData = {
-                    url: window.location.href,
-                    title: document.title,
-                    formAction: this._url,
-                    formMethod: 'POST',
-                    buttonText: 'AJAX Submit',
-                    timestamp: new Date().toISOString(),
-                    userAgent: navigator.userAgent,
-                    referrer: document.referrer || 'Direct'
-                };
-                
-                createIncident(formData);
-                if (showAlert) {
-                    showAlertMessage(customAlertMessage);
-                }
-            }
-            
-            return originalXHRSend.apply(this, arguments);
-        };
-    }
 
     // Panel management variables
     let panelInstance = null;
     
     // Create and inject the panel
-    function createPanel() {
-        // Check if panel already exists
-        const existingPanel = document.getElementById('incident-injector-panel');
-        if (existingPanel) {
-            return existingPanel;
+    // Resolves with the panel once it is in the DOM. A panel left behind by an
+    // older build (different version, or markup without the scenario list) is
+    // replaced instead of reused.
+    let panelReadyPromise = null;
+    function ensurePanel() {
+        const existing = document.getElementById('incident-injector-panel');
+        let version = '';
+        try { version = chrome.runtime.getManifest().version; } catch (e) { /* orphaned */ }
+        if (existing && (existing.dataset.version !== version || !existing.querySelector('#scenario-list'))) {
+            if (!panelReadyPromise || existing.dataset.version !== version) {
+                console.log('[Incident Injector] Replacing panel from an older build');
+                existing.remove();
+                panelReadyPromise = null;
+            }
         }
+        if (document.getElementById('incident-injector-panel') && panelReadyPromise) return panelReadyPromise;
+        if (!panelReadyPromise) {
+            panelReadyPromise = new Promise(resolve => { resolvePanelReady = resolve; });
+            createPanel();
+        }
+        return panelReadyPromise;
+    }
+    let resolvePanelReady = () => {};
+
+    function createPanel() {
         
         console.log('[Incident Injector] Creating new panel...');
         
@@ -1359,6 +1086,7 @@
         const panel = document.createElement('div');
         panel.id = 'incident-injector-panel';
         panel.className = 'incident-injector-panel';
+        try { panel.dataset.version = chrome.runtime.getManifest().version; } catch (e) { /* orphaned */ }
         panel.style.display = 'none';
         
         // Load panel HTML
@@ -1382,21 +1110,14 @@
                 }
                 
                 // Add panel to page
-                document.body.appendChild(panel);
+                (document.body || document.documentElement).appendChild(panel);
+                resolvePanelReady(panel);
                 
                 // Initialize panel functionality with longer delay to ensure all CSS is loaded
                 setTimeout(() => {
                     console.log('[Incident Injector] Initializing panel with full resources...');
                     
-                    // Ensure panel has all correct styles applied
-                    panel.style.width = '320px';
-                    panel.style.right = '-340px';
-                    panel.style.fontFamily = "'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
-                    panel.style.fontSize = '13px';
-                    
                     initializePanelEventListeners();
-                    // Verify and force font loading
-                    verifyFontLoading();
                     
                     console.log('[Incident Injector] Panel fully initialized with compact styles and fonts');
                 }, 500);
@@ -1409,13 +1130,8 @@
                 // Fallback: create a minimal panel structure
                 panel.innerHTML = toTrustedHTML(`
                     <div class="panel-header">
-                        <div class="panel-title">
-                            <i class="fas fa-bolt"></i>
-                            <span>Incident Injector</span>
-                        </div>
-                        <button id="panel-close" class="panel-close">
-                            <i class="fas fa-times"></i>
-                        </button>
+                        <div class="panel-title"><span>Incident Injector</span></div>
+                        <button id="panel-close" class="panel-close" aria-label="Close panel">×</button>
                     </div>
                     <div class="panel-content">
                         <div class="status-indicator">
@@ -1435,19 +1151,19 @@
                     background: #0f0f0f;
                     color: white;
                     z-index: 999999;
-                    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
                     font-size: 13px;
                     transition: right 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
                     display: flex;
                     flex-direction: column;
                 `;
                 
-                document.body.appendChild(panel);
+                (document.body || document.documentElement).appendChild(panel);
+                resolvePanelReady(panel);
                 // Ensure CSS and fonts are loaded even in fallback
                 loadPanelCSS();
                 setTimeout(() => {
                     initializePanelEventListeners();
-                    verifyFontLoading();
                 }, 200);
             });
         
@@ -1455,14 +1171,35 @@
         return panel;
     }
     
+    // The panel runs in the page's main world and can't see chrome.storage,
+    // so forward scenario progress to it.
+    function relayScenarioRunning() {
+        if (!contextAlive()) return;
+        chrome.storage.local.get(['scenario_running'], (result) => {
+            window.postMessage({
+                action: 'scenario_running_update',
+                source: 'incident-injector-content',
+                scenarioRunning: result.scenario_running || null
+            }, '*');
+        });
+    }
+    if (window.top === window) {
+        chrome.storage.onChanged.addListener((changes, area) => {
+            if (area === 'local' && changes.scenario_running && document.getElementById('incident-injector-panel')) {
+                window.postMessage({
+                    action: 'scenario_running_update',
+                    source: 'incident-injector-content',
+                    scenarioRunning: changes.scenario_running.newValue || null
+                }, '*');
+            }
+        });
+    }
+
     // Show/hide panel
     function togglePanel() {
         const panel = document.getElementById('incident-injector-panel');
-        if (!panel) {
-            console.log('[Incident Injector] No panel found, creating...');
-            createPanel();
-            setTimeout(() => showPanel(), 300);
-            return;
+        if (!panel || !panel.querySelector('#scenario-list') || !panel.dataset.version) {
+            return ensurePanel().then(() => showPanel());
         }
         
         const isVisible = panel.classList.contains('visible');
@@ -1474,39 +1211,14 @@
         }
     }
     
-    function showPanel() {
+    async function showPanel() {
         const panel = document.getElementById('incident-injector-panel');
         if (panel) {
-            console.log('[Incident Injector] Showing panel...');
-            
-            // Ensure fonts and CSS are loaded
-            console.log('[Incident Injector] Loading panel CSS and fonts...');
-            loadPanelCSS();
-            
+            await loadPanelCSS();
             panel.style.display = 'flex';
             
             // Force a reflow to ensure display change is processed
             panel.offsetHeight;
-            
-            // Ensure all styles are applied before showing
-            applyCompactStyles();
-            
-            // Force apply font to panel
-            const fontCSS = document.querySelector('style[data-font-applied]');
-            if (!fontCSS) {
-                const tempFontCSS = document.createElement('style');
-                tempFontCSS.setAttribute('data-font-applied', 'true');
-                tempFontCSS.textContent = `
-                    #incident-injector-panel {
-                        font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
-                    }
-                    #incident-injector-panel * {
-                        font-family: inherit !important;
-                    }
-                `;
-                document.head.appendChild(tempFontCSS);
-                console.log('[Incident Injector] Force-applied font to panel');
-            }
             
             // Add visible class to trigger CSS transition
             setTimeout(() => {
@@ -1596,6 +1308,8 @@
                     handleSaveEventDefinitionRequest(event.data);
                 } else if (event.data.action === 'save_scenario_selection_request') {
                     handleSaveScenarioSelectionRequest(event.data);
+                } else if (event.data.action === 'request_scenario_running') {
+                    relayScenarioRunning();
                 }
             }
         });
@@ -1606,334 +1320,33 @@
         console.log('[Incident Injector] Panel event listeners initialized');
     }
     
-    // Load panel CSS and fonts
+    // Load panel.css (fonts + icons live inside it). Versioned so a panel
+    // stylesheet left in the page by an older build is replaced, and returns a
+    // promise so the panel only slides in once it is styled.
+    let panelCssReady = null;
     function loadPanelCSS() {
-        console.log('[Incident Injector] Loading panel CSS and fonts...');
+        if (!contextAlive()) return Promise.resolve(false);
+        const version = chrome.runtime.getManifest().version;
+        const current = document.getElementById('incident-injector-css');
+        if (current && current.dataset.version === version && panelCssReady) return panelCssReady;
 
-        // Check if extension context is still valid
-        try {
-            if (!chrome.runtime?.id) {
-                console.error('[Incident Injector] Extension context invalidated - please reload the page');
-                return;
-            }
-        } catch (e) {
-            console.error('[Incident Injector] Extension context invalidated - please reload the page');
-            return;
-        }
+        // Drop stylesheets from older builds (they used an unversioned URL).
+        document.querySelectorAll('link[href*="panel.css"]').forEach(l => l.remove());
 
-        // Load Space Grotesk font files from extension
-        const panelFontCSS = document.createElement('style');
-        panelFontCSS.id = 'incident-injector-panel-fonts';
-
-        try {
-            const regularFontUrl = chrome.runtime.getURL('fonts/SpaceGrotesk-Regular.woff2');
-            const mediumFontUrl = chrome.runtime.getURL('fonts/SpaceGrotesk-Medium.woff2');
-            const boldFontUrl = chrome.runtime.getURL('fonts/SpaceGrotesk-Bold.woff2');
-
-            panelFontCSS.textContent = `
-                /* Space Grotesk Font Definitions */
-                @font-face {
-                    font-family: 'Space Grotesk';
-                    src: url('${regularFontUrl}') format('woff2');
-                    font-weight: 400;
-                    font-style: normal;
-                    font-display: swap;
-                }
-
-                @font-face {
-                    font-family: 'Space Grotesk';
-                    src: url('${mediumFontUrl}') format('woff2');
-                    font-weight: 500;
-                    font-style: normal;
-                    font-display: swap;
-                }
-
-                @font-face {
-                    font-family: 'Space Grotesk';
-                    src: url('${boldFontUrl}') format('woff2');
-                    font-weight: 700;
-                    font-style: normal;
-                    font-display: swap;
-                }
-
-                /* Apply Space Grotesk to panel elements */
-                #incident-injector-panel,
-                #incident-injector-panel *,
-                .incident-injector-panel,
-                .incident-injector-panel * {
-                    font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
-                }
-            `;
-
-            document.head.appendChild(panelFontCSS);
-            console.log('[Incident Injector] ✅ Space Grotesk font loaded and applied to panel');
-            console.log('[Incident Injector] Font URLs:', { regularFontUrl, mediumFontUrl, boldFontUrl });
-        } catch (error) {
-            console.error('[Incident Injector] Error loading fonts:', error);
-            console.log('[Incident Injector] Falling back to system fonts');
-
-            // Fallback to system fonts
-            panelFontCSS.textContent = `
-                #incident-injector-panel,
-                #incident-injector-panel *,
-                .incident-injector-panel,
-                .incident-injector-panel * {
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
-                }
-            `;
-            document.head.appendChild(panelFontCSS);
-        }
-        
-        // Skip Font Awesome to avoid CSP violations - use Unicode icons only
-        console.log('[Incident Injector] Using Unicode icons to avoid CSP violations');
-        
-        // Always inject basic fallback icons first (will be overridden by Font Awesome if it loads)
-        injectFallbackIcons();
-
-        // Try to load Font Awesome from CDN (will use fallback icons if blocked by CSP)
-        const existingFA = document.querySelector('link[href*="font-awesome"]');
-        if (!existingFA) {
-            try {
-                const faLink = document.createElement('link');
-                faLink.rel = 'stylesheet';
-                faLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css';
-                faLink.crossOrigin = 'anonymous';
-                faLink.onerror = () => console.log('[Incident Injector] Font Awesome CDN blocked, using fallback icons');
-                faLink.onload = () => console.log('[Incident Injector] Font Awesome loaded from CDN');
-                document.head.appendChild(faLink);
-            } catch (error) {
-                console.log('[Incident Injector] Font Awesome load failed, using fallback icons');
-            }
-        }
-
-        // Load DM Sans font from Google Fonts (stylish, modern, unique)
-        const existingFont = document.querySelector('link[href*="DM+Sans"]');
-        if (!existingFont) {
-            try {
-                const fontLink = document.createElement('link');
-                fontLink.rel = 'stylesheet';
-                fontLink.href = 'https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap';
-                fontLink.onload = () => {
-                    console.log('[Incident Injector] DM Sans font loaded from Google Fonts');
-                    // Apply to panel
-                    const panel = document.getElementById('incident-injector-panel');
-                    if (panel) {
-                        panel.style.fontFamily = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
-                    }
-                };
-                fontLink.onerror = () => console.log('[Incident Injector] DM Sans font blocked, using system fonts');
-                document.head.appendChild(fontLink);
-            } catch (error) {
-                console.log('[Incident Injector] Font load failed, using system fonts');
-            }
-        }
-
-        // Load panel CSS
-        const existingCSS = document.querySelector('link[href*="panel.css"]');
-        if (!existingCSS) {
-            try {
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = chrome.runtime.getURL('panel.css');
-                link.onload = () => {
-                    console.log('[Incident Injector] Panel CSS loaded successfully');
-                    setTimeout(() => {
-                        console.log('[Incident Injector] All CSS should be applied now');
-                    }, 100);
-                };
-                link.onerror = (error) => console.error('[Incident Injector] Error loading panel CSS:', error);
-                document.head.appendChild(link);
-                console.log('[Incident Injector] Panel CSS link added to head');
-            } catch (error) {
-                console.error('[Incident Injector] Failed to load panel CSS:', error);
-            }
-        } else {
-            console.log('[Incident Injector] Panel CSS already loaded');
-        }
+        const link = document.createElement('link');
+        link.id = 'incident-injector-css';
+        link.rel = 'stylesheet';
+        link.dataset.version = version;
+        link.href = chrome.runtime.getURL('panel.css') + '?v=' + encodeURIComponent(version);
+        panelCssReady = new Promise(resolve => {
+            link.onload = () => resolve(true);
+            link.onerror = () => { console.error('[Incident Injector] panel.css failed to load'); resolve(false); };
+            setTimeout(() => resolve(false), 2000); // never block opening on a slow sheet
+        });
+        (document.head || document.documentElement).appendChild(link);
+        return panelCssReady;
     }
 
-    // Verify font loading and apply if needed
-    function verifyFontLoading() {
-        console.log('[Incident Injector] Verifying font loading...');
-
-        // Check if Space Grotesk font is available
-        const testElement = document.createElement('div');
-        testElement.style.fontFamily = "'Space Grotesk', sans-serif";
-        testElement.style.position = 'absolute';
-        testElement.style.left = '-9999px';
-        testElement.textContent = 'Font test';
-        document.body.appendChild(testElement);
-
-        const computedFont = window.getComputedStyle(testElement).fontFamily;
-        document.body.removeChild(testElement);
-
-        if (computedFont.includes('Space Grotesk')) {
-            console.log('[Incident Injector] ✅ Space Grotesk font is active');
-
-            // Apply the font to the panel specifically
-            const panel = document.getElementById('incident-injector-panel');
-            if (panel) {
-                panel.style.fontFamily = "'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
-            }
-        } else {
-            console.log('[Incident Injector] ⚠️ Space Grotesk font not detected, computed font:', computedFont);
-            console.log('[Incident Injector] Force applying Space Grotesk font...');
-
-            // Simple fallback - just apply system fonts to avoid double font loading
-            console.log('[Incident Injector] Using system fonts as fallback');
-        }
-
-        // Also check the panel element specifically
-        const panel = document.getElementById('incident-injector-panel');
-        if (panel) {
-            const panelFont = window.getComputedStyle(panel).fontFamily;
-            console.log('[Incident Injector] Panel computed font:', panelFont);
-
-            // Apply font directly to panel
-            panel.style.fontFamily = "'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
-        }
-
-        // Also ensure compact styles are applied
-        setTimeout(() => {
-            applyCompactStyles();
-        }, 500);
-    }
-    
-    // Inject modern SVG icons (CSP-safe, no external dependencies)
-    function injectFallbackIcons() {
-        const existingFallback = document.querySelector('#incident-injector-icon-fallback');
-        if (existingFallback) return;
-
-        const fallbackCSS = document.createElement('style');
-        fallbackCSS.id = 'incident-injector-icon-fallback';
-        fallbackCSS.textContent = `
-            /* Modern SVG icon system - CSP-safe */
-            .incident-injector-panel .fas,
-            .incident-injector-panel .fa {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 1em;
-                height: 1em;
-                font-style: normal;
-            }
-
-            .incident-injector-panel .fas:before,
-            .incident-injector-panel .fa:before {
-                display: inline-block;
-                font-family: system-ui, -apple-system, sans-serif !important;
-                font-weight: normal !important;
-                font-style: normal !important;
-                line-height: 1;
-                -webkit-font-smoothing: antialiased;
-            }
-
-            /* Modern minimal icon set using symbols */
-            .incident-injector-panel .fa-bolt:before { content: "⚡"; }
-            .incident-injector-panel .fa-times:before { content: "✕"; font-weight: 300; }
-            .incident-injector-panel .fa-rocket:before { content: "↗"; font-weight: bold; }
-            .incident-injector-panel .fa-cog:before { content: "⚙"; }
-            .incident-injector-panel .fa-bell:before { content: "●"; font-size: 0.6em; }
-            .incident-injector-panel .fa-link:before { content: "⟁"; }
-            .incident-injector-panel .fa-chevron-down:before { content: "▾"; }
-            .incident-injector-panel .fa-chevron-up:before { content: "▴"; }
-            .incident-injector-panel .fa-chevron-right:before { content: "›"; font-size: 1.4em; font-weight: 300; }
-            .incident-injector-panel .fa-play:before { content: "▶"; font-size: 0.8em; }
-            .incident-injector-panel .fa-play-circle:before { content: "▶"; font-size: 0.9em; }
-            .incident-injector-panel .fa-file-alt:before { content: "☰"; }
-            .incident-injector-panel .fa-edit:before { content: "✎"; }
-            .incident-injector-panel .fa-download:before { content: "↓"; font-weight: bold; }
-            .incident-injector-panel .fa-upload:before { content: "↑"; font-weight: bold; }
-            .incident-injector-panel .fa-mouse-pointer:before { content: "⊙"; }
-            .incident-injector-panel .fa-exclamation-triangle:before { content: "⚠"; }
-            .incident-injector-panel .fa-spinner:before { content: "◠"; }
-
-            /* Spin animation */
-            .incident-injector-panel .fa-spin {
-                animation: ii-spin 1s linear infinite !important;
-            }
-            @keyframes ii-spin {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
-            }
-        `;
-        document.head.appendChild(fallbackCSS);
-    }
-    
-    // Force apply compact styles to ensure they're not overridden
-    function applyCompactStyles() {
-        const panel = document.getElementById('incident-injector-panel');
-        if (!panel) return;
-        
-        
-        // Inject comprehensive compact styles
-        const compactCSS = document.createElement('style');
-        compactCSS.id = 'incident-injector-compact-styles';
-        compactCSS.textContent = `
-            #incident-injector-panel {
-                width: 320px !important;
-                right: -340px !important;
-                font-size: 13px !important;
-                font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
-            }
-            
-            #incident-injector-panel.visible {
-                right: 0 !important;
-            }
-            
-            #incident-injector-panel .panel-header {
-                padding: 10px 14px !important;
-            }
-            
-            #incident-injector-panel .panel-content {
-                padding: 10px 14px !important;
-            }
-            
-            #incident-injector-panel .section-header {
-                padding: 10px 14px !important;
-            }
-            
-            #incident-injector-panel .section-header h3 {
-                font-size: 12px !important;
-            }
-            
-            #incident-injector-panel .form-group {
-                margin-bottom: 12px !important;
-            }
-            
-            #incident-injector-panel .form-group label {
-                font-size: 12px !important;
-                margin-bottom: 6px !important;
-            }
-            
-            #incident-injector-panel .form-group input,
-            #incident-injector-panel .form-group textarea,
-            #incident-injector-panel .form-group select {
-                padding: 8px 10px !important;
-                font-size: 12px !important;
-                font-family: 'Space Grotesk', sans-serif !important;
-            }
-            
-            #incident-injector-panel .btn {
-                padding: 8px 12px !important;
-                font-size: 11px !important;
-                font-family: 'Space Grotesk', sans-serif !important;
-            }
-            
-            #incident-injector-panel .panel-close {
-                width: 24px !important;
-                height: 24px !important;
-            }
-        `;
-        
-        // Remove any existing compact styles first
-        const existingCompactCSS = document.getElementById('incident-injector-compact-styles');
-        if (existingCompactCSS) {
-            existingCompactCSS.remove();
-        }
-        
-        document.head.appendChild(compactCSS);
-    }
     
     // Handle sample definition loading request from panel
     async function handleLoadSampleDefinition() {
@@ -2034,6 +1447,7 @@
             const response = await safeRuntimeSendMessage({
                 action: 'run_scenario',
                 scenarioId: requestData.scenarioId,
+                scenarioIds: requestData.scenarioIds,
                 options: requestData.options
             });
             
@@ -2170,7 +1584,10 @@
                 'crux_url',
                 'target_element_texts',
                 'trigger_on_click_enabled',
-                'run_scenario_on_submit'
+                'run_scenario_on_submit',
+                'active_scenario_id',
+                'active_scenario_ids',
+                'run_stagger'
             ]);
             
             console.log('[Content] Loaded settings:', result);
@@ -2464,7 +1881,7 @@
             if (has('extension_enabled')) {
                 if (extensionEnabled !== s.extension_enabled) listenerStateChanged = true;
                 extensionEnabled = s.extension_enabled;
-                localStorage.setItem('incident_injector_extension_enabled', extensionEnabled.toString());
+                safeStorage.set('incident_injector_extension_enabled', extensionEnabled.toString());
             }
             if (has('custom_alert_message')) customAlertMessage = s.custom_alert_message;
             if (has('show_alert')) showAlert = s.show_alert;
@@ -2476,7 +1893,7 @@
             if (has('trigger_on_click_enabled')) {
                 if (triggerOnClickEnabled !== s.trigger_on_click_enabled) listenerStateChanged = true;
                 triggerOnClickEnabled = s.trigger_on_click_enabled;
-                localStorage.setItem('incident_injector_trigger_on_click', triggerOnClickEnabled.toString());
+                safeStorage.set('incident_injector_trigger_on_click', triggerOnClickEnabled.toString());
             }
 
             // Update target elements
@@ -2584,7 +2001,10 @@
             
             // Save to sync storage
             await new Promise((resolve, reject) => {
-                chrome.storage.sync.set({ active_scenario_id: requestData.scenarioId }, () => {
+                const ids = Array.isArray(requestData.scenarioIds)
+                    ? requestData.scenarioIds
+                    : (requestData.scenarioId ? [requestData.scenarioId] : []);
+                chrome.storage.sync.set({ active_scenario_id: ids[0] || '', active_scenario_ids: ids }, () => {
                     if (chrome.runtime && chrome.runtime.lastError) {
                         reject(new Error(chrome.runtime.lastError.message));
                     } else {
@@ -2652,9 +2072,9 @@
         
         try {
             // Use the reinitialize function to set up listeners properly
+            // Listeners live on window (capture), so SPA navigation and
+            // late-rendered forms need no re-attachment.
             reinitializeListeners();
-            observeFormChanges();
-            interceptAjaxSubmissions();
         } catch (error) {
             console.error('[Incident Injector] Error during initialization:', error);
         }
@@ -2664,45 +2084,10 @@
         console.log('[Incident Injector] Content script initialized');
     }
 
-    // Re-initialize on page changes (for SPAs)
-    function reinitialize() {
-        console.log('[PagerDuty Simulator] Re-initializing for page change...');
-        setTimeout(() => {
-            initialize();
-        }, 100); // Small delay to let page settle
-    }
 
-    // Watch for page changes in SPAs
-    function watchForPageChanges() {
-        // Watch for URL changes
-        let currentUrl = window.location.href;
-        const urlObserver = new MutationObserver(() => {
-            if (window.location.href !== currentUrl) {
-                currentUrl = window.location.href;
-                console.log('[PagerDuty Simulator] URL changed to:', currentUrl);
-                reinitialize();
-            }
-        });
-        
-        urlObserver.observe(document, { subtree: true, childList: true });
-        
-        // Also listen for popstate events (back/forward navigation)
-        window.addEventListener('popstate', reinitialize);
-        
-        // Listen for pushstate/replacestate (programmatic navigation)
-        const originalPushState = history.pushState;
-        const originalReplaceState = history.replaceState;
-        
-        history.pushState = function(...args) {
-            originalPushState.apply(this, args);
-            reinitialize();
-        };
-        
-        history.replaceState = function(...args) {
-            originalReplaceState.apply(this, args);
-            reinitialize();
-        };
-    }
+
+    // Attach before the page's scripts run (manifest: document_start).
+    initializeListeners();
 
     // Start the extension
     if (document.readyState === 'loading') {
@@ -2710,7 +2095,5 @@
     } else {
         initialize();
     }
-    
-    // Start watching for page changes
-    watchForPageChanges();
+
 })();

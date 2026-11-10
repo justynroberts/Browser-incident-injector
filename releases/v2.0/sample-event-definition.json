@@ -1,0 +1,431 @@
+{
+  "schema_version": "1.0",
+  "global_config": {
+    "variables": {
+      "environment": "production",
+      "region": "us-east-1"
+    }
+  },
+  "event_definitions": [
+    {
+      "id": "finance_trading_alerts",
+      "name": "Trading Platform Alert Storm",
+      "description": "Financial trading platform monitoring alerts during market volatility",
+      "variables": {
+        "incident_key": "TRADE-{{incident_id}}",
+        "component": "trading-engine",
+        "application": "Trading Platform"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Market data feed latency > 500ms threshold",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "market-data",
+          "class": "latency",
+          "custom_details": {
+            "metric": "market_data_latency_p95",
+            "current_value": "847ms",
+            "threshold": "500ms",
+            "source": "nasdaq_feed_monitor",
+            "affected_symbols": "AAPL,MSFT,GOOGL",
+            "monitoring_tool": "DataDog",
+            "runbook": "https://wiki.company.com/trading/market-data-latency"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Order execution error rate > 1% threshold",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "order-execution",
+          "class": "error-rate",
+          "custom_details": {
+            "metric": "order_execution_error_rate",
+            "current_value": "3.7%",
+            "threshold": "1.0%",
+            "failed_orders_count": 47,
+            "error_types": "TIMEOUT,INVALID_SYMBOL,INSUFFICIENT_FUNDS",
+            "monitoring_tool": "Prometheus",
+            "dashboard": "https://grafana.company.com/d/trading-orders"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Risk management service healthcheck failed",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "risk-management",
+          "class": "healthcheck",
+          "custom_details": {
+            "service": "risk-calculator-service",
+            "health_endpoint": "/health",
+            "status_code": 503,
+            "last_successful_check": "2025-05-31T14:23:15Z",
+            "monitoring_tool": "Consul",
+            "consul_service_id": "risk-calc-prod-01"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Authentication service response time > 2s",
+          "severity": "error",
+          "component": "{{component}}",
+          "group": "authentication",
+          "class": "response-time",
+          "custom_details": {
+            "metric": "auth_response_time_p99",
+            "current_value": "3.2s",
+            "threshold": "2.0s",
+            "endpoint": "/api/v1/auth/login",
+            "request_count": 1247,
+            "monitoring_tool": "New Relic",
+            "apm_trace_id": "abc123def456"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": "automotive_telematics_alerts",
+      "name": "Connected Vehicle Platform Alerts",
+      "description": "Automotive telematics platform monitoring alerts",
+      "variables": {
+        "incident_key": "AUTO-{{incident_id}}",
+        "component": "telematics-api",
+        "application": "Connected Vehicle Platform"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Vehicle connection success rate < 95% threshold",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "connectivity",
+          "class": "success-rate",
+          "custom_details": {
+            "metric": "vehicle_connection_success_rate",
+            "current_value": "87.3%",
+            "threshold": "95.0%",
+            "failed_connections": 1847,
+            "total_attempts": 14523,
+            "monitoring_tool": "CloudWatch",
+            "log_group": "/aws/lambda/vehicle-connection-handler"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Emergency call service circuit breaker OPEN",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "emergency-services",
+          "class": "circuit-breaker",
+          "custom_details": {
+            "service": "emergency-call-service",
+            "circuit_breaker_state": "OPEN",
+            "failure_threshold": "5 failures in 60s",
+            "current_failures": 8,
+            "last_failure_reason": "HTTP 500 from PSAP gateway",
+            "monitoring_tool": "Hystrix Dashboard"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Navigation API error rate > 5% threshold",
+          "severity": "error",
+          "component": "{{component}}",
+          "group": "navigation",
+          "class": "error-rate",
+          "custom_details": {
+            "metric": "navigation_api_error_rate",
+            "current_value": "12.7%",
+            "threshold": "5.0%",
+            "endpoint": "/api/v2/navigation/route",
+            "error_codes": "500,503,timeout",
+            "monitoring_tool": "Splunk",
+            "search_query": "index=api service=navigation status>=400"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "OTA update service disk usage > 90%",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "ota-updates",
+          "class": "disk-usage",
+          "custom_details": {
+            "metric": "disk_usage_percent",
+            "current_value": "94.2%",
+            "threshold": "90.0%",
+            "mount_point": "/var/lib/ota-packages",
+            "available_space": "2.3GB",
+            "hostname": "ota-server-prod-03",
+            "monitoring_tool": "Nagios"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": "gaming_platform_alerts",
+      "name": "Gaming Platform Performance Alerts",
+      "description": "Multiplayer gaming platform monitoring alerts during peak hours",
+      "variables": {
+        "incident_key": "GAME-{{incident_id}}",
+        "component": "game-backend",
+        "application": "Multiplayer Gaming Platform"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Matchmaking queue wait time > 2min threshold",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "matchmaking",
+          "class": "queue-time",
+          "custom_details": {
+            "metric": "matchmaking_queue_wait_time_p95",
+            "current_value": "287s",
+            "threshold": "120s",
+            "queue_size": 45623,
+            "game_mode": "ranked_competitive",
+            "monitoring_tool": "Elastic APM",
+            "service_name": "matchmaking-service"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Game server CPU usage > 80% threshold",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "game-servers",
+          "class": "cpu-usage",
+          "custom_details": {
+            "metric": "cpu_utilization_percent",
+            "current_value": "92.1%",
+            "threshold": "80.0%",
+            "server_region": "us-west-2",
+            "instance_id": "i-0123456789abcdef0",
+            "active_matches": 127,
+            "monitoring_tool": "CloudWatch"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Payment API response time > 5s threshold",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "payments",
+          "class": "response-time",
+          "custom_details": {
+            "metric": "payment_api_response_time_p99",
+            "current_value": "8.9s",
+            "threshold": "5.0s",
+            "endpoint": "/api/v1/payments/purchase",
+            "failed_requests": 89,
+            "monitoring_tool": "AppDynamics",
+            "business_transaction": "In-Game Purchase"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Anti-cheat service memory usage > 4GB threshold",
+          "severity": "error",
+          "component": "{{component}}",
+          "group": "anti-cheat",
+          "class": "memory-usage",
+          "custom_details": {
+            "metric": "memory_usage_bytes",
+            "current_value": "4.7GB",
+            "threshold": "4.0GB",
+            "process": "anticheat-analyzer",
+            "container_id": "anticheat-prod-42a7f",
+            "monitoring_tool": "Kubernetes Metrics",
+            "namespace": "gaming-prod"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": "ecommerce_peak_alerts",
+      "name": "E-commerce Platform Black Friday Alerts",
+      "description": "E-commerce platform monitoring alerts during peak traffic events",
+      "variables": {
+        "incident_key": "ECOM-{{incident_id}}",
+        "component": "ecommerce-api",
+        "application": "E-commerce Platform"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Web application response time > 3s threshold",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "frontend",
+          "class": "response-time",
+          "custom_details": {
+            "metric": "http_request_duration_p95",
+            "current_value": "5.8s",
+            "threshold": "3.0s",
+            "endpoint": "/product-listing",
+            "concurrent_users": 89000,
+            "monitoring_tool": "Pingdom",
+            "load_balancer": "alb-ecommerce-prod"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Shopping cart service error rate > 2% threshold",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "shopping-cart",
+          "class": "error-rate",
+          "custom_details": {
+            "metric": "cart_service_error_rate",
+            "current_value": "8.7%",
+            "threshold": "2.0%",
+            "errors_per_minute": 247,
+            "total_requests_per_minute": 2839,
+            "primary_error": "DynamoDB ProvisionedThroughputExceededException",
+            "monitoring_tool": "X-Ray"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Payment gateway timeout rate > 10% threshold",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "payments",
+          "class": "timeout-rate",
+          "custom_details": {
+            "metric": "payment_timeout_rate",
+            "current_value": "23.4%",
+            "threshold": "10.0%",
+            "gateway": "stripe",
+            "timeout_threshold": "30s",
+            "failed_amount_usd": 127000,
+            "monitoring_tool": "Stripe Dashboard"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Inventory service database connection pool exhausted",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "inventory",
+          "class": "connection-pool",
+          "custom_details": {
+            "metric": "db_connection_pool_active",
+            "current_value": 100,
+            "max_connections": 100,
+            "cpu_usage": "98%",
+            "memory_usage": "87%",
+            "query_count": "3x normal load",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Database failover initiated",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "database",
+          "class": "availability",
+          "custom_details": {
+            "failover_type": "Automatic",
+            "estimated_downtime": "30-60 seconds",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Multiple services reporting database connection failures",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "application",
+          "class": "error",
+          "custom_details": {
+            "affected_services": ["checkout", "inventory", "user-profiles"],
+            "error_rate": "100%",
+            "customer_impact": "Unable to complete transactions",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        }
+      ]
+    }
+  ]
+}
