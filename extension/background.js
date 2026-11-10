@@ -31,33 +31,31 @@ eventProcessor.initialize()
 chrome.runtime.onInstalled.addListener(async () => {
     console.log('[Incident Injector] Extension installed');
     
-    // Check if we have existing stored preferences (for upgrades)
-    const existingSettings = await chrome.storage.sync.get(['extension_enabled', 'trigger_on_click_enabled']);
-    
-    // Set sensible defaults for new installs while preserving user settings on upgrades
+    // onInstalled also fires on every update and developer reload, so only
+    // fill keys that have never been set. (Writing the whole defaults object
+    // here used to reset the match list, scenario selection and trigger
+    // options every time the extension was reloaded.)
     const defaults = {
-        show_alert: false, // Default to off - user must opt-in to see alerts
-        allow_form_continuation: true, // Allow clicks to proceed by default - just observe
+        extension_enabled: true,
+        trigger_on_click_enabled: true,
+        show_alert: false,
+        allow_form_continuation: true,
         redirect_to_500: false,
         run_scenario_on_submit: false,
-        trigger_crux: false, // Default to off - user must opt-in to trigger Crux
-        crux_url: "", // No default Crux URL - user must configure
+        trigger_crux: false,
+        crux_url: "",
         custom_alert_message: "Error: UX Failure - Our team are working on it now.",
-        target_element_texts: "Login", // Simple default - user can customize
-        active_scenario_id: "" // No default active scenario
+        target_element_texts: "Login",
+        active_scenario_id: "",
+        active_scenario_ids: []
     };
-
-    // Set extension_enabled to true by default ONLY on fresh install (ready to use)
-    if (existingSettings.extension_enabled === undefined) {
-        defaults.extension_enabled = true; // Enabled by default - ready to use out of the box
+    const existing = await chrome.storage.sync.get(Object.keys(defaults));
+    const missing = Object.fromEntries(Object.entries(defaults).filter(([k]) => existing[k] === undefined));
+    if (Object.keys(missing).length) {
+        await chrome.storage.sync.set(missing);
     }
-
-    // Set trigger_on_click_enabled to true by default ONLY on fresh install
-    if (existingSettings.trigger_on_click_enabled === undefined) {
-        defaults.trigger_on_click_enabled = true; // Click interception enabled with sensible defaults
-    }
-    
-    chrome.storage.sync.set(defaults);
+    // Scenario progress moved from sync to local storage in v2.0
+    chrome.storage.sync.remove('scenario_running');
     console.log('[Incident Injector] Default settings applied:', defaults);
 });
 
@@ -190,7 +188,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         handleLoadEventDefinition(request.definition, sendResponse);
         return true;
     } else if (request.action === 'run_scenario') {
-        handleRunScenario(request.scenarioId, request.options, sendResponse);
+        const ids = Array.isArray(request.scenarioIds) && request.scenarioIds.length
+            ? request.scenarioIds
+            : [request.scenarioId];
+        handleRunScenario(ids, request.options, sendResponse);
         return true;
     } else if (request.action === 'run_active_scenario') {
         handleRunActiveScenario(request.data, sendResponse);
@@ -234,188 +235,178 @@ async function handleLoadEventDefinition(definitionJson, sendResponse) {
     }
 }
 
-// Handle running a scenario
-async function handleRunScenario(scenarioId, options, sendResponse) {
+// ---------------------------------------------------------------------------
+// Scenario runs. Every run — panel button or intercepted click — goes through
+// runScenarioSet(), which can fire several scenarios together. Each scenario
+// gets its own PagerDutyEventProcessor so template variables ({{incident_id}}
+// etc.) and the isRunning guard never collide between concurrent runs.
+// ---------------------------------------------------------------------------
+
+const STAGGER_MS = 5000;
+let activeRunSet = null;          // { runs, startTime } while anything is running
+let runningWriteTimer = null;
+
+function scenarioRunningSnapshot() {
+    if (!activeRunSet) return null;
+    const runs = activeRunSet.runs;
+    const progress = runs.reduce((sum, r) => sum + (r.state === 'running' || r.state === 'queued' ? (r.progress || 0) : 100), 0) / runs.length;
+    const live = runs.filter(r => r.state === 'running' || r.state === 'queued').length;
+    return {
+        id: runs.map(r => r.id).join(','),
+        name: runs.length === 1 ? runs[0].name : `${runs.length} scenarios`,
+        status: live ? `${runs.length - live}/${runs.length} complete` : 'complete',
+        progress: Math.round(progress),
+        runs: runs.map(({ id, name, progress, state }) => ({ id, name, progress, state })),
+        startTime: activeRunSet.startTime,
+        lastUpdate: Date.now()
+    };
+}
+
+// Coalesce progress writes: chrome.storage writes are rate-limited and the
+// panel only needs a few updates a second.
+function scheduleRunningWrite(immediate = false) {
+    if (immediate) {
+        clearTimeout(runningWriteTimer);
+        runningWriteTimer = null;
+        return setScenarioRunningStatus(scenarioRunningSnapshot());
+    }
+    if (runningWriteTimer) return;
+    runningWriteTimer = setTimeout(() => {
+        runningWriteTimer = null;
+        setScenarioRunningStatus(scenarioRunningSnapshot());
+    }, 400);
+}
+
+async function loadDefinitionObject(definitionJson) {
+    let raw = definitionJson;
+    if (!raw) {
+        const stored = await chrome.storage.local.get(['event_definition']);
+        raw = stored.event_definition;
+    }
+    if (!raw) throw new Error('No event definition loaded');
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+}
+
+async function runScenarioSet(scenarioIds, options = {}) {
+    const ids = [...new Set((scenarioIds || []).filter(Boolean).map(String))];
+    if (ids.length === 0) return { success: false, error: 'No scenario selected' };
+
+    const { integration_key } = await chrome.storage.sync.get(['integration_key']);
+    const key = (integration_key || '').trim();
+    if (!isValidIntegrationKey(key)) {
+        return { success: false, error: 'Valid PagerDuty integration key required (32 characters).' };
+    }
+
+    let definition;
     try {
-        // Re-initialize to ensure integration key is loaded
-        await eventProcessor.initialize();
-        
-        // Load the event definition if provided
-        if (options && options.eventDefinition) {
-            try {
-                const definition = JSON.parse(options.eventDefinition);
-                eventProcessor.loadEventDefinition(definition);
-            } catch (e) {
-                console.error('[Background] Failed to parse event definition:', e);
-                sendResponse({
-                    success: false,
-                    error: 'Invalid event definition JSON'
-                });
-                return;
-            }
-        }
-        
-        // Get scenario details for the indicator
-        const scenarios = eventProcessor.getAvailableScenarios();
-        const scenario = scenarios.find(s => s.id === scenarioId);
-        
-        // Set running status with timestamp
-        await setScenarioRunningStatus({
-            id: scenarioId,
-            name: scenario ? scenario.name : scenarioId,
-            progress: 0,
-            startTime: Date.now()
-        });
-        
-        // Check if integration key is configured - REQUIRED for scenarios
-        const result = await chrome.storage.sync.get(['integration_key']);
-        console.log('[Background] Integration key from storage:', result.integration_key ? `"${result.integration_key}" (${result.integration_key.length} chars)` : 'not set');
+        definition = await loadDefinitionObject(options.eventDefinition);
+    } catch (e) {
+        return { success: false, error: e instanceof SyntaxError ? 'Invalid event definition JSON' : e.message };
+    }
 
-        // Trim the key and validate
-        const integrationKey = result.integration_key ? result.integration_key.trim() : '';
-        const hasIntegrationKey = integrationKey.length === 32 && /^[a-zA-Z0-9]+$/.test(integrationKey);
+    // Keep the shared processor in sync for anything else that reads it.
+    eventProcessor.loadEventDefinition(definition);
+    const known = eventProcessor.getAvailableScenarios();
+    const missing = ids.filter(id => !known.some(s => s.id === id));
+    if (missing.length === ids.length) {
+        return { success: false, error: `Scenario not found: ${missing.join(', ')}` };
+    }
+    const runnable = ids.filter(id => !missing.includes(id));
 
-        if (!hasIntegrationKey) {
-            console.log('[Background] No valid integration key configured - scenario cannot run');
-            console.log('[Background] Key validation failed:', {
-                hasKey: !!result.integration_key,
-                trimmedLength: integrationKey.length,
-                isAlphanumeric: /^[a-zA-Z0-9]+$/.test(integrationKey)
-            });
-            await clearScenarioRunningStatus();
-            sendResponse({
-                success: false,
-                error: 'Valid PagerDuty integration key required. Please configure a 32-character integration key first.'
-            });
-            return;
+    const runs = runnable.map(id => ({
+        id,
+        name: known.find(s => s.id === id)?.name || id,
+        progress: 0,
+        state: 'queued'
+    }));
+
+    // A new set joins whatever is already running so the panel shows everything.
+    if (!activeRunSet) activeRunSet = { runs: [], startTime: Date.now() };
+    activeRunSet.runs.push(...runs);
+    await scheduleRunningWrite(true);
+
+    // MV3 service workers idle out after ~30s without extension events; long
+    // scenario delays would be killed mid-run. Any extension API call resets
+    // the idle timer, so ping one while runs are in flight.
+    const keepAlive = setInterval(() => chrome.runtime.getPlatformInfo(() => {}), 20000);
+
+    const stagger = options.stagger === true;
+    const results = await Promise.allSettled(runs.map(async (run, index) => {
+        if (stagger && index > 0) {
+            await new Promise(resolve => setTimeout(resolve, index * STAGGER_MS));
         }
-        
-        // Start the scenario with debugging
-        console.log('[Background] Starting scenario with options:', options);
-        console.log('[Background] Event processor integration key:', eventProcessor.integrationKey ? 'Present' : 'Missing');
-        console.log('[Background] Event processor has definition:', eventProcessor.currentDefinition ? 'Yes' : 'No');
-        
-        // Log the event definition being used
-        if (options && options.eventDefinition) {
-            try {
-                const parsed = JSON.parse(options.eventDefinition);
-                console.log('[Background] Event definition schema:', parsed.event_definitions ? 'New' : parsed.scenarios ? 'Legacy' : 'Unknown');
-                const eventCount = parsed.event_definitions ? 
-                    parsed.event_definitions.reduce((sum, def) => sum + (def.events?.length || 0), 0) :
-                    parsed.scenarios ? Object.values(parsed.scenarios).reduce((sum, scenario) => sum + (scenario.events?.length || 0), 0) : 0;
-                console.log('[Background] Total events to process:', eventCount);
-            } catch (e) {
-                console.error('[Background] Failed to parse event definition for logging:', e);
-            }
-        }
-        
-        const success = await eventProcessor.startScenario(scenarioId, options);
-        console.log('[Background] Scenario execution result:', success);
-        
-        // Clear running status
-        await clearScenarioRunningStatus();
-        
-        if (success) {
-            sendResponse({
-                success: true,
-                message: `Event definition ${scenarioId} started successfully`
-            });
-        } else {
-            // Check if integration key is missing
-            const result = await chrome.storage.sync.get(['integration_key']);
-            const errorMessage = !result.integration_key ?
-                'No PagerDuty integration key configured. Please set a key in the extension settings.' :
-                'Failed to start event definition';
-                
-            sendResponse({
-                success: false,
-                error: errorMessage
-            });
-        }
+        const processor = new PagerDutyEventProcessor();
+        processor.integrationKey = key;
+        processor.dryRun = options.dryRun === true;
+        if (!processor.loadEventDefinition(definition)) throw new Error('Definition failed validation');
+        processor.updateProgress = (progress) => {
+            run.progress = progress;
+            scheduleRunningWrite();
+        };
+        run.state = 'running';
+        scheduleRunningWrite();
+        const ok = await processor.runScenario(run.id);
+        run.state = ok && processor.failedEvents.length === 0 ? 'done' : 'failed';
+        run.progress = 100;
+        run.failed = processor.failedEvents.length;
+        scheduleRunningWrite();
+        if (!ok) throw new Error(`Scenario ${run.name} failed`);
+        return run;
+    }));
+
+    clearInterval(keepAlive);
+    results.forEach((r, i) => { if (r.status === 'rejected') runs[i].state = 'failed'; });
+
+    // Clear the indicator once every run in the active set has finished.
+    if (activeRunSet && activeRunSet.runs.every(r => r.state === 'done' || r.state === 'failed')) {
+        await scheduleRunningWrite(true);
+        activeRunSet = null;
+        setTimeout(() => { if (!activeRunSet) clearScenarioRunningStatus(); }, 1500);
+    } else {
+        scheduleRunningWrite();
+    }
+
+    const failed = runs.filter(r => r.state === 'failed');
+    const sent = runs.length - failed.length;
+    const parts = [];
+    if (sent) parts.push(runs.length === 1 ? `${runs[0].name}: events sent` : `${sent} of ${runs.length} scenarios sent`);
+    if (failed.length) parts.push(`failed: ${failed.map(f => f.name).join(', ')}`);
+    if (missing.length) parts.push(`not found: ${missing.join(', ')}`);
+    return {
+        success: failed.length === 0,
+        partial: failed.length > 0 && sent > 0,
+        message: parts.join(' · '),
+        error: failed.length ? parts.join(' · ') : undefined,
+        runs: runs.map(({ id, name, state, failed }) => ({ id, name, state, failedEvents: failed || 0 }))
+    };
+}
+
+// Panel "Run" button: explicit ids (or a single legacy id)
+async function handleRunScenario(scenarioIds, options, sendResponse) {
+    try {
+        sendResponse(await runScenarioSet(scenarioIds, options || {}));
     } catch (error) {
-        console.error('[Event Definition] Error running event definition:', error);
-        await clearScenarioRunningStatus();
-        sendResponse({
-            success: false,
-            error: error.message
-        });
+        console.error('[Background] Error running scenarios:', error);
+        sendResponse({ success: false, error: error.message });
     }
 }
 
-// Handle running the active scenario
+// Intercepted click / submit: run every ticked scenario
 async function handleRunActiveScenario(formData, sendResponse) {
     try {
-        console.log('[Event Definition] Handling run active scenario request with form data:', formData);
-        console.log('[Event Definition] Message received in background script');
-        
-        // Get the active scenario ID
-        const result = await chrome.storage.sync.get(['active_scenario_id']);
-        const activeScenarioId = result.active_scenario_id;
-        console.log('[Event Definition] Retrieved active scenario ID from storage:', activeScenarioId);
-        
-        console.log('[Event Definition] Active scenario ID:', activeScenarioId);
-        
-        if (!activeScenarioId) {
-            console.error('[Event Definition] No active scenario configured');
-            sendResponse({
-                success: false,
-                error: 'No active scenario configured'
-            });
+        const { active_scenario_ids, active_scenario_id, run_stagger } =
+            await chrome.storage.sync.get(['active_scenario_ids', 'active_scenario_id', 'run_stagger']);
+        const ids = Array.isArray(active_scenario_ids) && active_scenario_ids.length
+            ? active_scenario_ids
+            : (active_scenario_id ? [active_scenario_id] : []);
+        if (!ids.length) {
+            sendResponse({ success: false, error: 'No active scenario configured' });
             return;
         }
-        
-        // Re-initialize to ensure integration key is loaded
-        await eventProcessor.initialize();
-        
-        // Get scenario details for the indicator
-        const scenarios = eventProcessor.getAvailableScenarios();
-        const scenario = scenarios.find(s => s.id === activeScenarioId);
-        
-        // Set running status with timestamp
-        await setScenarioRunningStatus({
-            id: activeScenarioId,
-            name: scenario ? scenario.name : activeScenarioId,
-            progress: 0,
-            startTime: Date.now()
-        });
-        
-        // Start the scenario
-        console.log('[Event Definition] Running scenario:', activeScenarioId);
-        
-        // Add more detailed logging
-        console.log('[Event Definition] Integration key:', eventProcessor.integrationKey);
-        console.log('[Event Definition] Current definition:', eventProcessor.currentDefinition ? 'Loaded' : 'Not loaded');
-        
-        const success = await eventProcessor.runScenario(activeScenarioId);
-        console.log('[Event Definition] Scenario run result:', success);
-        
-        // Clear running status
-        await clearScenarioRunningStatus();
-        
-        if (success) {
-            sendResponse({
-                success: true,
-                message: `Active scenario ${activeScenarioId} executed successfully`
-            });
-        } else {
-            // Check if integration key is missing
-            const keyResult = await chrome.storage.sync.get(['integration_key']);
-            const errorMessage = !keyResult.integration_key ?
-                'No PagerDuty integration key configured. Please set a key in the extension settings.' :
-                'Failed to run active scenario';
-                
-            sendResponse({
-                success: false,
-                error: errorMessage
-            });
-        }
+        sendResponse(await runScenarioSet(ids, { stagger: run_stagger === true }));
     } catch (error) {
-        console.error('[Event Definition] Error running active scenario:', error);
-        await clearScenarioRunningStatus();
-        sendResponse({
-            success: false,
-            error: error.message
-        });
+        console.error('[Background] Error running active scenarios:', error);
+        sendResponse({ success: false, error: error.message });
     }
 }
 
@@ -423,13 +414,13 @@ async function handleRunActiveScenario(formData, sendResponse) {
 // Handle scenario progress updates
 async function handleUpdateScenarioProgress(progress, status, sendResponse) {
     try {
-        const result = await chrome.storage.sync.get(['scenario_running']);
+        const result = await chrome.storage.local.get(['scenario_running']);
         if (result.scenario_running) {
             result.scenario_running.progress = progress;
             result.scenario_running.status = status;
             result.scenario_running.lastUpdate = Date.now();
             
-            await chrome.storage.sync.set({ scenario_running: result.scenario_running });
+            await chrome.storage.local.set({ scenario_running: result.scenario_running });
             console.log(`[Background] Updated scenario progress: ${progress}% - ${status}`);
             
             sendResponse({ success: true });
@@ -487,9 +478,10 @@ async function handleIncidentCreation(formData, sendResponse) {
             // Store incident for deduplication
             await storeRecentIncident(dedupKey);
             
-            // Update last incident timestamp
-            await chrome.storage.sync.set({
-                last_incident_timestamp: new Date().toISOString()
+            // Last-incident time for the panel status line. Local, not sync:
+            // sync allows ~120 writes/min shared with every settings save.
+            await chrome.storage.local.set({
+                last_incident_time: new Date().toISOString()
             });
             
             console.log('[PagerDuty Simulator] Incident created successfully');
@@ -548,10 +540,15 @@ function isValidIntegrationKey(key) {
 }
 
 // Generate deduplication key with timestamp to ensure uniqueness
+// The old version base64'd `url:action:timestamp` and kept the first 32 chars,
+// which only covered the URL prefix — every incident from one host shared a
+// dedup_key, so PagerDuty folded repeat triggers into the first open alert.
 function generateDedupKey(url, formAction) {
-    const timestamp = Date.now();
-    const baseString = `${url}:${formAction}:${timestamp}`;
-    return btoa(baseString).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+    const id = (self.crypto && crypto.randomUUID) ? crypto.randomUUID().replace(/-/g, '')
+        : Date.now().toString(36) + Math.random().toString(36).slice(2);
+    let host = 'page';
+    try { host = new URL(url).hostname.replace(/[^a-zA-Z0-9.-]/g, '') || host; } catch (e) { /* keep default */ }
+    return `ii-${host}-${id}`.slice(0, 255);
 }
 
 // Create PagerDuty incident payload
@@ -655,7 +652,7 @@ chrome.notifications.onClicked.addListener((notificationId) => {
 // Scenario running status helpers
 async function setScenarioRunningStatus(scenarioData) {
     try {
-        await chrome.storage.sync.set({ scenario_running: scenarioData });
+        await chrome.storage.local.set({ scenario_running: scenarioData });
         console.log('[Background] Set scenario running status:', scenarioData);
     } catch (error) {
         console.error('[Background] Error setting scenario running status:', error);
@@ -665,15 +662,15 @@ async function setScenarioRunningStatus(scenarioData) {
 async function clearScenarioRunningStatus() {
     try {
         // Check if there was actually a running scenario before clearing
-        const beforeResult = await chrome.storage.sync.get(['scenario_running']);
+        const beforeResult = await chrome.storage.local.get(['scenario_running']);
         if (beforeResult.scenario_running) {
             console.log('[Background] Clearing scenario running status for:', beforeResult.scenario_running.name);
         }
         
-        await chrome.storage.sync.remove(['scenario_running']);
+        await chrome.storage.local.remove(['scenario_running']);
         
         // Verify it was actually cleared
-        const afterResult = await chrome.storage.sync.get(['scenario_running']);
+        const afterResult = await chrome.storage.local.get(['scenario_running']);
         if (!afterResult.scenario_running) {
             console.log('[Background] ✅ Scenario running status successfully cleared');
         } else {
@@ -687,11 +684,11 @@ async function clearScenarioRunningStatus() {
 // Update scenario progress
 async function updateScenarioProgress(progress) {
     try {
-        const result = await chrome.storage.sync.get(['scenario_running']);
+        const result = await chrome.storage.local.get(['scenario_running']);
         if (result.scenario_running) {
             result.scenario_running.progress = progress;
             result.scenario_running.lastUpdate = Date.now(); // Add timestamp
-            await chrome.storage.sync.set({ scenario_running: result.scenario_running });
+            await chrome.storage.local.set({ scenario_running: result.scenario_running });
             console.log('[Background] Updated scenario progress:', progress);
         }
     } catch (error) {
@@ -702,7 +699,7 @@ async function updateScenarioProgress(progress) {
 // Diagnostic function to check for stuck scenarios
 async function checkForStuckScenarios() {
     try {
-        const result = await chrome.storage.sync.get(['scenario_running']);
+        const result = await chrome.storage.local.get(['scenario_running']);
         if (result.scenario_running) {
             const runningTime = Date.now() - (result.scenario_running.startTime || 0);
             const maxRunTime = 10 * 60 * 1000; // 10 minutes max

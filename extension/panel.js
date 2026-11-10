@@ -3,6 +3,13 @@
 (function() {
     'use strict';
 
+    // Page localStorage throws in sandboxed frames and on opaque origins;
+    // never let that abort the script. chrome.storage.sync stays the source of truth.
+    const safeStorage = {
+        get(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } },
+        set(key, value) { try { window.localStorage.setItem(key, value); } catch (e) { /* ignore */ } }
+    };
+
     // Trusted Types policy — panel.js runs in the page's main world, so pages
     // that enforce `require-trusted-types-for 'script'` will reject raw string
     // assignments to innerHTML. Pass-through policy; all HTML we assign is
@@ -151,6 +158,9 @@
             
             // Ensure sections remain collapsed after initialization
             ensureSectionsCollapsed();
+
+            // Console-UI extras: armed state, summaries, about sheet, JSON format, multi-run
+            initConsoleUi();
             
             // Initialize trigger options
             initializeTriggerOptions();
@@ -255,7 +265,9 @@
                     'target_element_texts',
                     'trigger_on_click_enabled',
                     'run_scenario_on_submit',
-                    'active_scenario_id'
+                    'active_scenario_id',
+                    'active_scenario_ids',
+                    'run_stagger'
                 ]);
             } else {
                 // Fallback: communicate through content script
@@ -308,7 +320,7 @@
             if (integrationKeyInput) integrationKeyInput.value = result.integration_key || '';
             if (cruxUrlInput) cruxUrlInput.value = result.crux_url || '';
             // Check localStorage first, then chrome.storage, then default to true
-            const savedExtensionEnabled = localStorage.getItem('incident_injector_extension_enabled');
+            const savedExtensionEnabled = safeStorage.get('incident_injector_extension_enabled');
             let extensionEnabled = true; // Default to true (enabled)
             if (result.extension_enabled !== undefined) {
                 extensionEnabled = result.extension_enabled;
@@ -332,7 +344,7 @@
                     : defaultTargets;
             }
             // Check localStorage first, then chrome.storage, then default to true
-            const savedTriggerOnClick = localStorage.getItem('incident_injector_trigger_on_click');
+            const savedTriggerOnClick = safeStorage.get('incident_injector_trigger_on_click');
             let triggerOnClickEnabled = true; // Default to true (enabled)
             if (result.trigger_on_click_enabled !== undefined) {
                 triggerOnClickEnabled = result.trigger_on_click_enabled;
@@ -341,6 +353,8 @@
             }
             if (triggerOnClickEnabledToggle) triggerOnClickEnabledToggle.checked = triggerOnClickEnabled;
             if (runScenarioToggle) runScenarioToggle.checked = result.run_scenario_on_submit !== false;
+            const staggerToggle = panel.querySelector('#run-mode-stagger');
+            if (staggerToggle) staggerToggle.checked = result.run_stagger === true;
 
             // Add event listeners
             addEventListeners();
@@ -369,7 +383,7 @@
                 console.log('[Panel] Extension enabled changed to:', value);
 
                 // Always save to localStorage for persistence
-                localStorage.setItem('incident_injector_extension_enabled', value.toString());
+                safeStorage.set('incident_injector_extension_enabled', value.toString());
 
                 // Try to save to chrome.storage
                 try {
@@ -1267,6 +1281,7 @@
                         button.classList.add('collapsed');
                         targetSection.classList.add('collapsed');
                     }
+                    button.setAttribute('aria-expanded', String(isCollapsed));
                 }
             });
         });
@@ -1406,7 +1421,7 @@
                 console.log('[Panel] Trigger on click enabled changed to:', value);
 
                 // Always save to localStorage for persistence
-                localStorage.setItem('incident_injector_trigger_on_click', value.toString());
+                safeStorage.set('incident_injector_trigger_on_click', value.toString());
 
                 // Try to save to chrome.storage
                 try {
@@ -1486,8 +1501,6 @@
             // Note: We don't need to check isExtensionContext() here because
             // we have a fallback message relay system in place
 
-            // Get the current selected scenario
-            const scenarioSelect = panel.querySelector('#scenario-select');
             const eventDefinitionTextarea = panel.querySelector('#event-definition');
 
             if (!eventDefinitionTextarea || !eventDefinitionTextarea.value.trim()) {
@@ -1495,26 +1508,17 @@
                 resultDiv.className = 'test-result error';
                 return;
             }
-            
-            let selectedScenarioId = null;
-            if (scenarioSelect && scenarioSelect.value) {
-                selectedScenarioId = scenarioSelect.value;
-            }
-            
-            // If no scenario is explicitly selected, try to use the first available one
-            if (!selectedScenarioId && scenarioSelect && scenarioSelect.options.length > 1) {
-                selectedScenarioId = scenarioSelect.options[1].value; // Index 0 is "-- Select a scenario --"
-                scenarioSelect.value = selectedScenarioId;
-                console.log('[Panel] Auto-selected first scenario:', selectedScenarioId);
-            }
-            
-            if (!selectedScenarioId) {
-                resultDiv.textContent = 'No scenarios available - please load an event definition first';
+
+            const selectedScenarioIds = getSelectedScenarioIds();
+            if (selectedScenarioIds.length === 0) {
+                resultDiv.textContent = 'Tick at least one scenario first';
                 resultDiv.className = 'test-result error';
                 return;
             }
+            const stagger = !!panel.querySelector('#run-mode-stagger')?.checked;
+            const selectedScenarioId = selectedScenarioIds[0];
             
-            resultDiv.textContent = 'Running scenario...';
+            resultDiv.textContent = selectedScenarioIds.length > 1 ? `Running ${selectedScenarioIds.length} scenarios…` : 'Running scenario…';
             resultDiv.className = 'test-result';
             
             console.log('[Panel] Attempting to run scenario:', selectedScenarioId);
@@ -1550,7 +1554,9 @@
                     action: 'run_scenario_request',
                     source: 'incident-injector-panel',
                     scenarioId: selectedScenarioId,
+                    scenarioIds: selectedScenarioIds,
                     options: {
+                        stagger,
                         eventDefinition: eventDefinitionTextarea.value,
                         url: window.location.href,
                         timestamp: new Date().toISOString()
@@ -1562,11 +1568,11 @@
                     console.log('[Panel] Scenario run timed out after 60 seconds');
                     window.removeEventListener('message', messageHandler);
                     reject(new Error('Scenario run request timed out but may still be running in background'));
-                }, 60000);
+                }, 180000);
             });
             
             if (response && response.success) {
-                resultDiv.textContent = 'Scenario executed successfully!';
+                resultDiv.textContent = response.message || 'Scenario executed successfully';
                 resultDiv.className = 'test-result success';
             } else {
                 resultDiv.textContent = response?.error || 'Failed to run scenario';
@@ -1579,7 +1585,7 @@
                 resultDiv.textContent = 'Scenario may still be running in background. Check browser console for updates.';
                 resultDiv.className = 'test-result warning';
             } else if (error.message.includes('Extension context invalidated') || error.message.includes('CONTEXT_INVALIDATED')) {
-                resultDiv.innerHTML = toTrustedHTML('Extension reloaded - please refresh page to continue<br><button onclick="window.location.reload()" class="btn btn-secondary" style="margin-top:8px;width:100%">Refresh Page</button>');
+                resultDiv.textContent = 'Extension was reloaded. Refresh this page to continue.';
                 resultDiv.className = 'test-result error';
             } else {
                 resultDiv.textContent = 'Error: ' + error.message;
@@ -1705,6 +1711,8 @@
         if (!definition || !definition.trim()) {
             definitionValidation.textContent = '';
             definitionValidation.className = 'validation-message';
+            renderScenarioList([]);
+            setText('#definition-summary', 'empty');
             if (scenarioControls) scenarioControls.style.display = 'none';
             return;
         }
@@ -1739,60 +1747,13 @@
             definitionValidation.textContent = `Valid definition with ${scenarios.length} scenario(s)`;
             definitionValidation.className = 'validation-message valid';
             
-            // Show scenario controls and populate dropdown
-            if (scenarioControls) {
-                scenarioControls.style.display = 'block';
-                
-                if (scenarioSelect) {
-                    scenarioSelect.innerHTML = toTrustedHTML('<option value="">-- Select a scenario --</option>');
-                    scenarios.forEach((scenario, index) => {
-                        const option = document.createElement('option');
-                        option.value = scenario.id || index.toString();
-                        option.textContent = scenario.name || `Event Definition ${index + 1}`;
-                        scenarioSelect.appendChild(option);
-                    });
-                    
-                    // Restore saved scenario selection using loaded settings
-                    const activeScenarioId = loadedSettings.active_scenario_id;
-                    if (activeScenarioId && scenarios.find(s => s.id === activeScenarioId)) {
-                        scenarioSelect.value = activeScenarioId;
-                        console.log('[Panel] Restored saved scenario from loaded settings:', activeScenarioId);
-                    } else if (scenarios.length > 0) {
-                        scenarioSelect.value = scenarios[0].id || '0';
-                        console.log('[Panel] Auto-selected first scenario:', scenarioSelect.value);
-                    }
-                    
-                    // Add event listener to auto-save scenario selection changes
-                    scenarioSelect.addEventListener('change', async (e) => {
-                        const selectedScenarioId = e.target.value;
-                        console.log('[Panel] Scenario selection changed, saving:', selectedScenarioId);
-                        
-                        // Update loaded settings for immediate use
-                        loadedSettings.active_scenario_id = selectedScenarioId;
-                        
-                        // Save to storage with fallback support
-                        try {
-                            if (isExtensionContext()) {
-                                await chrome.storage.sync.set({ active_scenario_id: selectedScenarioId });
-                            } else {
-                                // Fallback: save via message relay
-                                window.postMessage({
-                                    action: 'save_scenario_selection_request',
-                                    source: 'incident-injector-panel',
-                                    scenarioId: selectedScenarioId
-                                }, '*');
-                            }
-                            console.log('[Panel] Scenario selection saved successfully');
-                        } catch (error) {
-                            console.log('[Panel] Failed to save scenario selection:', error);
-                        }
-                    });
-                }
-            }
+            renderScenarioList(scenarios);
+            setText('#definition-summary', `${scenarios.length} scenario${scenarios.length === 1 ? '' : 's'}`);
             
         } catch (error) {
             definitionValidation.textContent = `Invalid JSON: ${error.message}`;
             definitionValidation.className = 'validation-message invalid';
+            setText('#definition-summary', 'invalid');
             if (scenarioControls) scenarioControls.style.display = 'none';
         }
     }
@@ -1808,7 +1769,7 @@
         if (!isExtensionContext()) return;
         
         try {
-            chrome.storage.sync.get(['scenario_running'], (result) => {
+            chrome.storage.local.get(['scenario_running'], (result) => {
             const panel = document.getElementById('incident-injector-panel');
             if (!panel) return;
             
@@ -1854,7 +1815,7 @@
     if (isExtensionContext()) {
         try {
             chrome.storage.onChanged.addListener((changes, namespace) => {
-            if (namespace === 'sync') {
+            if (namespace === 'local') {
                 if (changes.scenario_running) {
                     const panel = document.getElementById('incident-injector-panel');
                     if (!panel) return;
@@ -2086,7 +2047,14 @@
         addBool('allow_form_continuation', '#option-continue-destination');
         addBool('trigger_on_click_enabled', '#trigger-on-click-enabled');
         addRawString('target_element_texts', '#target-elements');
-        addRawString('active_scenario_id', '#scenario-select');
+        // Scenario selection: only when the list is actually rendered, so an
+        // unloaded definition never wipes the saved selection.
+        if (panel.querySelector('#scenario-list input[data-scenario-id]')) {
+            const ids = getSelectedScenarioIds();
+            settings.active_scenario_ids = ids;
+            settings.active_scenario_id = ids[0] || '';
+        }
+        addBool('run_stagger', '#run-mode-stagger');
 
         console.log('[Panel] Auto-save gathering settings:', {
             keys: Object.keys(settings),
@@ -2108,7 +2076,7 @@
         // Save to localStorage for persistence
         Object.keys(settings).forEach(key => {
             if (key === 'extension_enabled' || key === 'trigger_on_click_enabled') {
-                localStorage.setItem(`incident_injector_${key}`, settings[key].toString());
+                safeStorage.set(`incident_injector_${key}`, settings[key].toString());
             }
         });
 
@@ -2199,6 +2167,254 @@
                 console.log('[Panel] Message relay failed:', msgError.message);
             }
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Console UI: multi-select scenarios, armed state, summaries, sheets
+    // ------------------------------------------------------------------
+
+    function setText(selector, text) {
+        const el = document.getElementById('incident-injector-panel')?.querySelector(selector);
+        if (el) el.textContent = text;
+    }
+
+    function getSelectedScenarioIds() {
+        const panel = document.getElementById('incident-injector-panel');
+        if (!panel) return [];
+        return Array.from(panel.querySelectorAll('#scenario-list input[data-scenario-id]:checked'))
+            .map(input => input.dataset.scenarioId);
+    }
+
+    function savedSelection(available) {
+        const ids = Array.isArray(loadedSettings.active_scenario_ids)
+            ? loadedSettings.active_scenario_ids
+            : (loadedSettings.active_scenario_id ? [loadedSettings.active_scenario_id] : null);
+        if (ids === null) return available.length ? [available[0]] : []; // first run: tick the first one
+        return ids.filter(id => available.includes(id));
+    }
+
+    function renderScenarioList(scenarios) {
+        const panel = document.getElementById('incident-injector-panel');
+        const list = panel?.querySelector('#scenario-list');
+        if (!list) return;
+        list.replaceChildren();
+
+        if (!scenarios.length) {
+            const empty = document.createElement('li');
+            empty.className = 'ii-empty';
+            empty.textContent = 'No event definition loaded. Open Definition below and load the default.';
+            list.appendChild(empty);
+            updateSelectionUi();
+            return;
+        }
+
+        const ids = scenarios.map((sc, i) => String(sc.id || i));
+        const selected = new Set(savedSelection(ids));
+
+        scenarios.forEach((sc, i) => {
+            const id = ids[i];
+            const li = document.createElement('li');
+            const label = document.createElement('label');
+            label.className = 'ii-scn';
+            label.dataset.scenarioRow = id;
+
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.dataset.scenarioId = id;
+            input.checked = selected.has(id);
+            const box = document.createElement('span');
+            box.className = 'ii-box';
+            box.setAttribute('aria-hidden', 'true');
+
+            const name = document.createElement('span');
+            name.className = 'ii-scn-name';
+            name.textContent = sc.name || `Scenario ${i + 1}`;
+            const count = document.createElement('span');
+            count.className = 'ii-scn-count';
+            const n = Array.isArray(sc.events) ? sc.events.length : 0;
+            count.textContent = `${n} event${n === 1 ? '' : 's'}`;
+
+            label.append(input, box, name, count);
+            if (sc.description) {
+                const desc = document.createElement('span');
+                desc.className = 'ii-scn-desc';
+                desc.textContent = sc.description;
+                label.appendChild(desc);
+            }
+            input.addEventListener('change', () => {
+                updateSelectionUi();
+                persistScenarioSelection();
+            });
+            li.appendChild(label);
+            list.appendChild(li);
+        });
+        updateSelectionUi();
+    }
+
+    function updateSelectionUi() {
+        const panel = document.getElementById('incident-injector-panel');
+        if (!panel) return;
+        const all = panel.querySelectorAll('#scenario-list input[data-scenario-id]');
+        const ids = getSelectedScenarioIds();
+        all.forEach(input => input.closest('.ii-scn')?.classList.toggle('is-on', input.checked));
+        setText('#scenario-count', all.length ? `${ids.length} of ${all.length} selected` : '');
+        setText('#run-scenario-label', ids.length > 1 ? `Run ${ids.length} scenarios` : ids.length === 1 ? 'Run scenario' : 'Select a scenario');
+        const run = panel.querySelector('#run-scenario-quick');
+        if (run) run.disabled = ids.length === 0;
+    }
+
+    function persistScenarioSelection() {
+        const ids = getSelectedScenarioIds();
+        loadedSettings.active_scenario_ids = ids;
+        loadedSettings.active_scenario_id = ids[0] || '';
+        const payload = { active_scenario_ids: ids, active_scenario_id: ids[0] || '' };
+        try {
+            if (isExtensionContext()) {
+                chrome.storage.sync.set(payload);
+            } else {
+                window.postMessage({
+                    action: 'save_scenario_selection_request',
+                    source: 'incident-injector-panel',
+                    scenarioId: payload.active_scenario_id,
+                    scenarioIds: ids
+                }, '*');
+            }
+        } catch (error) {
+            console.log('[Panel] Failed to save scenario selection:', error.message);
+        }
+    }
+
+    function updateSummaries() {
+        const panel = document.getElementById('incident-injector-panel');
+        if (!panel) return;
+        const armed = !!panel.querySelector('#extension-enabled')?.checked;
+        panel.classList.toggle('ii-armed', armed);
+
+        const on = [
+            ['#option-run-scenario', 'scenarios'],
+            ['#option-create-alert', 'alert'],
+            ['#option-add-500-error', '500'],
+            ['#option-trigger-crux', 'crux'],
+            ['#option-continue-destination', 'continue']
+        ].filter(([sel]) => panel.querySelector(sel)?.checked).map(([, label]) => label);
+        setText('#trigger-summary', on.length ? on.join(' · ') : 'nothing');
+
+        const clickOn = !!panel.querySelector('#trigger-on-click-enabled')?.checked;
+        const targets = (panel.querySelector('#target-elements')?.value || '')
+            .split(',').map(t => t.trim()).filter(Boolean);
+        setText('#target-summary', !clickOn ? 'off' : targets.length ? `${targets.length} match${targets.length === 1 ? '' : 'es'}` : 'none set');
+
+        const key = (panel.querySelector('#integration-key')?.value || '').trim();
+        setText('#key-summary', key.length === 32 ? `…${key.slice(-4)}` : key ? 'invalid key' : 'no key');
+    }
+
+    function openSheet(sheet, opener) {
+        if (!sheet) return;
+        sheet.style.display = 'block';
+        sheet._opener = opener || null;
+        sheet.querySelector('button, a')?.focus();
+    }
+    function closeSheet(sheet) {
+        if (!sheet || sheet.style.display === 'none') return;
+        sheet.style.display = 'none';
+        sheet._opener?.focus?.();
+    }
+
+    function renderRunning(data) {
+        const panel = document.getElementById('incident-injector-panel');
+        if (!panel) return;
+        const block = panel.querySelector('#scenario-running-indicator');
+        const list = panel.querySelector('#scenario-running-list');
+        panel.querySelectorAll('.ii-scn.is-running').forEach(el => el.classList.remove('is-running'));
+        if (!data) {
+            if (block) block.style.display = 'none';
+            return;
+        }
+        showScenarioRunning(data);
+        if (list) {
+            list.replaceChildren();
+            (data.runs || []).forEach(run => {
+                const li = document.createElement('li');
+                li.className = run.state === 'done' ? 'done' : run.state === 'failed' ? 'failed' : '';
+                const a = document.createElement('span');
+                a.textContent = run.name || run.id;
+                const b = document.createElement('span');
+                b.textContent = run.state === 'done' ? 'sent' : run.state === 'failed' ? 'failed' : `${Math.round(run.progress || 0)}%`;
+                li.append(a, b);
+                list.appendChild(li);
+                if (run.state === 'running') {
+                    panel.querySelector(`.ii-scn[data-scenario-row="${CSS.escape(String(run.id))}"]`)?.classList.add('is-running');
+                }
+            });
+        }
+    }
+
+    function initConsoleUi() {
+        const panel = document.getElementById('incident-injector-panel');
+        if (!panel || panel.dataset.consoleUi) return;
+        panel.dataset.consoleUi = '1';
+
+        // Summaries + armed state follow every input in the panel
+        panel.addEventListener('change', updateSummaries);
+        panel.addEventListener('input', updateSummaries);
+        updateSummaries();
+        updateSelectionUi();
+
+        // Version
+        let version = '';
+        try { version = chrome?.runtime?.getManifest?.().version || ''; } catch (e) { /* page context */ }
+        if (!version) version = panel.dataset.version || '';
+        if (version) {
+            setText('#ii-version', `v${version}`);
+            setText('#ii-about-version', `v${version}`);
+        }
+
+        // Select all / none
+        panel.querySelector('#scenario-select-all')?.addEventListener('click', () => {
+            panel.querySelectorAll('#scenario-list input[data-scenario-id]').forEach(i => { i.checked = true; });
+            updateSelectionUi();
+            persistScenarioSelection();
+        });
+        panel.querySelector('#scenario-select-none')?.addEventListener('click', () => {
+            panel.querySelectorAll('#scenario-list input[data-scenario-id]').forEach(i => { i.checked = false; });
+            updateSelectionUi();
+            persistScenarioSelection();
+        });
+
+        // Format JSON
+        panel.querySelector('#edit-json')?.addEventListener('click', () => {
+            const ta = panel.querySelector('#event-definition');
+            if (!ta || !ta.value.trim()) return;
+            try {
+                ta.value = JSON.stringify(JSON.parse(ta.value), null, 2);
+                validateEventDefinition(ta.value);
+            } catch (e) {
+                validateEventDefinition(ta.value); // shows the parse error
+            }
+        });
+
+        // About sheet (house info button) + Escape for both sheets
+        const about = panel.querySelector('#about-dialog');
+        const help = panel.querySelector('#help-modal');
+        const aboutBtn = panel.querySelector('#about-button');
+        aboutBtn?.addEventListener('click', () => openSheet(about, aboutBtn));
+        panel.querySelector('#about-close')?.addEventListener('click', () => closeSheet(about));
+        about?.addEventListener('click', (e) => { if (e.target === about) closeSheet(about); });
+        panel.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (about && about.style.display !== 'none') { closeSheet(about); e.stopPropagation(); }
+            else if (help && help.style.display !== 'none') { help.style.display = 'none'; e.stopPropagation(); }
+        });
+
+        // Running state relayed from the content script (panel runs in page context)
+        window.addEventListener('message', (event) => {
+            if (event.source !== window) return;
+            const d = event.data;
+            if (d && d.source === 'incident-injector-content' && d.action === 'scenario_running_update') {
+                renderRunning(d.scenarioRunning || null);
+            }
+        });
+        window.postMessage({ action: 'request_scenario_running', source: 'incident-injector-panel' }, '*');
     }
 
 })();
