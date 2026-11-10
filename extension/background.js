@@ -291,8 +291,14 @@ async function runScenarioSet(scenarioIds, options = {}) {
     const ids = [...new Set((scenarioIds || []).filter(Boolean).map(String))];
     if (ids.length === 0) return { success: false, error: 'No scenario selected' };
 
-    const { integration_key } = await chrome.storage.sync.get(['integration_key']);
+    const { integration_key, routing_keys } = await chrome.storage.sync.get(['integration_key', 'routing_keys']);
     const key = (integration_key || '').trim();
+    // Named keys for events that say "routing_key_env": "NAME"
+    const namedKeys = {};
+    (Array.isArray(routing_keys) ? routing_keys : []).forEach(k => {
+        const v = (k?.key || '').trim();
+        if (k?.name && isValidIntegrationKey(v)) namedKeys[k.name] = v;
+    });
     if (!isValidIntegrationKey(key)) {
         return { success: false, error: 'Valid PagerDuty integration key required (32 characters).' };
     }
@@ -337,6 +343,7 @@ async function runScenarioSet(scenarioIds, options = {}) {
         }
         const processor = new PagerDutyEventProcessor();
         processor.integrationKey = key;
+        processor.routingKeys = namedKeys;
         processor.dryRun = options.dryRun === true;
         if (!processor.loadEventDefinition(definition)) throw new Error('Definition failed validation');
         processor.updateProgress = (progress) => {

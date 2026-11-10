@@ -33,7 +33,7 @@ The extension intercepts clicks and form submits on any page, then sends PagerDu
 
 ### Event definitions
 
-Two schemas are supported: new (`event_definitions[]`) and legacy (`scenarios{}`). Event types are `trigger`, `acknowledge`, `resolve` and `change`. A `change` goes to `/v2/change/enqueue` as a real PagerDuty change event, and `offset_minutes` backdates its `timestamp`. A legacy `trigger` with `class: "change"` is still sent as an alert. Any event can carry `links` and `images`.
+Two schemas are supported: new (`event_definitions[]`) and legacy (`scenarios{}`). Event types are `trigger`, `acknowledge`, `resolve` and `change`. A `change` goes to `/v2/change/enqueue` as a real PagerDuty change event, and `offset_minutes` backdates its `timestamp`. A legacy `trigger` with `class: "change"` is still sent as an alert. Any event can carry `links` and `images`. An event picks its routing key in this order: a literal `routing_key`, then `routing_key_env: "NAME"` looked up in the panel's named keys (`routing_keys` in sync storage), then the main `integration_key`. A name with no stored key falls back to the main key and logs a warning. When a definition loads, the panel adds an empty row for every name it references.
 
 ### Interception rules (content.js)
 

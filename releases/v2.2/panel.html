@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<!-- MIT License - Copyright (c) fintonlabs.com -->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+
+<div id="incident-injector-panel" class="incident-injector-panel" style="display: none;">
+
+    <header class="ii-head">
+        <div class="ii-brand">
+            <span class="ii-mark" aria-hidden="true"></span>
+            <span class="ii-name">Incident Injector</span>
+        </div>
+        <div class="ii-head-tools">
+            <button id="about-button" class="ii-icon-btn" type="button" aria-label="About this app" aria-haspopup="dialog">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 7.25v4M8 4.75v.5"/></svg>
+            </button>
+            <button id="panel-close" class="ii-icon-btn panel-close" type="button" aria-label="Close panel">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Armed bar: master switch + live status -->
+    <div class="ii-armbar">
+        <label class="ii-switch" for="extension-enabled">
+            <input type="checkbox" id="extension-enabled">
+            <span class="ii-switch-track" aria-hidden="true"></span>
+            <span class="ii-armbar-label">Injection</span>
+        </label>
+        <div class="ii-status status-indicator" aria-live="polite">
+            <span id="status-dot" class="status-dot"></span>
+            <span id="status-text">Loading…</span>
+        </div>
+    </div>
+
+    <div class="panel-content ii-body">
+
+        <!-- Running scenarios -->
+        <section id="scenario-running-indicator" class="ii-running" style="display: none;" aria-live="polite">
+            <div class="ii-running-row">
+                <span class="ii-running-tag">Running</span>
+                <span id="scenario-name" class="ii-running-name">…</span>
+            </div>
+            <div class="ii-meter"><div id="scenario-progress-fill" class="ii-meter-fill"></div></div>
+            <ol id="scenario-running-list" class="ii-running-list"></ol>
+        </section>
+
+        <!-- Scenarios: multi-select -->
+        <section class="ii-sec ii-sec-open">
+            <div class="ii-sec-head">
+                <h3 class="ii-h">Scenarios</h3>
+                <span id="scenario-count" class="ii-meta">0 selected</span>
+                <div class="ii-sec-tools">
+                    <button id="scenario-select-all" class="ii-link" type="button">All</button>
+                    <button id="scenario-select-none" class="ii-link" type="button">None</button>
+                </div>
+            </div>
+            <ul id="scenario-list" class="ii-list" role="group" aria-label="Scenarios to run">
+                <li class="ii-empty">No event definition loaded. Open Definition below and load the default.</li>
+            </ul>
+
+            <div class="ii-runrow">
+                <button id="run-scenario-quick" class="ii-btn ii-btn-primary" type="button">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5z"/></svg>
+                    <span id="run-scenario-label">Run scenarios</span>
+                </button>
+                <label class="ii-check ii-inline" for="run-mode-stagger" title="Start each scenario a few seconds apart instead of all at once">
+                    <input type="checkbox" id="run-mode-stagger">
+                    <span class="ii-box" aria-hidden="true"></span>
+                    <span>Stagger</span>
+                </label>
+            </div>
+            <div id="quick-action-result" class="test-result ii-result" role="status"></div>
+
+            <!-- legacy hook, kept hidden for scripts that still look for it -->
+            <div id="scenario-controls" hidden></div>
+        </section>
+
+        <!-- Triggers -->
+        <section class="ii-sec">
+            <button class="ii-sec-head ii-toggle toggle-button collapsed" id="toggle-alert-config" type="button" aria-expanded="false">
+                <h3 class="ii-h">On trigger</h3>
+                <span class="ii-meta" id="trigger-summary"></span>
+                <svg class="ii-chev" viewBox="0 0 16 16" aria-hidden="true"><path class="ii-chev-r" d="M6 3.5l4.5 4.5L6 12.5"/><path class="ii-chev-d" d="M3.5 6l4.5 4.5L12.5 6"/></svg>
+            </button>
+            <div class="section-content collapsed" id="alert-config-content">
+                <ul class="ii-rows">
+                    <li><label class="ii-row"><div><div class="ii-row-title">Run selected scenarios</div><div class="ii-row-sub">Every ticked scenario fires on a match</div></div><span class="ii-switch"><input type="checkbox" id="option-run-scenario"><span class="ii-switch-track" aria-hidden="true"></span></span></label></li>
+                    <li><label class="ii-row"><div><div class="ii-row-title">Show alert</div><div class="ii-row-sub">Toast with the message below</div></div><span class="ii-switch"><input type="checkbox" id="option-create-alert"><span class="ii-switch-track" aria-hidden="true"></span></span></label></li>
+                    <li><label class="ii-row"><div><div class="ii-row-title">Show 500 page</div><div class="ii-row-sub">Replace the page with a server error</div></div><span class="ii-switch"><input type="checkbox" id="option-add-500-error"><span class="ii-switch-track" aria-hidden="true"></span></span></label></li>
+                    <li><label class="ii-row"><div><div class="ii-row-title">Crux event</div><div class="ii-row-sub">GET request to the Crux URL</div></div><span class="ii-switch"><input type="checkbox" id="option-trigger-crux"><span class="ii-switch-track" aria-hidden="true"></span></span></label></li>
+                    <li><label class="ii-row"><div><div class="ii-row-title">Continue to destination</div><div class="ii-row-sub">Let the click or submit go through</div></div><span class="ii-switch"><input type="checkbox" id="option-continue-destination"><span class="ii-switch-track" aria-hidden="true"></span></span></label></li>
+                </ul>
+                <div class="ii-field">
+                    <label for="alert-message">Alert message</label>
+                    <textarea id="alert-message" rows="2" placeholder="Error: Something went wrong. Our team is on it."></textarea>
+                </div>
+                <div class="ii-field">
+                    <label for="crux-url">Crux URL</label>
+                    <input type="text" id="crux-url" class="ii-mono" placeholder="https://eventsender.example.com/ondemand/your-id" spellcheck="false">
+                </div>
+            </div>
+        </section>
+
+        <!-- Click targets -->
+        <section class="ii-sec">
+            <button class="ii-sec-head ii-toggle toggle-button collapsed" id="toggle-target-config" type="button" aria-expanded="false">
+                <h3 class="ii-h">Targets</h3>
+                <span class="ii-meta" id="target-summary"></span>
+                <svg class="ii-chev" viewBox="0 0 16 16" aria-hidden="true"><path class="ii-chev-r" d="M6 3.5l4.5 4.5L6 12.5"/><path class="ii-chev-d" d="M3.5 6l4.5 4.5L12.5 6"/></svg>
+            </button>
+            <div class="section-content collapsed" id="target-config-content">
+                <ul class="ii-rows">
+                    <li><label class="ii-row"><div><div class="ii-row-title">Intercept clicks</div><div class="ii-row-sub">Buttons, links and submits matching the text below</div></div><span class="ii-switch"><input type="checkbox" id="trigger-on-click-enabled"><span class="ii-switch-track" aria-hidden="true"></span></span></label></li>
+                </ul>
+                <div id="click-interception-config" class="ii-field" style="display: none;">
+                    <label for="target-elements">Match text <span class="ii-hint">comma separated, case-insensitive</span></label>
+                    <textarea id="target-elements" rows="2" placeholder="sign in, checkout, submit, buy now" spellcheck="false"></textarea>
+                </div>
+            </div>
+        </section>
+
+        <!-- PagerDuty -->
+        <section class="ii-sec">
+            <button class="ii-sec-head ii-toggle toggle-button collapsed" id="toggle-pagerduty-config" type="button" aria-expanded="false">
+                <h3 class="ii-h">PagerDuty</h3>
+                <span class="ii-meta" id="key-summary"></span>
+                <svg class="ii-chev" viewBox="0 0 16 16" aria-hidden="true"><path class="ii-chev-r" d="M6 3.5l4.5 4.5L6 12.5"/><path class="ii-chev-d" d="M3.5 6l4.5 4.5L12.5 6"/></svg>
+            </button>
+            <div class="section-content collapsed" id="pagerduty-config-content">
+                <div class="ii-field">
+                    <label for="integration-key">Integration key <span class="ii-hint">Events API v2, 32 chars</span></label>
+                    <input type="text" id="integration-key" class="ii-mono" placeholder="R0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" maxlength="32" spellcheck="false" autocomplete="off">
+                    <div id="key-validation" class="validation-message"></div>
+                </div>
+                <div class="ii-field">
+                    <label id="routing-keys-label">Named keys <span class="ii-hint">for change events; JSON uses "routing_key_env": "NAME"</span></label>
+                    <ul id="routing-key-list" class="ii-rk-list" aria-labelledby="routing-keys-label"></ul>
+                    <button id="routing-key-add" class="ii-btn ii-rk-add" type="button">Add key</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Event definition -->
+        <section class="ii-sec">
+            <button class="ii-sec-head ii-toggle toggle-button collapsed" id="toggle-event-definition" type="button" aria-expanded="false">
+                <h3 class="ii-h">Definition</h3>
+                <span class="ii-meta" id="definition-summary"></span>
+                <svg class="ii-chev" viewBox="0 0 16 16" aria-hidden="true"><path class="ii-chev-r" d="M6 3.5l4.5 4.5L6 12.5"/><path class="ii-chev-d" d="M3.5 6l4.5 4.5L12.5 6"/></svg>
+            </button>
+            <div class="section-content collapsed" id="event-definition-content">
+                <div class="ii-field">
+                    <label for="event-definition">Event definition JSON</label>
+                    <textarea id="event-definition" class="ii-mono" rows="8" spellcheck="false" placeholder='{ "event_definitions": [ … ] }'></textarea>
+                    <div id="definition-validation" class="validation-message"></div>
+                </div>
+                <div class="ii-btnrow">
+                    <button id="load-sample" class="ii-btn" type="button">Load default</button>
+                    <button id="edit-json" class="ii-btn" type="button">Format</button>
+                    <button id="save-to-file" class="ii-btn" type="button">Export</button>
+                    <button id="load-from-file" class="ii-btn" type="button">Import</button>
+                </div>
+            </div>
+        </section>
+
+        <footer class="panel-footer ii-foot">
+            <a href="#" id="help-link">Help</a>
+            <a href="#" id="setup-link">Setup</a>
+            <span class="ii-foot-ver" id="ii-version"></span>
+        </footer>
+    </div>
+
+    <!-- Help -->
+    <div id="help-modal" class="modal ii-sheet" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="ii-help-title">
+        <div class="modal-content ii-sheet-body">
+            <div class="modal-header ii-sheet-head">
+                <h2 id="ii-help-title">Setup</h2>
+                <button class="close ii-icon-btn" type="button" aria-label="Close help">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <ol class="ii-steps">
+                    <li>In PagerDuty open <b>Services → your service → Integrations</b>.</li>
+                    <li>Add an <b>Events API v2</b> integration and copy its 32-character key.</li>
+                    <li>Paste it under <b>PagerDuty</b> in this panel.</li>
+                    <li>Under <b>Targets</b>, list the button texts to intercept, e.g. <code>checkout, sign in</code>.</li>
+                    <li>Tick one or more scenarios, turn <b>Injection</b> on, then click a matching button.</li>
+                </ol>
+                <p>Nothing is intercepted until the match list has at least one entry. Ticked scenarios run together when a match fires, or straight away with <b>Run</b>. <b>Stagger</b> starts them a few seconds apart.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- About (house info) -->
+    <div id="about-dialog" class="ii-sheet" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="ii-about-title">
+        <div class="ii-sheet-body">
+            <div class="ii-sheet-head">
+                <h2 id="ii-about-title">Incident Injector <span class="ii-meta" id="ii-about-version"></span></h2>
+                <button id="about-close" class="ii-icon-btn" type="button" aria-label="Close about">
+                    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>
+                </button>
+            </div>
+            <p>Incident-response training: fires PagerDuty events when people click the things you choose.</p>
+            <p><a href="https://fintonlabs.com" target="_blank" rel="noopener">Made by FintonLabs</a></p>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

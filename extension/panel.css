@@ -312,6 +312,22 @@
 #incident-injector-panel textarea:focus { border-color: var(--ii-accent); }
 #incident-injector-panel ::placeholder { color: var(--ii-text-3); opacity: 1; }
 
+/* ---------- named routing keys ---------- */
+#incident-injector-panel .ii-rk-list { list-style: none; margin: 0; padding: 0; }
+#incident-injector-panel .ii-rk { display: grid; grid-template-columns: 1fr 24px; gap: 4px; padding: 8px 0; border-top: 1px solid var(--ii-line); }
+#incident-injector-panel .ii-rk:first-child { border-top: 0; padding-top: 0; }
+#incident-injector-panel .ii-rk input.ii-rk-name { grid-column: 1; font-size: 11px; padding: 4px 8px; }
+#incident-injector-panel .ii-rk input.ii-rk-key { grid-column: 1; }
+#incident-injector-panel .ii-rk input.ii-rk-key.ii-bad { border-color: var(--ii-danger); }
+#incident-injector-panel .ii-rk-del {
+    grid-column: 2; grid-row: 1 / span 2; align-self: center;
+    width: 24px; height: 24px; padding: 0; border: 1px solid transparent; border-radius: var(--ii-radius);
+    background: none; color: var(--ii-text-3); cursor: pointer; font-size: 16px; line-height: 1;
+}
+#incident-injector-panel .ii-rk-del:hover { color: var(--ii-danger); border-color: var(--ii-line-2); }
+#incident-injector-panel .ii-rk-del:focus-visible { outline: 2px solid var(--ii-accent); outline-offset: 1px; }
+#incident-injector-panel .ii-rk-add { margin-top: 8px; }
+
 /* ---------- footer ---------- */
 #incident-injector-panel .ii-foot {
     display: flex; gap: 16px; align-items: center;

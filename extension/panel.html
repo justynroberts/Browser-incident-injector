@@ -137,6 +137,11 @@
                     <input type="text" id="integration-key" class="ii-mono" placeholder="R0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" maxlength="32" spellcheck="false" autocomplete="off">
                     <div id="key-validation" class="validation-message"></div>
                 </div>
+                <div class="ii-field">
+                    <label id="routing-keys-label">Named keys <span class="ii-hint">for change events; JSON uses "routing_key_env": "NAME"</span></label>
+                    <ul id="routing-key-list" class="ii-rk-list" aria-labelledby="routing-keys-label"></ul>
+                    <button id="routing-key-add" class="ii-btn ii-rk-add" type="button">Add key</button>
+                </div>
             </div>
         </section>
 

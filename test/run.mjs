@@ -121,6 +121,7 @@ const BASE = {
   active_scenario_id: '',
   active_scenario_ids: [],
   run_stagger: false,
+  routing_keys: [],
 };
 async function settings(over = {}) {
   await sw(o => chrome.storage.sync.set(o), { ...BASE, ...over });
@@ -398,7 +399,9 @@ await test('shipped scenarios: DDoS + payments storm, real change events', async
     const text = await (await fetch(chrome.runtime.getURL('sample-event-definition.json'))).text();
     await chrome.storage.local.set({ event_definition: text });
   });
-  await settings({ run_scenario_on_submit: true, active_scenario_ids: ['ddos_attack', 'payments_alert_storm'], active_scenario_id: 'ddos_attack' });
+  const DEPLOY_KEY = 'd'.repeat(32);
+  await settings({ run_scenario_on_submit: true, active_scenario_ids: ['ddos_attack', 'payments_alert_storm'], active_scenario_id: 'ddos_attack',
+    routing_keys: [{ name: 'PD_DEPLOY_ROUTING_KEY', key: DEPLOY_KEY }, { name: 'PD_FLAG_ROUTING_KEY', key: '' }] });
   const p = await open(`${A}/button`);
   await clickIn(p, '#b');
   const scenarioAlerts = () => triggers().filter(e => !String(e.json.payload.source).startsWith('http'));
@@ -411,6 +414,9 @@ await test('shipped scenarios: DDoS + payments storm, real change events', async
   const ago = (Date.now() - Date.parse(deploy.json.payload.timestamp)) / 60000;
   if (ago < 185 || ago > 195) throw new Error(`deploy timestamp ${ago.toFixed(1)} min ago, want ~190`);
   eq(deploy.json.links.length, 2, 'deploy links');
+  eq(deploy.json.routing_key, DEPLOY_KEY, 'deploy uses PD_DEPLOY_ROUTING_KEY');
+  const flag = changes.find(e => e.json.payload.summary.startsWith('Feature flag'));
+  eq(flag.json.routing_key, KEY, 'flag key not set, falls back to main key');
   const t = scenarioAlerts();
   eq(t.length, 14, 'alerts (1 DDoS + 13 storm)');
   if (t.some(e => e.path !== '/v2/enqueue')) throw new Error('alert sent to wrong endpoint');
@@ -480,6 +486,35 @@ async function assertPanelOnScreen(p) {
   });
   if (r.right !== r.vw || r.width !== 360) throw new Error('panel not on screen: ' + JSON.stringify(r));
 }
+
+await test('panel: named routing keys rows from definition, saved to storage', async () => {
+  const def = { event_definitions: [{ id: 'chg', name: 'Change', events: [
+    { type: 'change', routing_key_env: 'PD_DEPLOY_ROUTING_KEY', summary: 'deploy' },
+    { type: 'trigger', summary: 'alert', severity: 'error' }] }] };
+  await sw(d => chrome.storage.local.set({ event_definition: JSON.stringify(d) }), def);
+  await settings({ routing_keys: [{ name: 'EXISTING', key: 'e'.repeat(32) }] });
+  const p = await open(`${A}/blank`);
+  await p.bringToFront();
+  await sw(async () => {
+    const [tab] = await chrome.tabs.query({ url: 'http://site-a.test/blank' });
+    await chrome.tabs.sendMessage(tab.id, { action: 'toggle_panel' });
+  });
+  await p.waitForSelector('#incident-injector-panel.visible', { timeout: 5000 });
+  await p.waitForSelector('#routing-key-list .ii-rk', { timeout: 5000 });
+  await sleep(500);
+  const names = await p.$$eval('#routing-key-list .ii-rk-name', els => els.map(e => e.value));
+  eq(names.sort(), ['EXISTING', 'PD_DEPLOY_ROUTING_KEY'], 'rows');
+  await p.click('#toggle-pagerduty-config');
+  const keyInputs = await p.$$('#routing-key-list .ii-rk-key');
+  const idx = (await p.$$eval('#routing-key-list .ii-rk-name', els => els.map(e => e.value))).indexOf('PD_DEPLOY_ROUTING_KEY');
+  await keyInputs[idx].type('f'.repeat(32));
+  await p.keyboard.press('Tab');
+  await sleep(500);
+  const stored = (await sw(() => chrome.storage.sync.get(['routing_keys']))).routing_keys;
+  eq(stored, [{ name: 'EXISTING', key: 'e'.repeat(32) }, { name: 'PD_DEPLOY_ROUTING_KEY', key: 'f'.repeat(32) }], 'stored keys');
+  if (!(await p.$eval('#key-summary', e => e.textContent)).includes('+2')) throw new Error('summary missing named key count');
+  await p.screenshot({ path: path.join(OUT, 'panel-routing-keys.png') }).catch(() => {});
+});
 
 await test('panel opens on first click on a busy page (no 200ms race)', async () => {
   await settings();

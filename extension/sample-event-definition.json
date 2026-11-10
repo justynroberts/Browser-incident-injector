@@ -472,6 +472,7 @@
       "events": [
         {
           "type": "change",
+          "routing_key_env": "PD_DEPLOY_ROUTING_KEY",
           "summary": "Deployed payment-processor v3.2.0 to production (workshop-cluster)",
           "source": "github-actions:travelduty/payment-processor",
           "offset_minutes": -190,
@@ -499,6 +500,7 @@
         },
         {
           "type": "change",
+          "routing_key_env": "PD_FLAG_ROUTING_KEY",
           "summary": "Feature flag NEWWEBEXPERIENCE rolled out to 100% in production",
           "source": "evolven:production:web-checkout",
           "offset_minutes": -175,

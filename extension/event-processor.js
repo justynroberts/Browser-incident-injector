@@ -704,6 +704,19 @@ class PagerDutyEventProcessor {
     }
 
     // Create payload for trigger event
+    // Routing key for one event: a literal routing_key, then a named key
+    // ("routing_key_env": "NAME", set in the panel), then the main key.
+    resolveRoutingKey(event) {
+        if (event.routing_key) return event.routing_key;
+        const name = event.routing_key_env || event.routing_key_ref;
+        if (name) {
+            const named = this.routingKeys && this.routingKeys[name];
+            if (named) return named;
+            console.warn(`[Event Processor] No key stored for "${name}", using the main integration key`);
+        }
+        return this.integrationKey;
+    }
+
     // ISO timestamp for an event, shifted by offset_minutes (e.g. -190 = 190 minutes ago)
     eventTimestamp(event) {
         const offset = Number(event.offset_minutes);
@@ -723,7 +736,7 @@ class PagerDutyEventProcessor {
     // Payload for /v2/change/enqueue. No severity, dedup_key or event_action.
     createChangeEventPayload(event) {
         return this.withExtras({
-            routing_key: event.routing_key || this.integrationKey,
+            routing_key: this.resolveRoutingKey(event),
             payload: {
                 summary: event.summary || "Change event from Event Definition",
                 source: event.source || "chrome-extension",
@@ -734,7 +747,7 @@ class PagerDutyEventProcessor {
 
     createTriggerPayload(event) {
         return this.withExtras({
-            routing_key: event.routing_key || this.integrationKey,
+            routing_key: this.resolveRoutingKey(event),
             event_action: "trigger",
             dedup_key: event.dedup_key || `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
             payload: {
@@ -758,7 +771,7 @@ class PagerDutyEventProcessor {
         }
         
         return {
-            routing_key: event.routing_key || this.integrationKey,
+            routing_key: this.resolveRoutingKey(event),
             event_action: "resolve",
             dedup_key: event.dedup_key,
             payload: {
@@ -783,7 +796,7 @@ class PagerDutyEventProcessor {
         }
         
         return {
-            routing_key: event.routing_key || this.integrationKey,
+            routing_key: this.resolveRoutingKey(event),
             event_action: "acknowledge",
             dedup_key: event.dedup_key,
             payload: {
@@ -804,7 +817,7 @@ class PagerDutyEventProcessor {
     // Create payload for change event (using trigger event type with change context)
     createChangePayload(event) {
         return {
-            routing_key: event.routing_key || this.integrationKey,
+            routing_key: this.resolveRoutingKey(event),
             event_action: "trigger", // Using trigger instead of change
             dedup_key: event.dedup_key || `change-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
             payload: {
