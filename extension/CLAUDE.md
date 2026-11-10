@@ -39,3 +39,4 @@ The repo-root `../CLAUDE.md` has the architecture, interception rules, test suit
 | `show_alert`, `redirect_to_500`, `trigger_crux`, `allow_form_continuation`, `run_scenario_on_submit` | What happens on a match |
 | `active_scenario_ids` / `active_scenario_id` | Ticked scenarios / first of them, kept for older readers |
 | `run_stagger` | Start ticked scenarios 5s apart instead of together |
+| `routing_keys` | `[{ name, key }]` named keys; events reference them with `routing_key_env` |

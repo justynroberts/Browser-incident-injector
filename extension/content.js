@@ -1587,7 +1587,8 @@
                 'run_scenario_on_submit',
                 'active_scenario_id',
                 'active_scenario_ids',
-                'run_stagger'
+                'run_stagger',
+                'routing_keys'
             ]);
             
             console.log('[Content] Loaded settings:', result);

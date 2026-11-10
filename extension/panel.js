@@ -267,7 +267,8 @@
                     'run_scenario_on_submit',
                     'active_scenario_id',
                     'active_scenario_ids',
-                    'run_stagger'
+                    'run_stagger',
+                    'routing_keys'
                 ]);
             } else {
                 // Fallback: communicate through content script
@@ -318,6 +319,7 @@
             const runScenarioToggle = panel.querySelector('#option-run-scenario');
 
             if (integrationKeyInput) integrationKeyInput.value = result.integration_key || '';
+            renderRoutingKeys(result.routing_keys);
             if (cruxUrlInput) cruxUrlInput.value = result.crux_url || '';
             // Check localStorage first, then chrome.storage, then default to true
             const savedExtensionEnabled = safeStorage.get('incident_injector_extension_enabled');
@@ -1748,6 +1750,7 @@
             definitionValidation.className = 'validation-message valid';
             
             renderScenarioList(scenarios);
+            addReferencedKeyNames(parsed);
             setText('#definition-summary', `${scenarios.length} scenario${scenarios.length === 1 ? '' : 's'}`);
             
         } catch (error) {
@@ -2055,6 +2058,7 @@
             settings.active_scenario_id = ids[0] || '';
         }
         addBool('run_stagger', '#run-mode-stagger');
+        if (panel.querySelector('#routing-key-list')) settings.routing_keys = readRoutingKeys();
 
         console.log('[Panel] Auto-save gathering settings:', {
             keys: Object.keys(settings),
@@ -2305,7 +2309,8 @@
         setText('#target-summary', !clickOn ? 'off' : targets.length ? `${targets.length} match${targets.length === 1 ? '' : 'es'}` : 'none set');
 
         const key = (panel.querySelector('#integration-key')?.value || '').trim();
-        setText('#key-summary', key.length === 32 ? `…${key.slice(-4)}` : key ? 'invalid key' : 'no key');
+        const named = readRoutingKeys().filter(k => k.key.length === 32).length;
+        setText('#key-summary', (key.length === 32 ? `…${key.slice(-4)}` : key ? 'invalid key' : 'no key') + (named ? ` +${named}` : ''));
     }
 
     function openSheet(sheet, opener) {
@@ -2349,6 +2354,114 @@
         }
     }
 
+    // ---- Named routing keys (change events etc.) ----
+    // Stored as chrome.storage.sync.routing_keys = [{ name, key }]. An event in
+    // the definition picks one with "routing_key_env": "NAME".
+    const KEY_NAME_RE = /[^A-Za-z0-9_.-]/g;
+
+    function readRoutingKeys() {
+        const panel = document.getElementById('incident-injector-panel');
+        const rows = panel ? panel.querySelectorAll('#routing-key-list .ii-rk') : [];
+        const out = [];
+        const seen = new Set();
+        rows.forEach(row => {
+            const name = (row.querySelector('.ii-rk-name')?.value || '').trim();
+            const key = (row.querySelector('.ii-rk-key')?.value || '').trim();
+            if (!name || seen.has(name)) return;
+            seen.add(name);
+            out.push({ name, key });
+        });
+        return out;
+    }
+
+    function addRoutingKeyRow(name = '', key = '') {
+        const panel = document.getElementById('incident-injector-panel');
+        const list = panel?.querySelector('#routing-key-list');
+        if (!list) return null;
+        const row = document.createElement('li');
+        row.className = 'ii-rk';
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'ii-rk-name ii-mono';
+        nameInput.placeholder = 'PD_DEPLOY_ROUTING_KEY';
+        nameInput.spellcheck = false;
+        nameInput.autocomplete = 'off';
+        nameInput.setAttribute('aria-label', 'Key name');
+        nameInput.value = name;
+        const keyInput = document.createElement('input');
+        keyInput.type = 'text';
+        keyInput.className = 'ii-rk-key ii-mono';
+        keyInput.placeholder = '32-char routing key';
+        keyInput.maxLength = 32;
+        keyInput.spellcheck = false;
+        keyInput.autocomplete = 'off';
+        keyInput.setAttribute('aria-label', 'Routing key');
+        keyInput.value = key;
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'ii-rk-del';
+        del.textContent = '×';
+        del.setAttribute('aria-label', 'Remove key');
+        const mark = () => keyInput.classList.toggle('ii-bad', keyInput.value.trim().length > 0 && keyInput.value.trim().length !== 32);
+        nameInput.addEventListener('input', () => {
+            const clean = nameInput.value.replace(KEY_NAME_RE, '_');
+            if (clean !== nameInput.value) nameInput.value = clean;
+        });
+        keyInput.addEventListener('input', mark);
+        nameInput.addEventListener('change', persistRoutingKeys);
+        keyInput.addEventListener('change', persistRoutingKeys);
+        del.addEventListener('click', () => { row.remove(); persistRoutingKeys(); updateSummaries(); });
+        row.append(nameInput, keyInput, del);
+        list.appendChild(row);
+        mark();
+        return row;
+    }
+
+    function renderRoutingKeys(keys) {
+        const panel = document.getElementById('incident-injector-panel');
+        const list = panel?.querySelector('#routing-key-list');
+        if (!list) return;
+        // Keep names the definition already asked for (rendered before settings arrived)
+        const pending = readRoutingKeys().filter(k => !k.key).map(k => k.name);
+        list.replaceChildren();
+        const stored = Array.isArray(keys) ? keys.filter(k => k && k.name) : [];
+        stored.forEach(k => addRoutingKeyRow(k.name, k.key || ''));
+        pending.filter(n => !stored.some(k => k.name === n)).forEach(n => addRoutingKeyRow(n, ''));
+        updateSummaries();
+    }
+
+    // Every routing_key_env named in the definition gets a row, so the user
+    // only has to paste the key in.
+    function addReferencedKeyNames(parsed) {
+        const names = new Set();
+        const walk = (defs) => (defs || []).forEach(d => (d.events || []).forEach(e => {
+            const n = e && (e.routing_key_env || e.routing_key_ref);
+            if (typeof n === 'string' && n.trim()) names.add(n.trim());
+        }));
+        if (Array.isArray(parsed?.event_definitions)) walk(parsed.event_definitions);
+        else if (parsed?.scenarios) walk(Array.isArray(parsed.scenarios) ? parsed.scenarios : Object.values(parsed.scenarios));
+        const have = new Set(readRoutingKeys().map(k => k.name));
+        names.forEach(n => { if (!have.has(n)) addRoutingKeyRow(n, ''); });
+    }
+
+    function persistRoutingKeys() {
+        const routing_keys = readRoutingKeys();
+        loadedSettings.routing_keys = routing_keys;
+        try {
+            if (isExtensionContext()) {
+                chrome.storage.sync.set({ routing_keys });
+            } else {
+                window.postMessage({
+                    action: 'save_all_settings_request',
+                    source: 'incident-injector-panel',
+                    settings: { routing_keys }
+                }, '*');
+            }
+        } catch (error) {
+            console.log('[Panel] Failed to save routing keys:', error.message);
+        }
+    }
+
     function initConsoleUi() {
         const panel = document.getElementById('incident-injector-panel');
         if (!panel || panel.dataset.consoleUi) return;
@@ -2357,6 +2470,9 @@
         // Summaries + armed state follow every input in the panel
         panel.addEventListener('change', updateSummaries);
         panel.addEventListener('input', updateSummaries);
+        panel.querySelector('#routing-key-add')?.addEventListener('click', () => {
+            addRoutingKeyRow()?.querySelector('.ii-rk-name')?.focus();
+        });
         updateSummaries();
         updateSelectionUi();
 
