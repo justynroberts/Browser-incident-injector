@@ -291,11 +291,13 @@ async function runScenarioSet(scenarioIds, options = {}) {
     const ids = [...new Set((scenarioIds || []).filter(Boolean).map(String))];
     if (ids.length === 0) return { success: false, error: 'No scenario selected' };
 
-    const { integration_key, routing_keys } = await chrome.storage.sync.get(['integration_key', 'routing_keys']);
+    const { integration_key, change_keys, routing_keys } = await chrome.storage.sync.get(['integration_key', 'change_keys', 'routing_keys']);
     const key = (integration_key || '').trim();
-    // Named keys for events that say "routing_key_env": "NAME"
+    // Change keys for change events that say "routing_key_env": "NAME"
+    // (routing_keys is the v2.2 name for the same list)
+    const changeKeyList = Array.isArray(change_keys) ? change_keys : (Array.isArray(routing_keys) ? routing_keys : []);
     const namedKeys = {};
-    (Array.isArray(routing_keys) ? routing_keys : []).forEach(k => {
+    changeKeyList.forEach(k => {
         const v = (k?.key || '').trim();
         if (k?.name && isValidIntegrationKey(v)) namedKeys[k.name] = v;
     });
@@ -343,7 +345,7 @@ async function runScenarioSet(scenarioIds, options = {}) {
         }
         const processor = new PagerDutyEventProcessor();
         processor.integrationKey = key;
-        processor.routingKeys = namedKeys;
+        processor.changeKeys = namedKeys;
         processor.dryRun = options.dryRun === true;
         if (!processor.loadEventDefinition(definition)) throw new Error('Definition failed validation');
         processor.updateProgress = (progress) => {

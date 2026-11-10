@@ -32,11 +32,11 @@ The repo-root `../CLAUDE.md` has the architecture, interception rules, test suit
 
 | Key | Purpose |
 |---|---|
-| `integration_key` | 32-char Events API v2 routing key |
+| `integration_key` | 32-char Events API v2 routing key, used by every alert |
 | `extension_enabled` | Master switch, shown as "Injection" in the panel |
 | `trigger_on_click_enabled` | Click interception |
 | `target_element_texts` | Comma-separated labels to match |
 | `show_alert`, `redirect_to_500`, `trigger_crux`, `allow_form_continuation`, `run_scenario_on_submit` | What happens on a match |
 | `active_scenario_ids` / `active_scenario_id` | Ticked scenarios / first of them, kept for older readers |
 | `run_stagger` | Start ticked scenarios 5s apart instead of together |
-| `routing_keys` | `[{ name, key }]` named keys; events reference them with `routing_key_env` |
+| `change_keys` | `[{ name, key }]` change keys; change events pick one with `routing_key_env`. v2.2 used `routing_keys` |

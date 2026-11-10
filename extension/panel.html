@@ -133,14 +133,14 @@
             </button>
             <div class="section-content collapsed" id="pagerduty-config-content">
                 <div class="ii-field">
-                    <label for="integration-key">Integration key <span class="ii-hint">Events API v2, 32 chars</span></label>
+                    <label for="integration-key">Routing key <span class="ii-hint">all alerts · Events API v2, 32 chars</span></label>
                     <input type="text" id="integration-key" class="ii-mono" placeholder="R0xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" maxlength="32" spellcheck="false" autocomplete="off">
                     <div id="key-validation" class="validation-message"></div>
                 </div>
                 <div class="ii-field">
-                    <label id="routing-keys-label">Named keys <span class="ii-hint">for change events; JSON uses "routing_key_env": "NAME"</span></label>
+                    <label id="routing-keys-label">Change keys <span class="ii-hint">a change event picks one with "routing_key_env"</span></label>
                     <ul id="routing-key-list" class="ii-rk-list" aria-labelledby="routing-keys-label"></ul>
-                    <button id="routing-key-add" class="ii-btn ii-rk-add" type="button">Add key</button>
+                    <button id="routing-key-add" class="ii-btn ii-rk-add" type="button">Add change key</button>
                 </div>
             </div>
         </section>
