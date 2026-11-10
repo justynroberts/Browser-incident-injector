@@ -268,6 +268,7 @@
                     'active_scenario_id',
                     'active_scenario_ids',
                     'run_stagger',
+                    'change_keys',
                     'routing_keys'
                 ]);
             } else {
@@ -319,7 +320,7 @@
             const runScenarioToggle = panel.querySelector('#option-run-scenario');
 
             if (integrationKeyInput) integrationKeyInput.value = result.integration_key || '';
-            renderRoutingKeys(result.routing_keys);
+            renderRoutingKeys(result.change_keys || result.routing_keys);
             if (cruxUrlInput) cruxUrlInput.value = result.crux_url || '';
             // Check localStorage first, then chrome.storage, then default to true
             const savedExtensionEnabled = safeStorage.get('incident_injector_extension_enabled');
@@ -2058,7 +2059,7 @@
             settings.active_scenario_id = ids[0] || '';
         }
         addBool('run_stagger', '#run-mode-stagger');
-        if (panel.querySelector('#routing-key-list')) settings.routing_keys = readRoutingKeys();
+        if (panel.querySelector('#routing-key-list')) settings.change_keys = readRoutingKeys();
 
         console.log('[Panel] Auto-save gathering settings:', {
             keys: Object.keys(settings),
@@ -2310,7 +2311,7 @@
 
         const key = (panel.querySelector('#integration-key')?.value || '').trim();
         const named = readRoutingKeys().filter(k => k.key.length === 32).length;
-        setText('#key-summary', (key.length === 32 ? `…${key.slice(-4)}` : key ? 'invalid key' : 'no key') + (named ? ` +${named}` : ''));
+        setText('#key-summary', (key.length === 32 ? `…${key.slice(-4)}` : key ? 'invalid key' : 'no key') + (named ? ` · ${named} change` : ''));
     }
 
     function openSheet(sheet, opener) {
@@ -2354,9 +2355,10 @@
         }
     }
 
-    // ---- Named routing keys (change events etc.) ----
-    // Stored as chrome.storage.sync.routing_keys = [{ name, key }]. An event in
-    // the definition picks one with "routing_key_env": "NAME".
+    // ---- Change keys ----
+    // One routing key for every alert; any number of named change keys, stored as
+    // chrome.storage.sync.change_keys = [{ name, key }]. A change event in the
+    // definition picks one with "routing_key_env": "NAME". (v2.2 used routing_keys.)
     const KEY_NAME_RE = /[^A-Za-z0-9_.-]/g;
 
     function readRoutingKeys() {
@@ -2386,22 +2388,22 @@
         nameInput.placeholder = 'PD_DEPLOY_ROUTING_KEY';
         nameInput.spellcheck = false;
         nameInput.autocomplete = 'off';
-        nameInput.setAttribute('aria-label', 'Key name');
+        nameInput.setAttribute('aria-label', 'Change key name');
         nameInput.value = name;
         const keyInput = document.createElement('input');
         keyInput.type = 'text';
         keyInput.className = 'ii-rk-key ii-mono';
-        keyInput.placeholder = '32-char routing key';
+        keyInput.placeholder = '32-char change integration key';
         keyInput.maxLength = 32;
         keyInput.spellcheck = false;
         keyInput.autocomplete = 'off';
-        keyInput.setAttribute('aria-label', 'Routing key');
+        keyInput.setAttribute('aria-label', 'Change key');
         keyInput.value = key;
         const del = document.createElement('button');
         del.type = 'button';
         del.className = 'ii-rk-del';
         del.textContent = '×';
-        del.setAttribute('aria-label', 'Remove key');
+        del.setAttribute('aria-label', 'Remove change key');
         const mark = () => keyInput.classList.toggle('ii-bad', keyInput.value.trim().length > 0 && keyInput.value.trim().length !== 32);
         nameInput.addEventListener('input', () => {
             const clean = nameInput.value.replace(KEY_NAME_RE, '_');
@@ -2435,7 +2437,8 @@
     function addReferencedKeyNames(parsed) {
         const names = new Set();
         const walk = (defs) => (defs || []).forEach(d => (d.events || []).forEach(e => {
-            const n = e && (e.routing_key_env || e.routing_key_ref);
+            if (!e || String(e.type).toLowerCase() !== 'change') return;
+            const n = e.routing_key_env || e.routing_key_ref;
             if (typeof n === 'string' && n.trim()) names.add(n.trim());
         }));
         if (Array.isArray(parsed?.event_definitions)) walk(parsed.event_definitions);
@@ -2445,16 +2448,16 @@
     }
 
     function persistRoutingKeys() {
-        const routing_keys = readRoutingKeys();
-        loadedSettings.routing_keys = routing_keys;
+        const change_keys = readRoutingKeys();
+        loadedSettings.change_keys = change_keys;
         try {
             if (isExtensionContext()) {
-                chrome.storage.sync.set({ routing_keys });
+                chrome.storage.sync.set({ change_keys });
             } else {
                 window.postMessage({
                     action: 'save_all_settings_request',
                     source: 'incident-injector-panel',
-                    settings: { routing_keys }
+                    settings: { change_keys }
                 }, '*');
             }
         } catch (error) {

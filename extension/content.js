@@ -1588,6 +1588,7 @@
                 'active_scenario_id',
                 'active_scenario_ids',
                 'run_stagger',
+                'change_keys',
                 'routing_keys'
             ]);
             

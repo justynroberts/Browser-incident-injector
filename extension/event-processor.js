@@ -704,15 +704,15 @@ class PagerDutyEventProcessor {
     }
 
     // Create payload for trigger event
-    // Routing key for one event: a literal routing_key, then a named key
-    // ("routing_key_env": "NAME", set in the panel), then the main key.
+    // One routing key for every alert; change events may pick a named change key
+    // ("routing_key_env": "NAME", set in the panel). A literal routing_key still wins.
     resolveRoutingKey(event) {
         if (event.routing_key) return event.routing_key;
         const name = event.routing_key_env || event.routing_key_ref;
-        if (name) {
-            const named = this.routingKeys && this.routingKeys[name];
+        if (name && String(event.type).toLowerCase() === 'change') {
+            const named = this.changeKeys && this.changeKeys[name];
             if (named) return named;
-            console.warn(`[Event Processor] No key stored for "${name}", using the main integration key`);
+            console.warn(`[Event Processor] No change key stored for "${name}", using the routing key`);
         }
         return this.integrationKey;
     }
