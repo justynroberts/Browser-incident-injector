@@ -33,7 +33,7 @@ The extension intercepts clicks and form submits on any page, then sends PagerDu
 
 ### Event definitions
 
-Two schemas are supported: new (`event_definitions[]`) and legacy (`scenarios{}`). Event types are `trigger`, `acknowledge` and `resolve`.
+Two schemas are supported: new (`event_definitions[]`) and legacy (`scenarios{}`). Event types are `trigger`, `acknowledge`, `resolve` and `change`. A `change` goes to `/v2/change/enqueue` as a real PagerDuty change event, and `offset_minutes` backdates its `timestamp`. A legacy `trigger` with `class: "change"` is still sent as an alert. Any event can carry `links` and `images`.
 
 ### Interception rules (content.js)
 
