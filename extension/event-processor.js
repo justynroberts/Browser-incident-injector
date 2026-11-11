@@ -13,7 +13,9 @@ class PagerDutyEventProcessor {
         this.schemaVersion = "1.0";
         this.maxRetries = 3;
         this.retryDelay = 2000; // 2 seconds
-        this.maxConcurrentEvents = 3;
+        // 1 = strictly in order: each event's delay counts from the previous send.
+        // Higher values fire events in parallel groups and their order becomes a race.
+        this.maxConcurrentEvents = 1;
         this.failedEvents = [];
     }
 
