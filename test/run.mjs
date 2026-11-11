@@ -421,6 +421,14 @@ await test('shipped scenarios: DDoS + payments storm, real change events', async
   if (triggers().some(e => e.json.routing_key !== KEY)) throw new Error('an alert did not use the routing key');
   const t = scenarioAlerts();
   eq(t.length, 14, 'alerts (1 DDoS + 13 storm)');
+  // Events go out strictly in definition order: every other service first,
+  // then the payment-api CrashLoopBackOff, then the rest of payment-api.
+  const storm = t.filter(e => e.json.payload.class !== 'ddos-attack');
+  const svc = e => e.json.payload.custom_details?.service;
+  const firstApi = storm.findIndex(e => svc(e) === 'payment-api');
+  if (!storm[firstApi].json.payload.summary.includes('CrashLoopBackOff in namespace production - payment-api'))
+    throw new Error(`first payment-api alert was "${storm[firstApi].json.payload.summary}"`);
+  if (storm.slice(firstApi).some(e => svc(e) !== 'payment-api')) throw new Error('another service alerted after payment-api started');
   if (t.some(e => e.path !== '/v2/enqueue')) throw new Error('alert sent to wrong endpoint');
   const ddos = t.find(e => e.json.payload.class === 'ddos-attack');
   eq([ddos.json.payload.source, ddos.json.payload.custom_details.service, ddos.json.payload.custom_details.requests_per_second],

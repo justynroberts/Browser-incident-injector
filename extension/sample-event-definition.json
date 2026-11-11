@@ -539,7 +539,7 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 2000
+            "value": 1000
           }
         },
         {
@@ -564,7 +564,7 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 2000
+            "value": 1000
           }
         },
         {
@@ -586,7 +586,7 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 2000
+            "value": 1000
           }
         },
         {
@@ -610,7 +610,7 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 2000
+            "value": 1000
           }
         },
         {
@@ -632,49 +632,7 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 2000
-          }
-        },
-        {
-          "type": "trigger",
-          "summary": "Log volume /var/log at 86% on ip-10-0-1-87.ec2.internal",
-          "severity": "warning",
-          "source": "node-exporter:ip-10-0-1-87.ec2.internal",
-          "component": "disk",
-          "group": "infrastructure",
-          "class": "DiskUsage",
-          "custom_details": {
-            "service": "payment-api",
-            "problem": "unrelated-noise",
-            "node_name": "ip-10-0-1-87.ec2.internal",
-            "mount": "/var/log",
-            "used_pct": "86%",
-            "threshold": "85%"
-          },
-          "delay": {
-            "type": "fixed",
-            "value": 2000
-          }
-        },
-        {
-          "type": "trigger",
-          "summary": "[APM] payment-api p99 latency 4.8s on POST /v1/payments (SLO 800ms)",
-          "severity": "error",
-          "source": "datadog-apm:payment-api:production",
-          "component": "api",
-          "group": "apm",
-          "class": "Latency",
-          "custom_details": {
-            "service": "payment-api",
-            "problem": "payments-outage",
-            "endpoint": "POST /v1/payments",
-            "p99_latency_ms": 4800,
-            "slo_ms": 800,
-            "upstream": "payment-processor"
-          },
-          "delay": {
-            "type": "fixed",
-            "value": 2000
+            "value": 1000
           }
         },
         {
@@ -698,29 +656,52 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 2000
+            "value": 1000
           }
         },
         {
           "type": "trigger",
-          "summary": "[APM] payment-api 5xx error rate 18% (502/504 from payment-processor)",
+          "summary": "[Security] CloudTrail: 3,412 GetObject calls on s3://travelduty-settlement-exports in 4m by recon-ci-deployer",
           "severity": "critical",
-          "source": "datadog-apm:payment-api:production",
-          "component": "api",
-          "group": "apm",
-          "class": "ErrorRate",
+          "source": "aws-cloudtrail:eu-west-1",
+          "component": "s3",
+          "group": "security",
+          "class": "DataExfiltration",
           "custom_details": {
-            "service": "payment-api",
-            "problem": "payments-outage",
-            "endpoint": "POST /v1/payments",
-            "error_rate_pct": "18%",
-            "status_codes": "502, 504",
-            "failed_payments_per_min": 1250,
-            "service_down_cost_per_minute": "$4,850"
+            "service": "payment-reconciliation",
+            "problem": "leaked-ci-key",
+            "bucket": "travelduty-settlement-exports",
+            "principal": "arn:aws:iam::412345678901:role/recon-ci-deployer",
+            "get_object_calls": 3412,
+            "list_objects_calls": 58,
+            "window_minutes": 4,
+            "source_ip": "185.220.101.44",
+            "data_classification": "PCI - cardholder settlement data"
           },
           "delay": {
             "type": "fixed",
-            "value": 2000
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Settlement batch 2026-11-06-T1 has 1,204 unmatched transactions (authorisations missing from payment-processor)",
+          "severity": "error",
+          "source": "recon-scheduler:settlement-batch",
+          "component": "batch",
+          "group": "jobs",
+          "class": "ReconciliationMismatch",
+          "custom_details": {
+            "service": "payment-reconciliation",
+            "problem": "payments-outage",
+            "batch_id": "2026-11-06-T1",
+            "unmatched_transactions": 1204,
+            "unmatched_value": "GBP 187,450",
+            "missing_from": "payment-processor"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
           }
         },
         {
@@ -746,7 +727,71 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 2000
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Log volume /var/log at 86% on ip-10-0-1-87.ec2.internal",
+          "severity": "warning",
+          "source": "node-exporter:ip-10-0-1-87.ec2.internal",
+          "component": "disk",
+          "group": "infrastructure",
+          "class": "DiskUsage",
+          "custom_details": {
+            "service": "payment-api",
+            "problem": "unrelated-noise",
+            "node_name": "ip-10-0-1-87.ec2.internal",
+            "mount": "/var/log",
+            "used_pct": "86%",
+            "threshold": "85%"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[APM] payment-api p99 latency 4.8s on POST /v1/payments (SLO 800ms)",
+          "severity": "error",
+          "source": "datadog-apm:payment-api:production",
+          "component": "api",
+          "group": "apm",
+          "class": "Latency",
+          "custom_details": {
+            "service": "payment-api",
+            "problem": "payments-outage",
+            "endpoint": "POST /v1/payments",
+            "p99_latency_ms": 4800,
+            "slo_ms": 800,
+            "upstream": "payment-processor"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[APM] payment-api 5xx error rate 18% (502/504 from payment-processor)",
+          "severity": "critical",
+          "source": "datadog-apm:payment-api:production",
+          "component": "api",
+          "group": "apm",
+          "class": "ErrorRate",
+          "custom_details": {
+            "service": "payment-api",
+            "problem": "payments-outage",
+            "endpoint": "POST /v1/payments",
+            "error_rate_pct": "18%",
+            "status_codes": "502, 504",
+            "failed_payments_per_min": 1250,
+            "service_down_cost_per_minute": "$4,850"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
           }
         },
         {
@@ -768,52 +813,7 @@
           },
           "delay": {
             "type": "fixed",
-            "value": 2000
-          }
-        },
-        {
-          "type": "trigger",
-          "summary": "[Security] CloudTrail: 3,412 GetObject calls on s3://travelduty-settlement-exports in 4m by recon-ci-deployer",
-          "severity": "critical",
-          "source": "aws-cloudtrail:eu-west-1",
-          "component": "s3",
-          "group": "security",
-          "class": "DataExfiltration",
-          "custom_details": {
-            "service": "payment-reconciliation",
-            "problem": "leaked-ci-key",
-            "bucket": "travelduty-settlement-exports",
-            "principal": "arn:aws:iam::412345678901:role/recon-ci-deployer",
-            "get_object_calls": 3412,
-            "list_objects_calls": 58,
-            "window_minutes": 4,
-            "source_ip": "185.220.101.44",
-            "data_classification": "PCI - cardholder settlement data"
-          },
-          "delay": {
-            "type": "fixed",
-            "value": 2000
-          }
-        },
-        {
-          "type": "trigger",
-          "summary": "Settlement batch 2026-11-06-T1 has 1,204 unmatched transactions (authorisations missing from payment-processor)",
-          "severity": "error",
-          "source": "recon-scheduler:settlement-batch",
-          "component": "batch",
-          "group": "jobs",
-          "class": "ReconciliationMismatch",
-          "custom_details": {
-            "service": "payment-reconciliation",
-            "problem": "payments-outage",
-            "batch_id": "2026-11-06-T1",
-            "unmatched_transactions": 1204,
-            "unmatched_value": "GBP 187,450",
-            "missing_from": "payment-processor"
-          },
-          "delay": {
-            "type": "fixed",
-            "value": 2000
+            "value": 1000
           }
         }
       ]

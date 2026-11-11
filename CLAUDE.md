@@ -12,6 +12,7 @@ This repo ships a single Chrome extension (Manifest V3) called **Incident Inject
 - `docs/`: screenshots and `DEVELOPER.md`.
 - `releases/`: one unpacked `vX.Y/` folder and one `incident-injector-vX.Y.zip` per version.
 - `scope_css.py`: one-off helper script, now obsolete. `panel.css` is scoped by hand on `#incident-injector-panel`.
+- `README.md` and `docs/screenshots/` still describe v1.6 (DM Sans, Font Awesome, `incident-injector-v1.6.zip`). Don't trust them over this file or the code; update them as part of a release when asked.
 
 ## Architecture (big picture)
 
@@ -22,7 +23,7 @@ The extension intercepts clicks and form submits on any page, then sends PagerDu
    - **Interception core:** one path, `findTarget` → `trigger`.
    - **Panel host:** injects the panel into the top frame's DOM (not an iframe) and relays `window.postMessage` traffic between panel and background.
 3. **`panel.js`** runs in the page's **main world**, so it normally has no `chrome.*` access. Everything goes through the postMessage relay in `content.js` (the `*_request` and `*_response` actions). `isExtensionContext()` is the gate.
-4. **`event-processor.js`**: scenario engine. Handles `{{variable}}` templating, batching (`maxConcurrentEvents: 3`) and retries. Scenarios are looked up by id or name first, and by numeric index only for pure-digit ids.
+4. **`event-processor.js`**: scenario engine. Handles `{{variable}}` templating, retries, and sending. Events are sent strictly in order (`maxConcurrentEvents: 1`), and each `delay` counts from the previous send. Raising the batch size fires events in parallel groups, so their arrival order becomes a race. Scenarios are looked up by id or name first, and by numeric index only for pure-digit ids.
 
 ### Storage
 
