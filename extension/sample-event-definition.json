@@ -817,6 +817,297 @@
           }
         }
       ]
+    },
+    {
+      "id": "reinvent_scenario",
+      "name": "Reinvent Scenario",
+      "description": "A claims-reconciliation library upgrade 7h earlier, then 9 alerts: its hung pod leaks memory, node memory pressure evicts patient-portal and scheduling, claims submissions back up, compliance exposure. Fix: restart the pod and set a memory limit",
+      "events": [
+        {
+          "type": "change",
+          "routing_key_env": "PD_DEPLOY_ROUTING_KEY",
+          "summary": "Deployed claims-reconciliation v4.8.0 to production - dependency upgrade x12-edi-parser 4.3.2 -> 5.0.0",
+          "source": "github-actions:healthcare/claims-reconciliation",
+          "offset_minutes": -420,
+          "custom_details": {
+            "service": "claims-reconciliation",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "namespace": "claims",
+            "version": "v4.8.0",
+            "previous_version": "v4.7.3",
+            "commit_sha": "9e1b47d",
+            "pull_request": "#1127",
+            "change_type": "library upgrade",
+            "change_notes": "Dependabot: bump x12-edi-parser 4.3.2 -> 5.0.0 (835 remittance parsing). Major version; parser now caches segment definitions per document",
+            "resources_limits_memory": "not set",
+            "rollback_available": "yes"
+          },
+          "links": [
+            {
+              "href": "https://github.example.com/healthcare/claims-reconciliation/actions/runs/1127",
+              "text": "View GitHub Actions Run"
+            },
+            {
+              "href": "https://github.example.com/healthcare/claims-reconciliation/pull/1127",
+              "text": "View Pull Request"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[K8s] claims-reconciliation-6b8d9f7c4-qm7zt memory working set 11.8GiB and rising (~1.6GiB/h for 7h) - no memory limit set",
+          "severity": "warning",
+          "source": "prometheus:workshop-cluster:claims",
+          "component": "pod",
+          "group": "kubernetes",
+          "class": "ContainerMemoryGrowth",
+          "custom_details": {
+            "service": "claims-reconciliation",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "namespace": "claims",
+            "pod_name": "claims-reconciliation-6b8d9f7c4-qm7zt",
+            "node": "ip-10-0-3-142.ec2.internal",
+            "container": "reconciler",
+            "working_set": "11.8GiB",
+            "growth_rate": "1.6GiB/h",
+            "memory_request": "2GiB",
+            "memory_limit": "none",
+            "query": "container_memory_working_set_bytes{namespace=\"claims\",pod=~\"claims-reconciliation-.*\"}"
+          },
+          "links": [
+            {
+              "href": "https://wiki.example.com/runbooks/claims-reconciliation-memory",
+              "text": "Runbook: claims-reconciliation memory"
+            }
+          ],
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[K8s] Node ip-10-0-3-142.ec2.internal MemoryPressure=True - kubelet evicting pods (412MiB of 15.3GiB allocatable free)",
+          "severity": "critical",
+          "source": "kubernetes:workshop-cluster:node/ip-10-0-3-142.ec2.internal",
+          "component": "node",
+          "group": "kubernetes",
+          "class": "NodeMemoryPressure",
+          "custom_details": {
+            "service": "kubernetes-platform",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "node": "ip-10-0-3-142.ec2.internal",
+            "instance_type": "m6i.xlarge",
+            "allocatable_memory": "15.3GiB",
+            "available_memory": "412MiB",
+            "eviction_threshold": "memory.available<500Mi",
+            "pods_evicted": 7,
+            "top_consumer": "claims/claims-reconciliation-6b8d9f7c4-qm7zt (11.8GiB)"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[K8s] patient-portal 0/3 pods ready - Evicted from ip-10-0-3-142.ec2.internal (node memory pressure), rescheduling Pending",
+          "severity": "critical",
+          "source": "kubernetes:workshop-cluster:patient:deployment/patient-portal",
+          "component": "deployment",
+          "group": "kubernetes",
+          "class": "KubeDeploymentReplicasMismatch",
+          "custom_details": {
+            "service": "patient-portal",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "namespace": "patient",
+            "deployment": "patient-portal",
+            "replicas_desired": 3,
+            "replicas_ready": 0,
+            "reason": "Evicted: The node was low on resource: memory",
+            "pending_reason": "0/4 nodes available: 1 node(s) had memory pressure, 3 Insufficient memory"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[Synthetics] Patient portal login failing from 4/4 locations - HTTP 503 on POST /api/auth/session",
+          "severity": "critical",
+          "source": "synthetics:patient-portal-login",
+          "component": "synthetic",
+          "group": "synthetics",
+          "class": "SyntheticCheckFailed",
+          "custom_details": {
+            "service": "patient-portal",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "check": "patient-portal-login",
+            "locations_failing": "4/4",
+            "status_code": 503,
+            "consecutive_failures": 6,
+            "customer_impact": "Patients cannot sign in to view results, messages or bills"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[APM] appointment-scheduling 5xx error rate 71% on POST /v2/appointments - upstream connect error, 1/3 pods ready",
+          "severity": "critical",
+          "source": "datadog-apm:appointment-scheduling:production",
+          "component": "api",
+          "group": "apm",
+          "class": "ErrorRateHigh",
+          "custom_details": {
+            "service": "appointment-scheduling",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "namespace": "scheduling",
+            "endpoint": "POST /v2/appointments",
+            "error_rate": "71%",
+            "slo": "99.5% success",
+            "pods_ready": "1/3",
+            "failed_bookings_last_15m": 1284,
+            "customer_impact": "Online and call-centre bookings failing"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[APM] claims-reconciliation worker hung - no batch progress for 24m, 64/64 threads WAITING in X12SegmentCache.get",
+          "severity": "error",
+          "source": "datadog-apm:claims-reconciliation:production",
+          "component": "process",
+          "group": "apm",
+          "class": "ProcessHung",
+          "custom_details": {
+            "service": "claims-reconciliation",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "namespace": "claims",
+            "pod_name": "claims-reconciliation-6b8d9f7c4-qm7zt",
+            "node": "ip-10-0-3-142.ec2.internal",
+            "last_batch_completed": "835-ERA-20261112-0412",
+            "minutes_since_progress": 24,
+            "thread_pool": "64/64 blocked",
+            "gc_time_pct": "92%",
+            "full_gc_count_last_10m": 38,
+            "library": "x12-edi-parser 5.0.0"
+          },
+          "links": [
+            {
+              "href": "https://wiki.example.com/runbooks/claims-reconciliation-memory",
+              "text": "Runbook: claims-reconciliation memory"
+            }
+          ],
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[Kafka] claims-submission consumer lag 18,420 messages on topic claims.837.outbound - oldest 41m",
+          "severity": "error",
+          "source": "kafka-exporter:claims-cluster:claims.837.outbound",
+          "component": "queue",
+          "group": "kafka",
+          "class": "ConsumerLagHigh",
+          "custom_details": {
+            "service": "claims-submission",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "topic": "claims.837.outbound",
+            "consumer_group": "claims-submission",
+            "lag": 18420,
+            "oldest_message_age": "41m",
+            "blocked_on": "claims-reconciliation eligibility match (timeouts)",
+            "claims_value_usd": 6250000
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[Compliance] 3 claim batches (837P) not transmitted to clearinghouse - past 4h submission SLA",
+          "severity": "error",
+          "source": "claims-compliance-monitor:clearinghouse-sla",
+          "component": "compliance",
+          "group": "compliance",
+          "class": "SubmissionSLABreach",
+          "custom_details": {
+            "service": "claims-submission",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "batches_late": 3,
+            "claims_affected": 2731,
+            "sla": "4h from encounter close",
+            "clearinghouse": "clearinghouse.example.com",
+            "payer_impact": "Timely-filing risk on Medicare Advantage claims",
+            "notify": "compliance@example.com"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[Security] PHI access audit-log shipping stalled on ip-10-0-3-142.ec2.internal - 22m gap (fluent-bit evicted)",
+          "severity": "error",
+          "source": "audit-pipeline:workshop-cluster:node/ip-10-0-3-142.ec2.internal",
+          "component": "logging",
+          "group": "security",
+          "class": "AuditLogGap",
+          "custom_details": {
+            "service": "compliance",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "node": "ip-10-0-3-142.ec2.internal",
+            "agent": "fluent-bit",
+            "gap_minutes": 22,
+            "affected_services": "patient-portal, appointment-scheduling, claims-reconciliation",
+            "regulation": "HIPAA 164.312(b) audit controls",
+            "action": "Record the gap in the compliance incident log"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        }
+      ]
     }
   ]
 }

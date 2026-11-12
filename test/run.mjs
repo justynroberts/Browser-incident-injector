@@ -436,6 +436,29 @@ await test('shipped scenarios: DDoS + payments storm, real change events', async
   eq(new Set(t.map(e => e.json.dedup_key)).size, 14, 'unique dedup keys');
 });
 
+await test('shipped scenario: Reinvent (library upgrade change, then node memory cascade in order)', async () => {
+  await sw(async () => {
+    const text = await (await fetch(chrome.runtime.getURL('sample-event-definition.json'))).text();
+    await chrome.storage.local.set({ event_definition: text });
+  });
+  const DEPLOY_KEY = 'd'.repeat(32);
+  await settings({ run_scenario_on_submit: true, active_scenario_ids: ['reinvent_scenario'], active_scenario_id: 'reinvent_scenario',
+    change_keys: [{ name: 'PD_DEPLOY_ROUTING_KEY', key: DEPLOY_KEY }] });
+  const p = await open(`${A}/button`);
+  await clickIn(p, '#b');
+  const alerts = () => triggers().filter(e => e.json.payload.custom_details?.problem === 'claims-node-memory');
+  for (let i = 0; i < 40 && alerts().length < 9; i++) await sleep(500);
+  const changes = events.filter(e => e.path === '/v2/change/enqueue');
+  eq(changes.length, 1, 'one change event');
+  eq(changes[0].json.routing_key, DEPLOY_KEY, 'library upgrade uses PD_DEPLOY_ROUTING_KEY');
+  eq(changes[0].json.payload.custom_details.change_type, 'library upgrade', 'change type');
+  const ago = (Date.now() - Date.parse(changes[0].json.payload.timestamp)) / 60000;
+  if (ago < 415 || ago > 425) throw new Error(`upgrade timestamp ${ago.toFixed(1)} min ago, want ~420`);
+  eq(alerts().map(e => e.json.payload.custom_details.service), ['claims-reconciliation', 'kubernetes-platform', 'patient-portal',
+    'patient-portal', 'appointment-scheduling', 'claims-reconciliation', 'claims-submission', 'claims-submission', 'compliance'],
+    'alert order by service');
+});
+
 await test('panel: opens, new font renders, multi-select run', async () => {
   await sw(d => chrome.storage.local.set({ event_definition: JSON.stringify(d) }), DEFINITION);
   await settings({ active_scenario_ids: ['1-db-outage'], active_scenario_id: '1-db-outage' });
