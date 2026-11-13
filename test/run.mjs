@@ -430,6 +430,9 @@ await test('shipped scenarios: DDoS + payments storm, real change events', async
     throw new Error(`first payment-api alert was "${storm[firstApi].json.payload.summary}"`);
   if (storm.slice(firstApi).some(e => svc(e) !== 'payment-api')) throw new Error('another service alerted after payment-api started');
   if (t.some(e => e.path !== '/v2/enqueue')) throw new Error('alert sent to wrong endpoint');
+  // Every storm alert carries one dashcall chart in the top-level images field
+  const bad = storm.filter(e => e.json.images?.length !== 1 || !/^https:\/\/dash\.apps\.fintonlabs\.com\/.+\.png\?/.test(e.json.images[0].src) || !e.json.images[0].alt);
+  if (bad.length) throw new Error(`${bad.length} storm alerts missing a chart image, e.g. "${bad[0].json.payload.summary}"`);
   const ddos = t.find(e => e.json.payload.class === 'ddos-attack');
   eq([ddos.json.payload.source, ddos.json.payload.custom_details.service, ddos.json.payload.custom_details.requests_per_second],
      ['cloudflare-security', 'Security', 45000], 'DDoS payload');
@@ -443,14 +446,14 @@ await test('shipped scenario: Reinvent (library upgrade change, then node memory
   });
   const DEPLOY_KEY = 'd'.repeat(32);
   await settings({ run_scenario_on_submit: true, active_scenario_ids: ['reinvent_scenario'], active_scenario_id: 'reinvent_scenario',
-    change_keys: [{ name: 'PD_DEPLOY_ROUTING_KEY', key: DEPLOY_KEY }] });
+    change_keys: [{ name: 'PD_CLAIMS_CHANGE_KEY', key: DEPLOY_KEY }] });
   const p = await open(`${A}/button`);
   await clickIn(p, '#b');
   const alerts = () => triggers().filter(e => e.json.payload.custom_details?.problem === 'claims-node-memory');
   for (let i = 0; i < 40 && alerts().length < 9; i++) await sleep(500);
   const changes = events.filter(e => e.path === '/v2/change/enqueue');
   eq(changes.length, 1, 'one change event');
-  eq(changes[0].json.routing_key, DEPLOY_KEY, 'library upgrade uses PD_DEPLOY_ROUTING_KEY');
+  eq(changes[0].json.routing_key, DEPLOY_KEY, 'library upgrade uses PD_CLAIMS_CHANGE_KEY');
   eq(changes[0].json.payload.custom_details.change_type, 'library upgrade', 'change type');
   const ago = (Date.now() - Date.parse(changes[0].json.payload.timestamp)) / 60000;
   if (ago < 415 || ago > 425) throw new Error(`upgrade timestamp ${ago.toFixed(1)} min ago, want ~420`);
