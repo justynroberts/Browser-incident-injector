@@ -543,8 +543,8 @@
           },
           "images": [
             {
-              "src": "https://dash.apps.fintonlabs.com/pp-mem-ws.png?style=line&series=pod-1:61,63,62,70,77,83,88,91,93,94;pod-2:58,60,61,68,75,82,86,90,92,93;pod-3:55,57,57,63,70,78,84,89,91,92;pod-4:60,61,61,66,73,80,85,90,92,93&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor+memory+working+set+%28%+of+limit%29&suffix=%&min=40&max=100&target=90&theme=ink&font=familjen&size=800x400",
-              "href": "https://dash.apps.fintonlabs.com/pp-mem-ws.png?style=line&series=pod-1:61,63,62,70,77,83,88,91,93,94;pod-2:58,60,61,68,75,82,86,90,92,93;pod-3:55,57,57,63,70,78,84,89,91,92;pod-4:60,61,61,66,73,80,85,90,92,93&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor+memory+working+set+%28%+of+limit%29&suffix=%&min=40&max=100&target=90&theme=ink&font=familjen&size=800x400",
+              "src": "https://dash.apps.fintonlabs.com/pp-mem-ws.png?style=line&series=pod-1:61,63,62,70,77,83,88,91,93,94;pod-2:58,60,61,68,75,82,86,90,92,93;pod-3:55,57,57,63,70,78,84,89,91,92;pod-4:60,61,61,66,73,80,85,90,92,93&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor+memory+working+set+%28%25+of+limit%29&suffix=%25&min=40&max=100&target=90&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/pp-mem-ws.png?style=line&series=pod-1:61,63,62,70,77,83,88,91,93,94;pod-2:58,60,61,68,75,82,86,90,92,93;pod-3:55,57,57,63,70,78,84,89,91,92;pod-4:60,61,61,66,73,80,85,90,92,93&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor+memory+working+set+%28%25+of+limit%29&suffix=%25&min=40&max=100&target=90&theme=ink&font=familjen&size=800x400",
               "alt": "Memory working set by pod, last 45m"
             }
           ]
@@ -815,8 +815,8 @@
           },
           "images": [
             {
-              "src": "https://dash.apps.fintonlabs.com/api-logvol.png?style=gauge&series=86&min=0&max=100&target=85&suffix=%&title=%2Fvar%2Flog+on+ip-10-0-1-87.ec2.internal&theme=ink&font=familjen&size=800x400",
-              "href": "https://dash.apps.fintonlabs.com/api-logvol.png?style=gauge&series=86&min=0&max=100&target=85&suffix=%&title=%2Fvar%2Flog+on+ip-10-0-1-87.ec2.internal&theme=ink&font=familjen&size=800x400",
+              "src": "https://dash.apps.fintonlabs.com/api-logvol.png?style=gauge&series=86&min=0&max=100&target=85&suffix=%25&title=%2Fvar%2Flog+on+ip-10-0-1-87.ec2.internal&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-logvol.png?style=gauge&series=86&min=0&max=100&target=85&suffix=%25&title=%2Fvar%2Flog+on+ip-10-0-1-87.ec2.internal&theme=ink&font=familjen&size=800x400",
               "alt": "Disk usage, /var/log"
             }
           ]
@@ -872,8 +872,8 @@
           },
           "images": [
             {
-              "src": "https://dash.apps.fintonlabs.com/api-5xx.png?style=area&series=5xx+%:0.2,0.3,0.2,0.9,2.1,4.8,8.5,12.9,16.2,18&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+5xx+error+rate&suffix=%&target=1&theme=ink&font=familjen&size=800x400",
-              "href": "https://dash.apps.fintonlabs.com/api-5xx.png?style=area&series=5xx+%:0.2,0.3,0.2,0.9,2.1,4.8,8.5,12.9,16.2,18&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+5xx+error+rate&suffix=%&target=1&theme=ink&font=familjen&size=800x400",
+              "src": "https://dash.apps.fintonlabs.com/api-5xx.png?style=area&series=5xx+%25:0.2,0.3,0.2,0.9,2.1,4.8,8.5,12.9,16.2,18&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+5xx+error+rate&suffix=%25&target=1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-5xx.png?style=area&series=5xx+%25:0.2,0.3,0.2,0.9,2.1,4.8,8.5,12.9,16.2,18&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+5xx+error+rate&suffix=%25&target=1&theme=ink&font=familjen&size=800x400",
               "alt": "5xx error rate, last 45m"
             }
           ]
@@ -901,8 +901,8 @@
           },
           "images": [
             {
-              "src": "https://dash.apps.fintonlabs.com/api-synth.png?style=hbar&series=12,18,24,100&labels=LHR,FRA,IAD,SIN&title=Checkout+journey+success+rate+by+location+%28%%29&suffix=%&max=100&valuelabels=1&theme=ink&font=familjen&size=800x400",
-              "href": "https://dash.apps.fintonlabs.com/api-synth.png?style=hbar&series=12,18,24,100&labels=LHR,FRA,IAD,SIN&title=Checkout+journey+success+rate+by+location+%28%%29&suffix=%&max=100&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "src": "https://dash.apps.fintonlabs.com/api-synth.png?style=hbar&series=12,18,24,100&labels=LHR,FRA,IAD,SIN&title=Checkout+journey+success+rate+by+location+%28%25%29&suffix=%25&max=100&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-synth.png?style=hbar&series=12,18,24,100&labels=LHR,FRA,IAD,SIN&title=Checkout+journey+success+rate+by+location+%28%25%29&suffix=%25&max=100&valuelabels=1&theme=ink&font=familjen&size=800x400",
               "alt": "Success rate by location"
             }
           ]
