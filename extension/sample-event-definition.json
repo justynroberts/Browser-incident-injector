@@ -540,7 +540,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/pp-mem-ws.png?style=line&series=pod-1:61,63,62,70,77,83,88,91,93,94;pod-2:58,60,61,68,75,82,86,90,92,93;pod-3:55,57,57,63,70,78,84,89,91,92;pod-4:60,61,61,66,73,80,85,90,92,93&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor+memory+working+set+%28%+of+limit%29&suffix=%&min=40&max=100&target=90&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/pp-mem-ws.png?style=line&series=pod-1:61,63,62,70,77,83,88,91,93,94;pod-2:58,60,61,68,75,82,86,90,92,93;pod-3:55,57,57,63,70,78,84,89,91,92;pod-4:60,61,61,66,73,80,85,90,92,93&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor+memory+working+set+%28%+of+limit%29&suffix=%&min=40&max=100&target=90&theme=ink&font=familjen&size=800x400",
+              "alt": "Memory working set by pod, last 45m"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -565,7 +572,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/pp-oom.png?style=bar&series=restarts:0,0,0,0,1,1,1,2,3,3&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor-7d4f8c9b5-x2k9m+restarts+%28OOMKilled,+exit+137%29&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/pp-oom.png?style=bar&series=restarts:0,0,0,0,1,1,1,2,3,3&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor-7d4f8c9b5-x2k9m+restarts+%28OOMKilled,+exit+137%29&theme=ink&font=familjen&size=800x400",
+              "alt": "Pod restarts, last 45m"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -587,7 +601,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/recon-tls.png?style=gauge&series=6&min=0&max=90&title=sftp.settlement-bank.example.com+cert:+days+left&suffix=d&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/recon-tls.png?style=gauge&series=6&min=0&max=90&title=sftp.settlement-bank.example.com+cert:+days+left&suffix=d&theme=ink&font=familjen&size=800x400",
+              "alt": "Days until certificate expiry"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -611,7 +632,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/pp-crashloop.png?style=hbar&series=9,8,9,7,9,0&labels=pod-1,pod-2,pod-3,pod-4,pod-5,pod-6&title=payment-processor+restarts+per+pod,+last+10m&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/pp-crashloop.png?style=hbar&series=9,8,9,7,9,0&labels=pod-1,pod-2,pod-3,pod-4,pod-5,pod-6&title=payment-processor+restarts+per+pod,+last+10m&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "alt": "Restarts per pod, last 10m"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -633,7 +661,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/pp-alb.png?style=stacked&series=healthy:6,6,6,6,5,4,3,2,1,1;unhealthy:0,0,0,0,1,2,3,4,5,5&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=ALB+payment-processor-prod+target+health&colors=3fb950,f0646b&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/pp-alb.png?style=stacked&series=healthy:6,6,6,6,5,4,3,2,1,1;unhealthy:0,0,0,0,1,2,3,4,5,5&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=ALB+payment-processor-prod+target+health&colors=3fb950,f0646b&theme=ink&font=familjen&size=800x400",
+              "alt": "Healthy vs unhealthy ALB targets"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -657,7 +692,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/recon-gd.png?style=hbar&series=3412,41,12,6&labels=AS9009+%28RO%29,AS16509+%28AWS%29,AS8075+%28MSFT%29,AS15169+%28GOOG%29&title=recon-ci-deployer+API+calls+by+source+ASN,+last+1h&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/recon-gd.png?style=hbar&series=3412,41,12,6&labels=AS9009+%28RO%29,AS16509+%28AWS%29,AS8075+%28MSFT%29,AS15169+%28GOOG%29&title=recon-ci-deployer+API+calls+by+source+ASN,+last+1h&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "alt": "API calls by source ASN"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -681,7 +723,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/recon-ct.png?style=bar&series=GetObject:8,6,9,7,5,8,412,1104,1309,587&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=GetObject+on+s3:%2F%2Ftravelduty-settlement-exports+by+recon-ci-deployer&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/recon-ct.png?style=bar&series=GetObject:8,6,9,7,5,8,412,1104,1309,587&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=GetObject+on+s3:%2F%2Ftravelduty-settlement-exports+by+recon-ci-deployer&theme=ink&font=familjen&size=800x400",
+              "alt": "GetObject calls per 5m"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -702,7 +751,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/recon-batch.png?style=donut&series=matched:41870;unmatched:1204&title=Settlement+batch+2026-11-06-T1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/recon-batch.png?style=donut&series=matched:41870;unmatched:1204&title=Settlement+batch+2026-11-06-T1&theme=ink&font=familjen&size=800x400",
+              "alt": "Matched vs unmatched transactions"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -728,7 +784,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/api-crashloop.png?style=bar&series=restarts:0,0,0,1,1,2,3,5,6,8&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api-7d4f8c9b5-x2k9m+restart+count&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-crashloop.png?style=bar&series=restarts:0,0,0,1,1,2,3,5,6,8&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api-7d4f8c9b5-x2k9m+restart+count&theme=ink&font=familjen&size=800x400",
+              "alt": "Restart count, last 45m"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -749,7 +812,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/api-logvol.png?style=gauge&series=86&min=0&max=100&target=85&suffix=%&title=%2Fvar%2Flog+on+ip-10-0-1-87.ec2.internal&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-logvol.png?style=gauge&series=86&min=0&max=100&target=85&suffix=%&title=%2Fvar%2Flog+on+ip-10-0-1-87.ec2.internal&theme=ink&font=familjen&size=800x400",
+              "alt": "Disk usage, /var/log"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -770,7 +840,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/api-p99.png?style=line&series=p99:420,430,410,520,900,1600,2400,3300,4200,4800;p50:120,118,121,140,210,380,520,700,860,940&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+POST+%2Fv1%2Fpayments+latency+%28ms%29,+SLO+800ms&suffix=ms&target=800&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-p99.png?style=line&series=p99:420,430,410,520,900,1600,2400,3300,4200,4800;p50:120,118,121,140,210,380,520,700,860,940&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+POST+%2Fv1%2Fpayments+latency+%28ms%29,+SLO+800ms&suffix=ms&target=800&theme=ink&font=familjen&size=800x400",
+              "alt": "p99 and p50 latency vs 800ms SLO"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -792,7 +869,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/api-5xx.png?style=area&series=5xx+%:0.2,0.3,0.2,0.9,2.1,4.8,8.5,12.9,16.2,18&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+5xx+error+rate&suffix=%&target=1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-5xx.png?style=area&series=5xx+%:0.2,0.3,0.2,0.9,2.1,4.8,8.5,12.9,16.2,18&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+5xx+error+rate&suffix=%&target=1&theme=ink&font=familjen&size=800x400",
+              "alt": "5xx error rate, last 45m"
+            }
+          ]
         },
         {
           "type": "trigger",
@@ -814,7 +898,14 @@
           "delay": {
             "type": "fixed",
             "value": 1000
-          }
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/api-synth.png?style=hbar&series=12,18,24,100&labels=LHR,FRA,IAD,SIN&title=Checkout+journey+success+rate+by+location+%28%%29&suffix=%&max=100&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-synth.png?style=hbar&series=12,18,24,100&labels=LHR,FRA,IAD,SIN&title=Checkout+journey+success+rate+by+location+%28%%29&suffix=%&max=100&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "alt": "Success rate by location"
+            }
+          ]
         }
       ]
     },
@@ -825,7 +916,7 @@
       "events": [
         {
           "type": "change",
-          "routing_key_env": "PD_DEPLOY_ROUTING_KEY",
+          "routing_key_env": "PD_CLAIMS_CHANGE_KEY",
           "summary": "Deployed claims-reconciliation v4.8.0 to production - dependency upgrade x12-edi-parser 4.3.2 -> 5.0.0",
           "source": "github-actions:healthcare/claims-reconciliation",
           "offset_minutes": -420,
