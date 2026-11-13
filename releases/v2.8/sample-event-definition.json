@@ -1,0 +1,1204 @@
+{
+  "schema_version": "1.0",
+  "global_config": {
+    "variables": {
+      "environment": "production",
+      "region": "us-east-1"
+    }
+  },
+  "event_definitions": [
+    {
+      "id": "finance_trading_alerts",
+      "name": "Trading Platform Alert Storm",
+      "description": "Financial trading platform monitoring alerts during market volatility",
+      "variables": {
+        "incident_key": "TRADE-{{incident_id}}",
+        "component": "trading-engine",
+        "application": "Trading Platform"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Market data feed latency > 500ms threshold",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "market-data",
+          "class": "latency",
+          "custom_details": {
+            "metric": "market_data_latency_p95",
+            "current_value": "847ms",
+            "threshold": "500ms",
+            "source": "nasdaq_feed_monitor",
+            "affected_symbols": "AAPL,MSFT,GOOGL",
+            "monitoring_tool": "DataDog",
+            "runbook": "https://wiki.company.com/trading/market-data-latency"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Order execution error rate > 1% threshold",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "order-execution",
+          "class": "error-rate",
+          "custom_details": {
+            "metric": "order_execution_error_rate",
+            "current_value": "3.7%",
+            "threshold": "1.0%",
+            "failed_orders_count": 47,
+            "error_types": "TIMEOUT,INVALID_SYMBOL,INSUFFICIENT_FUNDS",
+            "monitoring_tool": "Prometheus",
+            "dashboard": "https://grafana.company.com/d/trading-orders"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Risk management service healthcheck failed",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "risk-management",
+          "class": "healthcheck",
+          "custom_details": {
+            "service": "risk-calculator-service",
+            "health_endpoint": "/health",
+            "status_code": 503,
+            "last_successful_check": "2025-05-31T14:23:15Z",
+            "monitoring_tool": "Consul",
+            "consul_service_id": "risk-calc-prod-01"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Authentication service response time > 2s",
+          "severity": "error",
+          "component": "{{component}}",
+          "group": "authentication",
+          "class": "response-time",
+          "custom_details": {
+            "metric": "auth_response_time_p99",
+            "current_value": "3.2s",
+            "threshold": "2.0s",
+            "endpoint": "/api/v1/auth/login",
+            "request_count": 1247,
+            "monitoring_tool": "New Relic",
+            "apm_trace_id": "abc123def456"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": "automotive_telematics_alerts",
+      "name": "Connected Vehicle Platform Alerts",
+      "description": "Automotive telematics platform monitoring alerts",
+      "variables": {
+        "incident_key": "AUTO-{{incident_id}}",
+        "component": "telematics-api",
+        "application": "Connected Vehicle Platform"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Vehicle connection success rate < 95% threshold",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "connectivity",
+          "class": "success-rate",
+          "custom_details": {
+            "metric": "vehicle_connection_success_rate",
+            "current_value": "87.3%",
+            "threshold": "95.0%",
+            "failed_connections": 1847,
+            "total_attempts": 14523,
+            "monitoring_tool": "CloudWatch",
+            "log_group": "/aws/lambda/vehicle-connection-handler"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Emergency call service circuit breaker OPEN",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "emergency-services",
+          "class": "circuit-breaker",
+          "custom_details": {
+            "service": "emergency-call-service",
+            "circuit_breaker_state": "OPEN",
+            "failure_threshold": "5 failures in 60s",
+            "current_failures": 8,
+            "last_failure_reason": "HTTP 500 from PSAP gateway",
+            "monitoring_tool": "Hystrix Dashboard"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Navigation API error rate > 5% threshold",
+          "severity": "error",
+          "component": "{{component}}",
+          "group": "navigation",
+          "class": "error-rate",
+          "custom_details": {
+            "metric": "navigation_api_error_rate",
+            "current_value": "12.7%",
+            "threshold": "5.0%",
+            "endpoint": "/api/v2/navigation/route",
+            "error_codes": "500,503,timeout",
+            "monitoring_tool": "Splunk",
+            "search_query": "index=api service=navigation status>=400"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "OTA update service disk usage > 90%",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "ota-updates",
+          "class": "disk-usage",
+          "custom_details": {
+            "metric": "disk_usage_percent",
+            "current_value": "94.2%",
+            "threshold": "90.0%",
+            "mount_point": "/var/lib/ota-packages",
+            "available_space": "2.3GB",
+            "hostname": "ota-server-prod-03",
+            "monitoring_tool": "Nagios"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": "gaming_platform_alerts",
+      "name": "Gaming Platform Performance Alerts",
+      "description": "Multiplayer gaming platform monitoring alerts during peak hours",
+      "variables": {
+        "incident_key": "GAME-{{incident_id}}",
+        "component": "game-backend",
+        "application": "Multiplayer Gaming Platform"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Matchmaking queue wait time > 2min threshold",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "matchmaking",
+          "class": "queue-time",
+          "custom_details": {
+            "metric": "matchmaking_queue_wait_time_p95",
+            "current_value": "287s",
+            "threshold": "120s",
+            "queue_size": 45623,
+            "game_mode": "ranked_competitive",
+            "monitoring_tool": "Elastic APM",
+            "service_name": "matchmaking-service"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Game server CPU usage > 80% threshold",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "game-servers",
+          "class": "cpu-usage",
+          "custom_details": {
+            "metric": "cpu_utilization_percent",
+            "current_value": "92.1%",
+            "threshold": "80.0%",
+            "server_region": "us-west-2",
+            "instance_id": "i-0123456789abcdef0",
+            "active_matches": 127,
+            "monitoring_tool": "CloudWatch"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Payment API response time > 5s threshold",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "payments",
+          "class": "response-time",
+          "custom_details": {
+            "metric": "payment_api_response_time_p99",
+            "current_value": "8.9s",
+            "threshold": "5.0s",
+            "endpoint": "/api/v1/payments/purchase",
+            "failed_requests": 89,
+            "monitoring_tool": "AppDynamics",
+            "business_transaction": "In-Game Purchase"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Anti-cheat service memory usage > 4GB threshold",
+          "severity": "error",
+          "component": "{{component}}",
+          "group": "anti-cheat",
+          "class": "memory-usage",
+          "custom_details": {
+            "metric": "memory_usage_bytes",
+            "current_value": "4.7GB",
+            "threshold": "4.0GB",
+            "process": "anticheat-analyzer",
+            "container_id": "anticheat-prod-42a7f",
+            "monitoring_tool": "Kubernetes Metrics",
+            "namespace": "gaming-prod"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": "ecommerce_peak_alerts",
+      "name": "E-commerce Platform Black Friday Alerts",
+      "description": "E-commerce platform monitoring alerts during peak traffic events",
+      "variables": {
+        "incident_key": "ECOM-{{incident_id}}",
+        "component": "ecommerce-api",
+        "application": "E-commerce Platform"
+      },
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "Web application response time > 3s threshold",
+          "severity": "warning",
+          "component": "{{component}}",
+          "group": "frontend",
+          "class": "response-time",
+          "custom_details": {
+            "metric": "http_request_duration_p95",
+            "current_value": "5.8s",
+            "threshold": "3.0s",
+            "endpoint": "/product-listing",
+            "concurrent_users": 89000,
+            "monitoring_tool": "Pingdom",
+            "load_balancer": "alb-ecommerce-prod"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Shopping cart service error rate > 2% threshold",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "shopping-cart",
+          "class": "error-rate",
+          "custom_details": {
+            "metric": "cart_service_error_rate",
+            "current_value": "8.7%",
+            "threshold": "2.0%",
+            "errors_per_minute": 247,
+            "total_requests_per_minute": 2839,
+            "primary_error": "DynamoDB ProvisionedThroughputExceededException",
+            "monitoring_tool": "X-Ray"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Payment gateway timeout rate > 10% threshold",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "payments",
+          "class": "timeout-rate",
+          "custom_details": {
+            "metric": "payment_timeout_rate",
+            "current_value": "23.4%",
+            "threshold": "10.0%",
+            "gateway": "stripe",
+            "timeout_threshold": "30s",
+            "failed_amount_usd": 127000,
+            "monitoring_tool": "Stripe Dashboard"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Inventory service database connection pool exhausted",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "inventory",
+          "class": "connection-pool",
+          "custom_details": {
+            "metric": "db_connection_pool_active",
+            "current_value": 100,
+            "max_connections": 100,
+            "cpu_usage": "98%",
+            "memory_usage": "87%",
+            "query_count": "3x normal load",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Database failover initiated",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "database",
+          "class": "availability",
+          "custom_details": {
+            "failover_type": "Automatic",
+            "estimated_downtime": "30-60 seconds",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "Multiple services reporting database connection failures",
+          "severity": "critical",
+          "component": "{{component}}",
+          "group": "application",
+          "class": "error",
+          "custom_details": {
+            "affected_services": [
+              "checkout",
+              "inventory",
+              "user-profiles"
+            ],
+            "error_rate": "100%",
+            "customer_impact": "Unable to complete transactions",
+            "timestamp": "{{timestamp}}",
+            "application": "{{application}}"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
+        }
+      ]
+    },
+    {
+      "id": "ddos_attack",
+      "name": "DDoS attack",
+      "description": "Single security alert: volumetric HTTP GET flood on /api/v1/bookings/search (from the TravelDuty cascade)",
+      "events": [
+        {
+          "type": "trigger",
+          "summary": "DDoS attack detected - abnormal traffic spike from multiple sources",
+          "severity": "critical",
+          "source": "cloudflare-security",
+          "component": "travelduty-platform",
+          "group": "security",
+          "class": "ddos-attack",
+          "custom_details": {
+            "service": "Security",
+            "problem": "ddos",
+            "attack_type": "volumetric",
+            "requests_per_second": 45000,
+            "baseline_rps": 850,
+            "source_ips": 1247,
+            "top_source_countries": "RU, CN, VN, BR",
+            "attack_vector": "HTTP GET flood",
+            "target_endpoint": "/api/v1/bookings/search",
+            "blocked_requests": 38200,
+            "monitoring_tool": "Cloudflare Security",
+            "mitigation_status": "rate_limiting_active",
+            "bandwidth_consumed": "2.1Gbps",
+            "application": "TravelDuty Booking Platform",
+            "environment": "production",
+            "region": "us-east-1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "payments_alert_storm",
+      "name": "Payments alert storm",
+      "description": "Change events, then 13 interleaved alerts: payment-processor v3.2.0 OOM cascade, a leaked CI key, a cert expiry and disk noise",
+      "events": [
+        {
+          "type": "change",
+          "routing_key_env": "PD_DEPLOY_ROUTING_KEY",
+          "summary": "Deployed payment-processor v3.2.0 to production (workshop-cluster)",
+          "source": "github-actions:travelduty/payment-processor",
+          "offset_minutes": -190,
+          "custom_details": {
+            "service": "payment-processor",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "version": "v3.2.0",
+            "previous_version": "v3.1.4",
+            "commit_sha": "a3f9c1e",
+            "pull_request": "#482",
+            "change_notes": "Switch HTTP client to pooled connections; raise max in-flight authorisations 200 -> 1000",
+            "rollback_available": "yes"
+          },
+          "links": [
+            {
+              "href": "https://github.example.com/travelduty/payment-processor/actions/runs/482",
+              "text": "View GitHub Actions Run"
+            },
+            {
+              "href": "https://github.example.com/travelduty/payment-processor/pull/482",
+              "text": "View Pull Request"
+            }
+          ]
+        },
+        {
+          "type": "change",
+          "routing_key_env": "PD_FLAG_ROUTING_KEY",
+          "summary": "Feature flag NEWWEBEXPERIENCE rolled out to 100% in production",
+          "source": "evolven:production:payment-api",
+          "offset_minutes": -10,
+          "custom_details": {
+            "service": "payment-api",
+            "flag_name": "NEWWEBEXPERIENCE",
+            "environment": "production",
+            "rollout_percentage": "100%",
+            "previous_rollout_percentage": "25%",
+            "enabled_by": "release-management"
+          },
+          "links": [
+            {
+              "href": "https://feature-flags.example.com/flags/NEWWEBEXPERIENCE",
+              "text": "View Flag"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[K8s] payment-processor memory working set above 90% of limit on 4/6 pods",
+          "severity": "warning",
+          "source": "prometheus:workshop-cluster:production",
+          "component": "pod",
+          "group": "kubernetes",
+          "class": "MemoryPressure",
+          "custom_details": {
+            "service": "payment-processor",
+            "problem": "payments-outage",
+            "cluster": "workshop-cluster",
+            "namespace": "production",
+            "deployment": "payment-processor",
+            "pods_affected": "4/6",
+            "memory_limit": "2Gi",
+            "working_set_pct": "93%"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/pp-mem-ws.png?style=line&series=pod-1:61,63,62,70,77,83,88,91,93,94;pod-2:58,60,61,68,75,82,86,90,92,93;pod-3:55,57,57,63,70,78,84,89,91,92;pod-4:60,61,61,66,73,80,85,90,92,93&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor+memory+working+set+%28%25+of+limit%29&suffix=%25&min=40&max=100&target=90&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/pp-mem-ws.png?style=line&series=pod-1:61,63,62,70,77,83,88,91,93,94;pod-2:58,60,61,68,75,82,86,90,92,93;pod-3:55,57,57,63,70,78,84,89,91,92;pod-4:60,61,61,66,73,80,85,90,92,93&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor+memory+working+set+%28%25+of+limit%29&suffix=%25&min=40&max=100&target=90&theme=ink&font=familjen&size=800x400",
+              "alt": "Memory working set by pod, last 45m"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[K8s] Pod payment-processor-7d4f8c9b5-x2k9m OOMKilled (exit 137) - 3 restarts",
+          "severity": "error",
+          "source": "kubernetes:workshop-cluster:production:pod/payment-processor-7d4f8c9b5-x2k9m",
+          "component": "pod",
+          "group": "kubernetes",
+          "class": "OOMKilled",
+          "custom_details": {
+            "service": "payment-processor",
+            "problem": "payments-outage",
+            "cluster": "workshop-cluster",
+            "namespace": "production",
+            "pod_name": "payment-processor-7d4f8c9b5-x2k9m",
+            "container": "processor",
+            "node_name": "ip-10-0-3-142.ec2.internal",
+            "last_state": "OOMKilled",
+            "exit_code": 137,
+            "restart_count": 3
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/pp-oom.png?style=bar&series=restarts:0,0,0,0,1,1,1,2,3,3&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor-7d4f8c9b5-x2k9m+restarts+%28OOMKilled,+exit+137%29&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/pp-oom.png?style=bar&series=restarts:0,0,0,0,1,1,1,2,3,3&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-processor-7d4f8c9b5-x2k9m+restarts+%28OOMKilled,+exit+137%29&theme=ink&font=familjen&size=800x400",
+              "alt": "Pod restarts, last 45m"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "TLS certificate for sftp.settlement-bank.example.com expires in 6 days",
+          "severity": "warning",
+          "source": "cert-monitor:sftp.settlement-bank.example.com",
+          "component": "tls",
+          "group": "certificates",
+          "class": "CertExpiry",
+          "custom_details": {
+            "service": "payment-reconciliation",
+            "problem": "reconciliation-cert",
+            "host": "sftp.settlement-bank.example.com",
+            "port": 22,
+            "issuer": "DigiCert TLS RSA SHA256 2020 CA1",
+            "expires_in_days": 6,
+            "owner": "finance-integrations"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/recon-tls.png?style=gauge&series=6&min=0&max=90&title=sftp.settlement-bank.example.com+cert:+days+left&suffix=d&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/recon-tls.png?style=gauge&series=6&min=0&max=90&title=sftp.settlement-bank.example.com+cert:+days+left&suffix=d&theme=ink&font=familjen&size=800x400",
+              "alt": "Days until certificate expiry"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[K8s] payment-processor CrashLoopBackOff on 5/6 pods - 9 restarts in 10m",
+          "severity": "critical",
+          "source": "kubernetes:workshop-cluster:production:deployment/payment-processor",
+          "component": "pod",
+          "group": "kubernetes",
+          "class": "CrashLoopBackOff",
+          "custom_details": {
+            "service": "payment-processor",
+            "problem": "payments-outage",
+            "cluster": "workshop-cluster",
+            "namespace": "production",
+            "deployment": "payment-processor",
+            "pods_crashlooping": "5/6",
+            "restart_count": 9,
+            "last_state": "OOMKilled",
+            "exit_code": 137
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/pp-crashloop.png?style=hbar&series=9,8,9,7,9,0&labels=pod-1,pod-2,pod-3,pod-4,pod-5,pod-6&title=payment-processor+restarts+per+pod,+last+10m&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/pp-crashloop.png?style=hbar&series=9,8,9,7,9,0&labels=pod-1,pod-2,pod-3,pod-4,pod-5,pod-6&title=payment-processor+restarts+per+pod,+last+10m&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "alt": "Restarts per pod, last 10m"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[AWS] ALB payment-processor-prod: 5 of 6 targets unhealthy",
+          "severity": "critical",
+          "source": "aws-cloudwatch:eu-west-1:alb/payment-processor-prod",
+          "component": "load-balancer",
+          "group": "aws",
+          "class": "UnHealthyHostCount",
+          "custom_details": {
+            "service": "payment-processor",
+            "problem": "payments-outage",
+            "load_balancer": "payment-processor-prod",
+            "region": "eu-west-1",
+            "healthy_targets": 1,
+            "unhealthy_targets": 5,
+            "health_check": "GET /healthz"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/pp-alb.png?style=stacked&series=healthy:6,6,6,6,5,4,3,2,1,1;unhealthy:0,0,0,0,1,2,3,4,5,5&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=ALB+payment-processor-prod+target+health&colors=3fb950,f0646b&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/pp-alb.png?style=stacked&series=healthy:6,6,6,6,5,4,3,2,1,1;unhealthy:0,0,0,0,1,2,3,4,5,5&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=ALB+payment-processor-prod+target+health&colors=3fb950,f0646b&theme=ink&font=familjen&size=800x400",
+              "alt": "Healthy vs unhealthy ALB targets"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[Security] GuardDuty: access key for role recon-ci-deployer used from unusual ASN (AS9009, Romania)",
+          "severity": "error",
+          "source": "aws-guardduty:eu-west-1",
+          "component": "iam",
+          "group": "security",
+          "class": "UnauthorizedAccess:IAMUser/AnomalousBehavior",
+          "custom_details": {
+            "service": "payment-reconciliation",
+            "problem": "leaked-ci-key",
+            "finding_type": "UnauthorizedAccess:IAMUser/AnomalousBehavior",
+            "principal": "arn:aws:iam::412345678901:role/recon-ci-deployer",
+            "access_key_id": "AKIA****7QXZ",
+            "source_ip": "185.220.101.44",
+            "asn": "AS9009",
+            "country": "RO",
+            "guardduty_severity": 7.2
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/recon-gd.png?style=hbar&series=3412,41,12,6&labels=AS9009+%28RO%29,AS16509+%28AWS%29,AS8075+%28MSFT%29,AS15169+%28GOOG%29&title=recon-ci-deployer+API+calls+by+source+ASN,+last+1h&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/recon-gd.png?style=hbar&series=3412,41,12,6&labels=AS9009+%28RO%29,AS16509+%28AWS%29,AS8075+%28MSFT%29,AS15169+%28GOOG%29&title=recon-ci-deployer+API+calls+by+source+ASN,+last+1h&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "alt": "API calls by source ASN"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[Security] CloudTrail: 3,412 GetObject calls on s3://travelduty-settlement-exports in 4m by recon-ci-deployer",
+          "severity": "critical",
+          "source": "aws-cloudtrail:eu-west-1",
+          "component": "s3",
+          "group": "security",
+          "class": "DataExfiltration",
+          "custom_details": {
+            "service": "payment-reconciliation",
+            "problem": "leaked-ci-key",
+            "bucket": "travelduty-settlement-exports",
+            "principal": "arn:aws:iam::412345678901:role/recon-ci-deployer",
+            "get_object_calls": 3412,
+            "list_objects_calls": 58,
+            "window_minutes": 4,
+            "source_ip": "185.220.101.44",
+            "data_classification": "PCI - cardholder settlement data"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/recon-ct.png?style=bar&series=GetObject:8,6,9,7,5,8,412,1104,1309,587&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=GetObject+on+s3:%2F%2Ftravelduty-settlement-exports+by+recon-ci-deployer&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/recon-ct.png?style=bar&series=GetObject:8,6,9,7,5,8,412,1104,1309,587&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=GetObject+on+s3:%2F%2Ftravelduty-settlement-exports+by+recon-ci-deployer&theme=ink&font=familjen&size=800x400",
+              "alt": "GetObject calls per 5m"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "Settlement batch 2026-11-06-T1 has 1,204 unmatched transactions (authorisations missing from payment-processor)",
+          "severity": "error",
+          "source": "recon-scheduler:settlement-batch",
+          "component": "batch",
+          "group": "jobs",
+          "class": "ReconciliationMismatch",
+          "custom_details": {
+            "service": "payment-reconciliation",
+            "problem": "payments-outage",
+            "batch_id": "2026-11-06-T1",
+            "unmatched_transactions": 1204,
+            "unmatched_value": "GBP 187,450",
+            "missing_from": "payment-processor"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/recon-batch.png?style=donut&series=matched:41870;unmatched:1204&title=Settlement+batch+2026-11-06-T1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/recon-batch.png?style=donut&series=matched:41870;unmatched:1204&title=Settlement+batch+2026-11-06-T1&theme=ink&font=familjen&size=800x400",
+              "alt": "Matched vs unmatched transactions"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[K8s] Pod CrashLoopBackOff in namespace production - payment-api-7d4f8c9b5-x2k9m",
+          "severity": "critical",
+          "source": "kubernetes:workshop-cluster:production:pod/payment-api-7d4f8c9b5-x2k9m",
+          "component": "pod",
+          "group": "kubernetes",
+          "class": "CrashLoopBackOff",
+          "custom_details": {
+            "service": "payment-api",
+            "problem": "payments-outage",
+            "namespace": "production",
+            "kube_namespace": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "pod_name": "payment-api-7d4f8c9b5-x2k9m",
+            "container": "api-server",
+            "restart_count": 8,
+            "last_state": "Error",
+            "exit_code": 1
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/api-crashloop.png?style=bar&series=restarts:0,0,0,1,1,2,3,5,6,8&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api-7d4f8c9b5-x2k9m+restart+count&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-crashloop.png?style=bar&series=restarts:0,0,0,1,1,2,3,5,6,8&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api-7d4f8c9b5-x2k9m+restart+count&theme=ink&font=familjen&size=800x400",
+              "alt": "Restart count, last 45m"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "Log volume /var/log at 86% on ip-10-0-1-87.ec2.internal",
+          "severity": "warning",
+          "source": "node-exporter:ip-10-0-1-87.ec2.internal",
+          "component": "disk",
+          "group": "infrastructure",
+          "class": "DiskUsage",
+          "custom_details": {
+            "service": "payment-api",
+            "problem": "unrelated-noise",
+            "node_name": "ip-10-0-1-87.ec2.internal",
+            "mount": "/var/log",
+            "used_pct": "86%",
+            "threshold": "85%"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/api-logvol.png?style=gauge&series=86&min=0&max=100&target=85&suffix=%25&title=%2Fvar%2Flog+on+ip-10-0-1-87.ec2.internal&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-logvol.png?style=gauge&series=86&min=0&max=100&target=85&suffix=%25&title=%2Fvar%2Flog+on+ip-10-0-1-87.ec2.internal&theme=ink&font=familjen&size=800x400",
+              "alt": "Disk usage, /var/log"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[APM] payment-api p99 latency 4.8s on POST /v1/payments (SLO 800ms)",
+          "severity": "error",
+          "source": "datadog-apm:payment-api:production",
+          "component": "api",
+          "group": "apm",
+          "class": "Latency",
+          "custom_details": {
+            "service": "payment-api",
+            "problem": "payments-outage",
+            "endpoint": "POST /v1/payments",
+            "p99_latency_ms": 4800,
+            "slo_ms": 800,
+            "upstream": "payment-processor"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/api-p99.png?style=line&series=p99:420,430,410,520,900,1600,2400,3300,4200,4800;p50:120,118,121,140,210,380,520,700,860,940&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+POST+%2Fv1%2Fpayments+latency+%28ms%29,+SLO+800ms&suffix=ms&target=800&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-p99.png?style=line&series=p99:420,430,410,520,900,1600,2400,3300,4200,4800;p50:120,118,121,140,210,380,520,700,860,940&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+POST+%2Fv1%2Fpayments+latency+%28ms%29,+SLO+800ms&suffix=ms&target=800&theme=ink&font=familjen&size=800x400",
+              "alt": "p99 and p50 latency vs 800ms SLO"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[APM] payment-api 5xx error rate 18% (502/504 from payment-processor)",
+          "severity": "critical",
+          "source": "datadog-apm:payment-api:production",
+          "component": "api",
+          "group": "apm",
+          "class": "ErrorRate",
+          "custom_details": {
+            "service": "payment-api",
+            "problem": "payments-outage",
+            "endpoint": "POST /v1/payments",
+            "error_rate_pct": "18%",
+            "status_codes": "502, 504",
+            "failed_payments_per_min": 1250,
+            "service_down_cost_per_minute": "$4,850"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/api-5xx.png?style=area&series=5xx+%25:0.2,0.3,0.2,0.9,2.1,4.8,8.5,12.9,16.2,18&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+5xx+error+rate&suffix=%25&target=1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-5xx.png?style=area&series=5xx+%25:0.2,0.3,0.2,0.9,2.1,4.8,8.5,12.9,16.2,18&labels=-45m,-40m,-35m,-30m,-25m,-20m,-15m,-10m,-5m,now&title=payment-api+5xx+error+rate&suffix=%25&target=1&theme=ink&font=familjen&size=800x400",
+              "alt": "5xx error rate, last 45m"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[Synthetics] Checkout journey failing from 3/4 locations - step ‘Submit payment’ timed out",
+          "severity": "critical",
+          "source": "synthetics:checkout-journey",
+          "component": "synthetic",
+          "group": "synthetics",
+          "class": "SyntheticFailure",
+          "custom_details": {
+            "service": "payment-api",
+            "problem": "payments-outage",
+            "test": "checkout-journey",
+            "failing_locations": "eu-west-1, us-east-1, ap-southeast-1",
+            "passing_locations": "sa-east-1",
+            "failed_step": "Submit payment",
+            "timeout_ms": 10000
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          },
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/api-synth.png?style=hbar&series=12,18,24,100&labels=LHR,FRA,IAD,SIN&title=Checkout+journey+success+rate+by+location+%28%25%29&suffix=%25&max=100&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/api-synth.png?style=hbar&series=12,18,24,100&labels=LHR,FRA,IAD,SIN&title=Checkout+journey+success+rate+by+location+%28%25%29&suffix=%25&max=100&valuelabels=1&theme=ink&font=familjen&size=800x400",
+              "alt": "Success rate by location"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reinvent_scenario",
+      "name": "Reinvent Scenario",
+      "description": "A claims-reconciliation library upgrade 7h earlier, then 9 alerts: its hung pod leaks memory, node memory pressure evicts patient-portal and scheduling, claims submissions back up, compliance exposure. Fix: restart the pod and set a memory limit",
+      "events": [
+        {
+          "type": "change",
+          "routing_key_env": "PD_CLAIMS_CHANGE_KEY",
+          "summary": "Deployed claims-reconciliation v4.8.0 to production - dependency upgrade x12-edi-parser 4.3.2 -> 5.0.0",
+          "source": "github-actions:healthcare/claims-reconciliation",
+          "offset_minutes": -420,
+          "custom_details": {
+            "service": "claims-reconciliation",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "namespace": "claims",
+            "version": "v4.8.0",
+            "previous_version": "v4.7.3",
+            "commit_sha": "9e1b47d",
+            "pull_request": "#1127",
+            "change_type": "library upgrade",
+            "change_notes": "Dependabot: bump x12-edi-parser 4.3.2 -> 5.0.0 (835 remittance parsing). Major version; parser now caches segment definitions per document",
+            "resources_limits_memory": "not set",
+            "rollback_available": "yes"
+          },
+          "links": [
+            {
+              "href": "https://github.example.com/healthcare/claims-reconciliation/actions/runs/1127",
+              "text": "View GitHub Actions Run"
+            },
+            {
+              "href": "https://github.example.com/healthcare/claims-reconciliation/pull/1127",
+              "text": "View Pull Request"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[K8s] claims-reconciliation-6b8d9f7c4-qm7zt memory working set 11.8GiB and rising (~1.6GiB/h for 7h) - no memory limit set",
+          "severity": "warning",
+          "source": "prometheus:workshop-cluster:claims",
+          "component": "pod",
+          "group": "kubernetes",
+          "class": "ContainerMemoryGrowth",
+          "custom_details": {
+            "service": "claims-reconciliation",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "namespace": "claims",
+            "pod_name": "claims-reconciliation-6b8d9f7c4-qm7zt",
+            "node": "ip-10-0-3-142.ec2.internal",
+            "container": "reconciler",
+            "working_set": "11.8GiB",
+            "growth_rate": "1.6GiB/h",
+            "memory_request": "2GiB",
+            "memory_limit": "none",
+            "query": "container_memory_working_set_bytes{namespace=\"claims\",pod=~\"claims-reconciliation-.*\"}"
+          },
+          "links": [
+            {
+              "href": "https://wiki.example.com/runbooks/claims-reconciliation-memory",
+              "text": "Runbook: claims-reconciliation memory"
+            }
+          ],
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[K8s] Node ip-10-0-3-142.ec2.internal MemoryPressure=True - kubelet evicting pods (412MiB of 15.3GiB allocatable free)",
+          "severity": "critical",
+          "source": "kubernetes:workshop-cluster:node/ip-10-0-3-142.ec2.internal",
+          "component": "node",
+          "group": "kubernetes",
+          "class": "NodeMemoryPressure",
+          "custom_details": {
+            "service": "kubernetes-platform",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "node": "ip-10-0-3-142.ec2.internal",
+            "instance_type": "m6i.xlarge",
+            "allocatable_memory": "15.3GiB",
+            "available_memory": "412MiB",
+            "eviction_threshold": "memory.available<500Mi",
+            "pods_evicted": 7,
+            "top_consumer": "claims/claims-reconciliation-6b8d9f7c4-qm7zt (11.8GiB)"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[K8s] patient-portal 0/3 pods ready - Evicted from ip-10-0-3-142.ec2.internal (node memory pressure), rescheduling Pending",
+          "severity": "critical",
+          "source": "kubernetes:workshop-cluster:patient:deployment/patient-portal",
+          "component": "deployment",
+          "group": "kubernetes",
+          "class": "KubeDeploymentReplicasMismatch",
+          "custom_details": {
+            "service": "patient-portal",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "namespace": "patient",
+            "deployment": "patient-portal",
+            "replicas_desired": 3,
+            "replicas_ready": 0,
+            "reason": "Evicted: The node was low on resource: memory",
+            "pending_reason": "0/4 nodes available: 1 node(s) had memory pressure, 3 Insufficient memory"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[Synthetics] Patient portal login failing from 4/4 locations - HTTP 503 on POST /api/auth/session",
+          "severity": "critical",
+          "source": "synthetics:patient-portal-login",
+          "component": "synthetic",
+          "group": "synthetics",
+          "class": "SyntheticCheckFailed",
+          "custom_details": {
+            "service": "patient-portal",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "check": "patient-portal-login",
+            "locations_failing": "4/4",
+            "status_code": 503,
+            "consecutive_failures": 6,
+            "customer_impact": "Patients cannot sign in to view results, messages or bills"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[APM] appointment-scheduling 5xx error rate 71% on POST /v2/appointments - upstream connect error, 1/3 pods ready",
+          "severity": "critical",
+          "source": "datadog-apm:appointment-scheduling:production",
+          "component": "api",
+          "group": "apm",
+          "class": "ErrorRateHigh",
+          "custom_details": {
+            "service": "appointment-scheduling",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "namespace": "scheduling",
+            "endpoint": "POST /v2/appointments",
+            "error_rate": "71%",
+            "slo": "99.5% success",
+            "pods_ready": "1/3",
+            "failed_bookings_last_15m": 1284,
+            "customer_impact": "Online and call-centre bookings failing"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[APM] claims-reconciliation worker hung - no batch progress for 24m, 64/64 threads WAITING in X12SegmentCache.get",
+          "severity": "error",
+          "source": "datadog-apm:claims-reconciliation:production",
+          "component": "process",
+          "group": "apm",
+          "class": "ProcessHung",
+          "custom_details": {
+            "service": "claims-reconciliation",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "namespace": "claims",
+            "pod_name": "claims-reconciliation-6b8d9f7c4-qm7zt",
+            "node": "ip-10-0-3-142.ec2.internal",
+            "last_batch_completed": "835-ERA-20261112-0412",
+            "minutes_since_progress": 24,
+            "thread_pool": "64/64 blocked",
+            "gc_time_pct": "92%",
+            "full_gc_count_last_10m": 38,
+            "library": "x12-edi-parser 5.0.0"
+          },
+          "links": [
+            {
+              "href": "https://wiki.example.com/runbooks/claims-reconciliation-memory",
+              "text": "Runbook: claims-reconciliation memory"
+            }
+          ],
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[Kafka] claims-submission consumer lag 18,420 messages on topic claims.837.outbound - oldest 41m",
+          "severity": "error",
+          "source": "kafka-exporter:claims-cluster:claims.837.outbound",
+          "component": "queue",
+          "group": "kafka",
+          "class": "ConsumerLagHigh",
+          "custom_details": {
+            "service": "claims-submission",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "topic": "claims.837.outbound",
+            "consumer_group": "claims-submission",
+            "lag": 18420,
+            "oldest_message_age": "41m",
+            "blocked_on": "claims-reconciliation eligibility match (timeouts)",
+            "claims_value_usd": 6250000
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[Compliance] 3 claim batches (837P) not transmitted to clearinghouse - past 4h submission SLA",
+          "severity": "error",
+          "source": "claims-compliance-monitor:clearinghouse-sla",
+          "component": "compliance",
+          "group": "compliance",
+          "class": "SubmissionSLABreach",
+          "custom_details": {
+            "service": "claims-submission",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "batches_late": 3,
+            "claims_affected": 2731,
+            "sla": "4h from encounter close",
+            "clearinghouse": "clearinghouse.example.com",
+            "payer_impact": "Timely-filing risk on Medicare Advantage claims",
+            "notify": "compliance@example.com"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[Security] PHI access audit-log shipping stalled on ip-10-0-3-142.ec2.internal - 22m gap (fluent-bit evicted)",
+          "severity": "error",
+          "source": "audit-pipeline:workshop-cluster:node/ip-10-0-3-142.ec2.internal",
+          "component": "logging",
+          "group": "security",
+          "class": "AuditLogGap",
+          "custom_details": {
+            "service": "compliance",
+            "problem": "claims-node-memory",
+            "environment": "production",
+            "cluster": "workshop-cluster",
+            "region": "us-east-1",
+            "node": "ip-10-0-3-142.ec2.internal",
+            "agent": "fluent-bit",
+            "gap_minutes": 22,
+            "affected_services": "patient-portal, appointment-scheduling, claims-reconciliation",
+            "regulation": "HIPAA 164.312(b) audit controls",
+            "action": "Record the gap in the compliance incident log"
+          },
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        }
+      ]
+    }
+  ]
+}
