@@ -28,6 +28,7 @@ How to add a scenario to the default event definition: alerts, change events, ch
 - **`delay`:** `{ "type": "fixed", "value": 10000 }` waits that many milliseconds after the previous event before sending this one. Leave it off the first event.
 - **Other delay types:** `random` (`min`, `max`) also works.
 - **Pace:** 1s gaps read as an alert storm, 10s gaps read as a story unfolding.
+- **Start straight away:** change events are backdated, so don't delay them or the first alert. Send the changes and the first alert together, and space the alerts after that. Otherwise the run looks idle, because change events don't open incidents.
 
 ## Alerts (`trigger`)
 
@@ -96,7 +97,7 @@ So, for every `service` value a scenario uses, create a PagerDuty service with e
 
 **Endpoint:** change events go to `/v2/change/enqueue` as real PagerDuty change events, not alerts. They have no severity and no dedup key.
 
-**`offset_minutes`:** backdates the event, so `-9` puts it 9 minutes before the run. This is how you plant the cause ahead of the symptoms: a deploy, a library upgrade, a flag flip, a break-glass access. Put change events first in the array.
+**`offset_minutes`:** backdates the event, so `-9` puts it 9 minutes before the run. This is how you plant the cause ahead of the symptoms: a deploy, a library upgrade, a flag flip, a break-glass access. Put change events first in the array. Give them no `delay`.
 
 **`routing_key_env`:** names a change key in the panel. Only change events use it; alerts ignore it.
 - **One name per owning service:** so the change lands on the right service, for example `PD_CLAIMS_CHANGE_KEY` or `PD_DATA_PLATFORM_CHANGE_KEY`.

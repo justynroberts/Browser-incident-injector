@@ -32,10 +32,6 @@
             "affected_symbols": "AAPL,MSFT,GOOGL",
             "monitoring_tool": "DataDog",
             "runbook": "https://wiki.company.com/trading/market-data-latency"
-          },
-          "delay": {
-            "type": "fixed",
-            "value": 10000
           }
         },
         {
@@ -127,10 +123,6 @@
             "total_attempts": 14523,
             "monitoring_tool": "CloudWatch",
             "log_group": "/aws/lambda/vehicle-connection-handler"
-          },
-          "delay": {
-            "type": "fixed",
-            "value": 10000
           }
         },
         {
@@ -222,10 +214,6 @@
             "game_mode": "ranked_competitive",
             "monitoring_tool": "Elastic APM",
             "service_name": "matchmaking-service"
-          },
-          "delay": {
-            "type": "fixed",
-            "value": 10000
           }
         },
         {
@@ -318,10 +306,6 @@
             "concurrent_users": 89000,
             "monitoring_tool": "Pingdom",
             "load_balancer": "alb-ecommerce-prod"
-          },
-          "delay": {
-            "type": "fixed",
-            "value": 10000
           }
         },
         {
@@ -1260,11 +1244,7 @@
               "href": "https://github.example.com/data-platform/orders-service/pull/2214",
               "text": "View Pull Request"
             }
-          ],
-          "delay": {
-            "type": "fixed",
-            "value": 10000
-          }
+          ]
         },
         {
           "type": "trigger",
@@ -1303,11 +1283,7 @@
               "href": "https://dash.apps.fintonlabs.com/dp-checkout-p99.png?style=line&series=p99:310,320,300,340,620,1150,1680,2240,2710,3180;p50:90,92,88,95,180,340,520,710,880,1040&labels=-9m,-8m,-7m,-6m,-5m,-4m,-3m,-2m,-1m,now&title=checkout-api+p99+latency+%28ms%29,+warn+above+2000ms&suffix=ms&target=2000&theme=ink&font=familjen&size=800x400",
               "alt": "checkout-api p99 and p50 latency, last 10m"
             }
-          ],
-          "delay": {
-            "type": "fixed",
-            "value": 10000
-          }
+          ]
         },
         {
           "type": "trigger",

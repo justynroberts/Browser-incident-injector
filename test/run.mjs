@@ -473,7 +473,7 @@ await test('shipped scenario: data-platform orders-db lock contention', async ()
   const p = await open(`${A}/button`);
   await clickIn(p, '#b');
   const alerts = () => triggers().filter(e => e.json.payload.custom_details?.problem === 'orders-db-lock-contention');
-  for (let i = 0; i < 140 && alerts().length < 4; i++) await sleep(500);
+  for (let i = 0; i < 100 && alerts().length < 4; i++) await sleep(500);
   const changes = events.filter(e => e.path === '/v2/change/enqueue');
   eq(changes.map(e => e.json.routing_key), [CHANGE_KEY, CHANGE_KEY], 'both changes use PD_DATA_PLATFORM_CHANGE_KEY');
   eq(changes.map(e => e.json.payload.custom_details.change_type), ['privileged access', 'schema migration'], 'change order');
@@ -482,11 +482,12 @@ await test('shipped scenario: data-platform orders-db lock contention', async ()
   if (a.some(e => e.json.payload.custom_details.service !== 'data-platform')) throw new Error('alert without service=data-platform');
   if (a.some(e => e.json.images?.length !== 1)) throw new Error('alert without a chart image');
   eq([a[0].json.payload.severity, a[2].json.payload.severity], ['warning', 'critical'], 'warn then critical');
-  // Every event, changes included, goes out ~10s after the previous one
+  // Both (backdated) changes and the first alert go out together, then the alerts ~10s apart
   const all = events.filter(e => e.path === '/v2/change/enqueue' || e.json.payload?.custom_details?.problem === 'orders-db-lock-contention');
   eq(all.length, 6, 'six events');
   const gaps = all.slice(1).map((e, i) => e.t - all[i].t);
-  if (gaps.some(g => g < 9500 || g > 12500)) throw new Error(`gaps not ~10s: ${gaps.join(', ')}ms`);
+  if (gaps.slice(0, 2).some(g => g > 3000)) throw new Error(`changes and first alert not together: ${gaps.join(', ')}ms`);
+  if (gaps.slice(2).some(g => g < 9500 || g > 12500)) throw new Error(`alert gaps not ~10s: ${gaps.join(', ')}ms`);
 });
 
 await test('panel: opens, new font renders, multi-select run', async () => {
