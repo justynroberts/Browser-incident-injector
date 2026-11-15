@@ -1260,7 +1260,11 @@
               "href": "https://github.example.com/data-platform/orders-service/pull/2214",
               "text": "View Pull Request"
             }
-          ]
+          ],
+          "delay": {
+            "type": "fixed",
+            "value": 10000
+          }
         },
         {
           "type": "trigger",
@@ -1302,7 +1306,7 @@
           ],
           "delay": {
             "type": "fixed",
-            "value": 1000
+            "value": 10000
           }
         },
         {
@@ -1342,7 +1346,7 @@
           ],
           "delay": {
             "type": "fixed",
-            "value": 1000
+            "value": 10000
           }
         },
         {
@@ -1400,7 +1404,7 @@
           ],
           "delay": {
             "type": "fixed",
-            "value": 5000
+            "value": 10000
           }
         },
         {
@@ -1441,7 +1445,7 @@
           ],
           "delay": {
             "type": "fixed",
-            "value": 1000
+            "value": 10000
           }
         }
       ]

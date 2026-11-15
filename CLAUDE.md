@@ -9,7 +9,7 @@ This repo ships a single Chrome extension (Manifest V3) called **Incident Inject
 - `extension/`: extension source, loaded unpacked in Chrome. There is no build step, so these files are the shipped artifact.
 - `test/`: end-to-end suite (puppeteer-core plus Chrome for Testing). See **Testing**.
 - `DESIGN.md`: panel design direction and tokens. Read it before touching `panel.css` or `panel.html`.
-- `docs/`: screenshots and `DEVELOPER.md`.
+- `docs/`: screenshots, `DEVELOPER.md`, and `SCENARIOS.md`, the guide to writing scenarios: alerts, change events, dashcall chart images, routing, and a runbook per scenario. Read it before adding or changing a scenario.
 - `releases/`: one unpacked `vX.Y/` folder and one `incident-injector-vX.Y.zip` per version.
 - `scope_css.py`: one-off helper script, now obsolete. `panel.css` is scoped by hand on `#incident-injector-panel`.
 - `README.md` and `docs/screenshots/` still describe v1.6 (DM Sans, Font Awesome, `incident-injector-v1.6.zip`). Don't trust them over this file or the code; update them as part of a release when asked.
