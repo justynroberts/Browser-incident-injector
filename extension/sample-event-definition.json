@@ -1199,6 +1199,252 @@
           }
         }
       ]
+    },
+    {
+      "id": "data_platform_lock_contention",
+      "name": "Data platform: orders-db lock contention",
+      "description": "Break-glass psql session left idle in transaction, then a migration queues behind it: checkout p99 warn, timeouts, blocked sessions critical (class locks), connections at 71%. Fix: terminate pid 18342 via the Terminate blocking session action",
+      "events": [
+        {
+          "type": "change",
+          "routing_key_env": "PD_DATA_PLATFORM_CHANGE_KEY",
+          "summary": "Break-glass psql session opened on orders-db (pg-prod-01.eu-west-1.prod) by ops_breakglass",
+          "source": "teleport:db-access:orders-db",
+          "offset_minutes": -41,
+          "custom_details": {
+            "service": "data-platform",
+            "owning_team": "data-platform",
+            "database": "orders-db",
+            "host": "pg-prod-01.eu-west-1.prod",
+            "change_type": "privileged access",
+            "db_user": "ops_breakglass",
+            "application_name": "psql",
+            "client_addr": "10.20.4.17",
+            "reason": "Manual refund correction, ticket OPS-2291",
+            "approved_by": "data-platform on-call"
+          },
+          "links": [
+            {
+              "href": "https://teleport.example.com/web/sessions/orders-db-breakglass",
+              "text": "View access session"
+            }
+          ]
+        },
+        {
+          "type": "change",
+          "routing_key_env": "PD_DATA_PLATFORM_CHANGE_KEY",
+          "summary": "Deployed orders-service v5.12.0 to production - runs migration 20261114_add_fulfilment_status (ALTER TABLE orders)",
+          "source": "github-actions:data-platform/orders-service",
+          "offset_minutes": -9,
+          "custom_details": {
+            "service": "data-platform",
+            "owning_team": "data-platform",
+            "database": "orders-db",
+            "change_type": "schema migration",
+            "version": "v5.12.0",
+            "previous_version": "v5.11.3",
+            "commit_sha": "4c7e2a9",
+            "pull_request": "#2214",
+            "migration": "20261114_add_fulfilment_status",
+            "ddl": "ALTER TABLE orders ADD COLUMN fulfilment_status text NOT NULL DEFAULT 'pending'",
+            "lock_required": "AccessExclusiveLock",
+            "lock_timeout": "not set",
+            "rollback_available": "yes"
+          },
+          "links": [
+            {
+              "href": "https://github.example.com/data-platform/orders-service/actions/runs/2214",
+              "text": "View GitHub Actions Run"
+            },
+            {
+              "href": "https://github.example.com/data-platform/orders-service/pull/2214",
+              "text": "View Pull Request"
+            }
+          ]
+        },
+        {
+          "type": "trigger",
+          "summary": "[Datadog] Checkout API p99 latency above 2s - 3.18s on checkout-api (warn)",
+          "severity": "warning",
+          "source": "datadog:monitor:checkout-api-p99-latency",
+          "component": "api",
+          "group": "datadog",
+          "class": "latency",
+          "custom_details": {
+            "service": "data-platform",
+            "owning_team": "data-platform",
+            "problem": "orders-db-lock-contention",
+            "database": "orders-db",
+            "environment": "production",
+            "region": "eu-west-1",
+            "host": "pg-prod-01.eu-west-1.prod",
+            "monitor": "Checkout API p99 latency above 2s",
+            "metric": "trace.http.request.duration.by.service.99p",
+            "affected_service": "checkout-api",
+            "current_value": "3.18s",
+            "threshold": "2s for 5 min",
+            "monitor_handle": "@pagerduty-orders-db-low",
+            "urgency": "low",
+            "note": "Early symptom, usually 4-5 min before the blocked sessions monitor. Run diagnostics now"
+          },
+          "links": [
+            {
+              "href": "https://wiki.example.com/runbooks/orders-db-postgres-lock-contention",
+              "text": "Runbook: orders-db Postgres lock contention"
+            }
+          ],
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/dp-checkout-p99.png?style=line&series=p99:310,320,300,340,620,1150,1680,2240,2710,3180;p50:90,92,88,95,180,340,520,710,880,1040&labels=-9m,-8m,-7m,-6m,-5m,-4m,-3m,-2m,-1m,now&title=checkout-api+p99+latency+%28ms%29,+warn+above+2000ms&suffix=ms&target=2000&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/dp-checkout-p99.png?style=line&series=p99:310,320,300,340,620,1150,1680,2240,2710,3180;p50:90,92,88,95,180,340,520,710,880,1040&labels=-9m,-8m,-7m,-6m,-5m,-4m,-3m,-2m,-1m,now&title=checkout-api+p99+latency+%28ms%29,+warn+above+2000ms&suffix=ms&target=2000&theme=ink&font=familjen&size=800x400",
+              "alt": "checkout-api p99 and p50 latency, last 10m"
+            }
+          ],
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[Datadog] checkout-api requests timing out on orders-db - 331/min, connection wait > 5s",
+          "severity": "error",
+          "source": "datadog-apm:checkout-api:production",
+          "component": "api",
+          "group": "datadog",
+          "class": "timeouts",
+          "custom_details": {
+            "service": "data-platform",
+            "owning_team": "data-platform",
+            "problem": "orders-db-lock-contention",
+            "database": "orders-db",
+            "environment": "production",
+            "region": "eu-west-1",
+            "host": "pg-prod-01.eu-west-1.prod",
+            "affected_service": "checkout-api",
+            "timeouts_per_min": 331,
+            "endpoint": "POST /v1/checkout",
+            "error": "canceling statement due to statement timeout",
+            "customer_impact": "Checkouts failing for a growing share of customers"
+          },
+          "links": [
+            {
+              "href": "https://wiki.example.com/runbooks/orders-db-postgres-lock-contention",
+              "text": "Runbook: orders-db Postgres lock contention"
+            }
+          ],
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/dp-checkout-5xx.png?style=bar&series=timeouts:0,0,2,5,14,41,96,180,262,331&labels=-9m,-8m,-7m,-6m,-5m,-4m,-3m,-2m,-1m,now&title=checkout-api+requests+timing+out+on+orders-db+per+minute&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/dp-checkout-5xx.png?style=bar&series=timeouts:0,0,2,5,14,41,96,180,262,331&labels=-9m,-8m,-7m,-6m,-5m,-4m,-3m,-2m,-1m,now&title=checkout-api+requests+timing+out+on+orders-db+per+minute&theme=ink&font=familjen&size=800x400",
+              "alt": "checkout-api timeouts per minute"
+            }
+          ],
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[Datadog] Postgres blocked sessions on orders-db above 50 - 64 sessions waiting on Lock (critical)",
+          "severity": "critical",
+          "source": "datadog:monitor:postgresql.blocked_sessions:pg-prod-01.eu-west-1.prod",
+          "component": "postgres",
+          "group": "database",
+          "class": "locks",
+          "custom_details": {
+            "service": "data-platform",
+            "owning_team": "data-platform",
+            "problem": "orders-db-lock-contention",
+            "database": "orders-db",
+            "environment": "production",
+            "region": "eu-west-1",
+            "host": "pg-prod-01.eu-west-1.prod",
+            "monitor": "Postgres blocked sessions above 50",
+            "metric": "postgresql.blocked_sessions (Agent custom query: pg_stat_activity wait_event_type = Lock)",
+            "current_value": 64,
+            "threshold": "50 for 3 min",
+            "monitor_handle": "@pagerduty-orders-db-high",
+            "urgency": "high",
+            "growth_rate": "25 sessions/min",
+            "connections_used": "286 / 400 (71%)",
+            "minutes_to_exhaustion": 4,
+            "hot_table": "orders",
+            "root_blocker_pid": 18342,
+            "root_blocker_state": "idle in transaction",
+            "root_blocker_user": "ops_breakglass",
+            "root_blocker_application": "psql",
+            "root_blocker_xact_age": "38m",
+            "root_blocker_lock": "RowExclusiveLock on orders",
+            "root_blocker_last_query": "UPDATE orders SET status = 'refunded' WHERE id = 884213",
+            "first_waiter_pid": 21877,
+            "first_waiter": "ALTER TABLE orders ADD COLUMN fulfilment_status (wants AccessExclusiveLock)",
+            "waiters_behind_migration": 62,
+            "idle_in_transaction_session_timeout": "0",
+            "automation_runner": "prod-eu-runner-01",
+            "automation_actions": "Diagnose lock contention (read only); Terminate blocking session (needs approval)"
+          },
+          "links": [
+            {
+              "href": "https://wiki.example.com/runbooks/orders-db-postgres-lock-contention",
+              "text": "Runbook: orders-db Postgres lock contention"
+            }
+          ],
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/dp-blocked.png?style=area&series=blocked+sessions:0,0,1,3,9,18,31,44,57,64&labels=-9m,-8m,-7m,-6m,-5m,-4m,-3m,-2m,-1m,now&title=postgresql.blocked_sessions+on+orders-db,+critical+above+50&target=50&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/dp-blocked.png?style=area&series=blocked+sessions:0,0,1,3,9,18,31,44,57,64&labels=-9m,-8m,-7m,-6m,-5m,-4m,-3m,-2m,-1m,now&title=postgresql.blocked_sessions+on+orders-db,+critical+above+50&target=50&theme=ink&font=familjen&size=800x400",
+              "alt": "Blocked sessions on orders-db, last 10m"
+            }
+          ],
+          "delay": {
+            "type": "fixed",
+            "value": 5000
+          }
+        },
+        {
+          "type": "trigger",
+          "summary": "[Datadog] orders-db connections at 71% of max_connections (286/400) on pg-prod-01.eu-west-1.prod",
+          "severity": "error",
+          "source": "datadog:postgres:pg-prod-01.eu-west-1.prod",
+          "component": "postgres",
+          "group": "database",
+          "class": "connections",
+          "custom_details": {
+            "service": "data-platform",
+            "owning_team": "data-platform",
+            "problem": "orders-db-lock-contention",
+            "database": "orders-db",
+            "environment": "production",
+            "region": "eu-west-1",
+            "host": "pg-prod-01.eu-west-1.prod",
+            "metric": "postgresql.percent_usage_connections",
+            "connections_used": 286,
+            "max_connections": 400,
+            "percent_used": "71%",
+            "posture": "60-85%: remediate now, keep the incident channel updated",
+            "escalate_above": "85% (340): page the data-platform lead"
+          },
+          "links": [
+            {
+              "href": "https://wiki.example.com/runbooks/orders-db-postgres-lock-contention",
+              "text": "Runbook: orders-db Postgres lock contention"
+            }
+          ],
+          "images": [
+            {
+              "src": "https://dash.apps.fintonlabs.com/dp-conns.png?style=gauge&series=286&min=0&max=400&target=340&title=orders-db+connections+used+of+max_connections+400&theme=ink&font=familjen&size=800x400",
+              "href": "https://dash.apps.fintonlabs.com/dp-conns.png?style=gauge&series=286&min=0&max=400&target=340&title=orders-db+connections+used+of+max_connections+400&theme=ink&font=familjen&size=800x400",
+              "alt": "Connections used of 400"
+            }
+          ],
+          "delay": {
+            "type": "fixed",
+            "value": 1000
+          }
+        }
+      ]
     }
   ]
 }

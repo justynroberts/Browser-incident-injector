@@ -462,6 +462,28 @@ await test('shipped scenario: Reinvent (library upgrade change, then node memory
     'alert order by service');
 });
 
+await test('shipped scenario: data-platform orders-db lock contention', async () => {
+  await sw(async () => {
+    const text = await (await fetch(chrome.runtime.getURL('sample-event-definition.json'))).text();
+    await chrome.storage.local.set({ event_definition: text });
+  });
+  const CHANGE_KEY = 'c'.repeat(32);
+  await settings({ run_scenario_on_submit: true, active_scenario_ids: ['data_platform_lock_contention'], active_scenario_id: 'data_platform_lock_contention',
+    change_keys: [{ name: 'PD_DATA_PLATFORM_CHANGE_KEY', key: CHANGE_KEY }] });
+  const p = await open(`${A}/button`);
+  await clickIn(p, '#b');
+  const alerts = () => triggers().filter(e => e.json.payload.custom_details?.problem === 'orders-db-lock-contention');
+  for (let i = 0; i < 40 && alerts().length < 4; i++) await sleep(500);
+  const changes = events.filter(e => e.path === '/v2/change/enqueue');
+  eq(changes.map(e => e.json.routing_key), [CHANGE_KEY, CHANGE_KEY], 'both changes use PD_DATA_PLATFORM_CHANGE_KEY');
+  eq(changes.map(e => e.json.payload.custom_details.change_type), ['privileged access', 'schema migration'], 'change order');
+  const a = alerts();
+  eq(a.map(e => e.json.payload.class), ['latency', 'timeouts', 'locks', 'connections'], 'alert order by class');
+  if (a.some(e => e.json.payload.custom_details.service !== 'data-platform')) throw new Error('alert without service=data-platform');
+  if (a.some(e => e.json.images?.length !== 1)) throw new Error('alert without a chart image');
+  eq([a[0].json.payload.severity, a[2].json.payload.severity], ['warning', 'critical'], 'warn then critical');
+});
+
 await test('panel: opens, new font renders, multi-select run', async () => {
   await sw(d => chrome.storage.local.set({ event_definition: JSON.stringify(d) }), DEFINITION);
   await settings({ active_scenario_ids: ['1-db-outage'], active_scenario_id: '1-db-outage' });
